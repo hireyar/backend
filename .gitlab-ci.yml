@@ -1,4 +1,4 @@
-```yaml
+
 stages:
   - deploy
 
@@ -24,4 +24,3 @@ deploy:
     - git checkout main
     - git reset --hard origin/main
     - docker compose up -d --build
-```
