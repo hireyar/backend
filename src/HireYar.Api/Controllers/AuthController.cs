@@ -21,7 +21,11 @@ public sealed class AuthController(AuthService service, MemberService members, I
     [AllowAnonymous, HttpPost("confirm-email")]
     public async Task<IActionResult> Confirm(TokenRequest r, CancellationToken ct) { await service.ConfirmAsync(r, ct); return NoContent(); }
     [AllowAnonymous, HttpPost("resend-confirmation")]
-    public async Task<IActionResult> Resend(EmailRequest r, CancellationToken ct) { await service.ResendAsync(r, ct); return Accepted(new GenericEmailResponse()); }
+    public async Task<IActionResult> Resend(EmailRequest r, CancellationToken ct)
+    {
+        await service.ResendAsync(r, ct);
+        return Accepted(new GenericEmailResponse());
+    }
     [AllowAnonymous, HttpPost("login")]
     public async Task<AccessResponse> Login(LoginRequest r, CancellationToken ct) => Session(await service.LoginAsync(r, ct));
     [AllowAnonymous, HttpPost("refresh")]
@@ -43,5 +47,3 @@ public sealed class AuthController(AuthService service, MemberService members, I
     [AllowAnonymous, HttpPost("invitations/accept")]
     public async Task<IActionResult> Accept(AcceptInviteRequest r, CancellationToken ct) { await members.AcceptAsync(r, ct); return NoContent(); }
 }
-public sealed record CsrfResponse(string Token);
-public sealed record GenericEmailResponse(string Code = "request_received");

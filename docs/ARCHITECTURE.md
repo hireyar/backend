@@ -32,3 +32,30 @@ ProblemDetails/ValidationProblemDetails با code و traceId؛ ۴۰۰ validation
 موضوع باز محیطی: صحت Docker و SMTP واقعی محلی تا اجرای آن‌ها قابل تأیید نیست؛ [STATUS](STATUS.md). روش حفاظت کلیدها و TLS میزبان production باید هنگام تسک deployment تعیین شود. این موارد تصمیم پیاده‌شده تلقی نمی‌شوند.
 
 توسعه آینده AI و فایل از قرارداد مصرف‌شده Application و implementation Infrastructure انجام می‌شود؛ اکنون abstraction یا جدول آن‌ها نداریم. جلسه آینده به snapshot سؤال و معیار نیاز دارد؛ engine نسخه‌بندی اکنون ساخته نمی‌شود.
+
+
+## پوشه‌بندی پس از بازآرایی
+
+طبق انتخاب صریح کاربر، این تغییر فقط سازمان‌دهی فایل‌هاست؛ مسیر Service → IApplicationDbContext حفظ شده و Repository جدید ساخته نشده است.
+
+```text
+src/
+  HireYar.Api/
+    Controllers/       # هر شش کنترلر
+    DTOs/              # پاسخ‌های مخصوص HTTP
+    Security/
+    Errors/
+  HireYar.Application/
+    Services/          # Auth, Members, Organizations, JobPositions, InterviewTemplates, Dashboard
+    DTOs/              # درخواست/پاسخ و validation بر اساس قابلیت
+    Interfaces/        # IAccounts, ITeamMembers, ICurrentUser, IEmailSender, IApplicationDbContext
+    Common/            # AppException, Page, PageQuery
+  HireYar.Infrastructure/
+    Services/          # Auth, Members, Email
+    Auth/              # مدل Identity و تنظیمات امنیتی
+    Members/           # مدل دعوت
+    Persistence/       # DbContext، mapping و migrations
+  HireYar.Domain/       # مدل‌های مستقل بر اساس قابلیت
+```
+
+ADR-011: پوشه‌ها بر اساس مسئولیت و سپس قابلیت مرتب شدند. namespaceهای موجود برای حفظ هویت typeها ثابت ماندند؛ نام پوشه الزاماً namespace نیست. API routeها، DI و مدل دیتابیس تغییر نکردند. سرویس/DTO/interface اکنون فایل مستقل دارند و AuthService دیگر داخل Contracts.cs نیست.

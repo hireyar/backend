@@ -25,3 +25,5 @@ dotnet test HireYar.slnx
 dotnet ef database update --project src/HireYar.Infrastructure --startup-project src/HireYar.Api
 dotnet ef migrations script --idempotent --project src/HireYar.Infrastructure --startup-project src/HireYar.Api --output artifacts/migrations.sql
 ```
+
+پوشه‌بندی مورد توافق: Api/Controllers؛ Application/Services، DTOs، Interfaces، Common؛ Infrastructure/Services و Persistence. تغییر اخیر فقط فایل‌بندی است؛ Repository جدید بدون درخواست مستقل اضافه نکن. namespaceهای قابلیت‌ها فعلاً حفظ شده‌اند.

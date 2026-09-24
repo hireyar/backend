@@ -4,8 +4,6 @@ using HireYar.Domain.JobPositions;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Dashboard;
 
-public sealed record JobStatusCount(JobStatus Status, int Count);
-public sealed record DashboardDto(IReadOnlyList<JobStatusCount> Jobs, int Templates, int ActiveMembers, int PendingInvitations);
 public sealed class DashboardService(IApplicationDbContext db, ITeamMembers members, ICurrentUser user)
 {
     public async Task<DashboardDto> GetAsync(CancellationToken ct)

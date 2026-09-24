@@ -8,16 +8,16 @@ Implemented یعنی کد موجود است؛ Verified یعنی بررسی مر�
 | قابلیت | وضعیت | مسیر و شواهد |
 |---|---|---|
 | Solution .NET 10 و مرز پروژه‌ها | Verified | `src/` و `HireYar.slnx`؛ restore/build موفق |
-| ثبت‌نام اتمیک، ایمیل یکتا و تأیید یک‌بارمصرف | Verified | `Infrastructure/Auth/Accounts.cs` زیر src؛ تست transaction، duplicate و رقابت ثبت‌نام |
+| ثبت‌نام اتمیک، ایمیل یکتا و تأیید یک‌بارمصرف | Verified | `Infrastructure/Services/Auth/Accounts.cs` زیر src؛ تست transaction، duplicate و رقابت ثبت‌نام |
 | ورود، lockout و مجوز جاری | Verified | `Api/Security/CurrentAccountValidation.cs` و Accounts؛ نقش جاری، کاربر غیرفعال و JWT نامعتبر/منقضی بررسی شد |
 | refresh rotation/replay/هم‌زمانی | Verified | Accounts؛ فقط یک جانشین و ابطال خانواده در replay روی SQL واقعی |
-| logout/all، reset/change، پروفایل | Verified | `Api/Auth/AuthController.cs`؛ ابطال refreshها و overposting بررسی شد |
-| سازمان و دعوت/اعضا | Verified | `Application/Organizations/` و `Infrastructure/Members/`؛ نقش، لغو، انقضا، resend و پذیرش هم‌زمان |
-| جداسازی سازمان و Dashboard | Verified | `Application/Dashboard/`؛ دسترسی بین دو سازمان و FK مرکب روی SQL واقعی |
-| موقعیت، قالب، سؤال و RowVersion | Verified | `Application/JobPositions/` و `Application/InterviewTemplates/`؛ ترتیب، حفظ Id، افزودن/حذف و 409 |
+| logout/all، reset/change، پروفایل | Verified | `Api/Controllers/AuthController.cs`؛ ابطال refreshها و overposting بررسی شد |
+| سازمان و دعوت/اعضا | Verified | `Application/Services/Organizations/` و `Infrastructure/Services/Members/`؛ نقش، لغو، انقضا، resend و پذیرش هم‌زمان |
+| جداسازی سازمان و Dashboard | Verified | `Application/Services/Dashboard/`؛ دسترسی بین دو سازمان و FK مرکب روی SQL واقعی |
+| موقعیت، قالب، سؤال و RowVersion | Verified | `Application/Services/JobPositions/` و `Application/Services/InterviewTemplates/`؛ ترتیب، حفظ Id، افزودن/حذف و 409 |
 | cookie/CSRF/CORS و startup امن | Verified | `Api/Program.cs`, `Api/Security/`؛ Secure در production، CSRF ناقص، origin غیرمجاز، نبود کلید |
 | OpenAPI و UI توسعه | Implemented | OpenAPI JSON در integration بررسی شد؛ UI مرورگر دستی بررسی نشده |
-| SMTP فارسی و مدیریت شکست | Implemented | `Infrastructure/Email/SmtpEmailSender.cs`؛ شکست/بازیابی با test double بررسی شد؛ Mailpit واقعی اجرا نشده |
+| SMTP فارسی و مدیریت شکست | Implemented | `Infrastructure/Services/Email/SmtpEmailSender.cs`؛ شکست/بازیابی با test double بررسی شد؛ Mailpit واقعی اجرا نشده |
 | Dockerfile و compose توسعه | Implemented | فایل‌های ریشه؛ Docker Linux engine روی میزبان در اجرا نبود؛ build/up انجام نشده |
 | مستندات و نمونه HTTP | Implemented | README، AGENTS، docs و `src/HireYar.Api/HireYar.Api.http` |
 
@@ -46,3 +46,12 @@ Docker build/compose و ارسال واقعی SMTP به Mailpit اجرا نشد�
 بررسی ساختار compose: `docker compose --env-file .env.example -f compose.dev.yaml config --quiet` موفق؛ این فقط اعتبارسنجی پیکربندی است و به معنی اجرای سرویس‌ها نیست.
 `2026-09-24`: خطای startup محلی ناشی از نبود SigningKey بود؛ کلید تصادفی در User Secrets ذخیره و اتصال توسعهٔ محلی تنظیم شد. اجرای Development و GET /health با HTTP 200 بررسی شد؛ دیتابیس توسعه یا migration در این بررسی تغییر نکرد.
 `2026-09-24`، رفع 401 روی Swagger: middleware مربوط به UI در Development قبل از fallback authorization قرار گرفت. تست redirect /swagger، HTML، CSS، OpenAPI و محافظت API پاس شد؛ تست محدودیت Production نیز پاس شد (۲ تست منتخب Release؛ TestResults/swagger-fix.trx). فرایند در حال اجرای قبلی باید برای دریافت اصلاح rebuild/restart شود.
+
+
+## آخرین بررسی پس از مرتب‌سازی پوشه‌ها
+
+طبق انتخاب کاربر فقط فایل‌بندی تغییر کرد: Controllers، Services، DTOs و Interfaces جدا شدند؛ مسیر Service → IApplicationDbContext حفظ شد. `dotnet build HireYar.slnx -c Release --no-restore`: موفق با صفر warning/error.
+
+`dotnet test HireYar.slnx -c Release --no-build --logger 'trx;LogFileName=folder-structure.trx' --results-directory TestResults`: ۲۳ موفق، ۱ شکست، صفر Skip. این نتیجه جایگزین نتیجه ۲۴/۲۴ قبلی برای checkout فعلی است.
+
+شکست `Production_sets_secure_cookies_and_hides_openapi` به شرط `//if (app.Environment.IsDevelopment())` در Program.cs مربوط است که در commit پایه 1b86ec4 وجود داشت. OpenAPI در Production پاسخ 200 می‌دهد. Program.cs در این بازآرایی تغییر نکرد؛ رفتار موجود کاربر حفظ شد. ادعای قبلی «هیچ تست شکست‌خورده‌ای باقی نمانده» دیگر برای checkout فعلی معتبر نیست؛ HY-010 ثبت شد.
