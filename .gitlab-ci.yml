@@ -1,0 +1,27 @@
+```yaml
+stages:
+  - deploy
+
+variables:
+  PROJECT_DIR: /home/docker/hireyar/backend
+
+  REMOTE_URL: http://gitlab:$GITLAB_TOKEN@45.9.253.178:5050/hireyar/backend.git
+  GIT_STRATEGY: none
+
+deploy:
+  stage: deploy
+  tags:
+    - kube-service
+
+  only:
+    - main
+
+  script:
+    - cd $PROJECT_DIR
+    - git config --global --add safe.directory $PROJECT_DIR
+    - git remote set-url origin $REMOTE_URL
+    - git fetch origin main
+    - git checkout main
+    - git reset --hard origin/main
+    - docker compose up -d --build
+```
