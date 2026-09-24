@@ -1,0 +1,523 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="98f2ac5a-391c-4835-9a10-68dd7814e70e" name="Farzad-PC@DESKTOP-I8QMJN3 2026-09-24 11:21:44" runUser="DESKTOP-I8QMJN3\Farzad-PC" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-24T11:21:44.5006754+03:30" queuing="2026-09-24T11:21:44.5006757+03:30" start="2026-09-24T11:21:38.1653271+03:30" finish="2026-09-24T11:21:59.9386432+03:30" />
+  <TestSettings name="default" id="3a4d167b-9542-4774-be7b-7deda96b120d">
+    <Deployment runDeploymentRoot="Farzad-PC_DESKTOP-I8QMJN3_2026-09-24_11_21_44" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="b9eaa560-5508-4229-a650-8adbfe7c478b" testId="a527cbc0-548d-f65f-10c0-16e5bb6b3f86" testName="HireYar.Tests.AuthTests.Reset_is_single_use_and_revokes_existing_sessions" computerName="DESKTOP-I8QMJN3" duration="00:00:00.8187169" startTime="2026-09-24T11:21:56.4882714+03:30" endTime="2026-09-24T11:21:57.3077606+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b9eaa560-5508-4229-a650-8adbfe7c478b" />
+    <UnitTestResult executionId="d267742c-56f0-450b-90a5-b7292e9b635b" testId="8376234e-1590-65f3-9931-a6395e3a81d9" testName="HireYar.Tests.SecurityTests.Database_rejects_cross_tenant_template_even_without_service_checks" computerName="DESKTOP-I8QMJN3" duration="00:00:00.8921924" startTime="2026-09-24T11:21:44.4722497+03:30" endTime="2026-09-24T11:21:45.3499862+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d267742c-56f0-450b-90a5-b7292e9b635b" />
+    <UnitTestResult executionId="9a6ec720-bfc0-49d3-8b03-f5764cc32378" testId="9de49b67-b19c-abc1-6da5-3da1be33c3fc" testName="HireYar.Tests.PanelTests.Invitations_are_single_use_and_recruiter_cannot_manage_members_or_organization" computerName="DESKTOP-I8QMJN3" duration="00:00:01.0474075" startTime="2026-09-24T11:21:51.8424810+03:30" endTime="2026-09-24T11:21:52.8907062+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9a6ec720-bfc0-49d3-8b03-f5764cc32378" />
+    <UnitTestResult executionId="69e97887-ecf9-46c5-a67a-3b647e304d3c" testId="640a920a-2eb1-380f-e7d4-29dbe865d447" testName="HireYar.Tests.PanelTests.Concurrent_invitation_acceptance_creates_one_recruiter" computerName="DESKTOP-I8QMJN3" duration="00:00:00.5478201" startTime="2026-09-24T11:21:51.2929987+03:30" endTime="2026-09-24T11:21:51.8419515+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="69e97887-ecf9-46c5-a67a-3b647e304d3c" />
+    <UnitTestResult executionId="2964a341-cbaf-4b17-80b2-e2b78bf3bb7d" testId="c866a230-e661-7164-c4b3-df4265296550" testName="HireYar.Tests.PanelTests.Expired_cancelled_resent_and_cross_tenant_invitations_are_safe" computerName="DESKTOP-I8QMJN3" duration="00:00:00.9152156" startTime="2026-09-24T11:21:50.0346381+03:30" endTime="2026-09-24T11:21:50.9508715+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2964a341-cbaf-4b17-80b2-e2b78bf3bb7d" />
+    <UnitTestResult executionId="c06c92b3-3bfc-4d6d-968f-d7eaf91ae572" testId="da507191-7b1e-0b9b-5769-d6f1539730b0" testName="HireYar.Tests.AuthTests.Logout_and_logout_all_revoke_refresh_but_access_remains_until_expiry" computerName="DESKTOP-I8QMJN3" duration="00:00:00.6247567" startTime="2026-09-24T11:21:57.3084403+03:30" endTime="2026-09-24T11:21:57.9339907+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c06c92b3-3bfc-4d6d-968f-d7eaf91ae572" />
+    <UnitTestResult executionId="5bc72f8c-b840-4da7-b392-c40528f58ebd" testId="fb780dd6-c469-99e2-fbfe-a886ef1f4e18" testName="HireYar.Tests.SecurityTests.Missing_signing_key_fails_startup" computerName="DESKTOP-I8QMJN3" duration="00:00:00.0286837" startTime="2026-09-24T11:21:44.4685524+03:30" endTime="2026-09-24T11:21:44.4689207+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5bc72f8c-b840-4da7-b392-c40528f58ebd" />
+    <UnitTestResult executionId="f06a4462-f989-434c-bc5b-75d45b642cf5" testId="326ff1cd-08a6-2ef7-fcc8-cc396e9cb580" testName="HireYar.Tests.AuthTests.Refresh_rotation_replay_revokes_only_its_session_family" computerName="DESKTOP-I8QMJN3" duration="00:00:00.5259172" startTime="2026-09-24T11:21:58.2941224+03:30" endTime="2026-09-24T11:21:58.8205606+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f06a4462-f989-434c-bc5b-75d45b642cf5" />
+    <UnitTestResult executionId="03ac5b6d-7451-4e5e-9625-37ed2061cfc2" testId="f717cbb7-eabf-36ef-3a34-6d6bd83b6f60" testName="HireYar.Tests.AuthTests.Register_is_atomic_and_duplicate_email_is_rejected" computerName="DESKTOP-I8QMJN3" duration="00:00:00.2680768" startTime="2026-09-24T11:21:52.8913850+03:30" endTime="2026-09-24T11:21:53.1603501+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="03ac5b6d-7451-4e5e-9625-37ed2061cfc2" />
+    <UnitTestResult executionId="32b05edd-587a-4f90-a861-d5ce6dde427c" testId="5b1716bc-aef8-e511-9dc9-b44947897e28" testName="HireYar.Tests.SecurityTests.Production_sets_secure_cookies_and_hides_openapi" computerName="DESKTOP-I8QMJN3" duration="00:00:02.1107809" startTime="2026-09-24T11:21:45.5687706+03:30" endTime="2026-09-24T11:21:47.6996806+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="32b05edd-587a-4f90-a861-d5ce6dde427c">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.NotEqual() Failure: Values are equal&#xD;
+Expected: Not OK&#xD;
+Actual:       OK</Message>
+          <StackTrace>   at HireYar.Tests.SecurityTests.Production_sets_secure_cookies_and_hides_openapi() in D:\Projects\viravss\HireYar\tests\HireYar.Tests\SecurityTests.cs:line 51&#xD;
+   at HireYar.Tests.SecurityTests.Production_sets_secure_cookies_and_hides_openapi() in D:\Projects\viravss\HireYar\tests\HireYar.Tests\SecurityTests.cs:line 53&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="7ecdb8a5-7c4f-4e7a-8dda-4da80630af3e" testId="68d6ee2b-ddb8-30e6-170f-d12a8d7bf19a" testName="HireYar.Tests.AuthTests.Change_password_revokes_sessions_and_profile_cannot_overpost" computerName="DESKTOP-I8QMJN3" duration="00:00:00.7927491" startTime="2026-09-24T11:21:53.9118493+03:30" endTime="2026-09-24T11:21:54.7048672+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7ecdb8a5-7c4f-4e7a-8dda-4da80630af3e" />
+    <UnitTestResult executionId="bccebc83-9a76-4765-a378-dfe85be35975" testId="878f9a84-0981-26ae-5532-37e7cfdd2bb4" testName="HireYar.Tests.AuthTests.Confirmation_is_required_and_single_use" computerName="DESKTOP-I8QMJN3" duration="00:00:00.5223960" startTime="2026-09-24T11:21:53.3880957+03:30" endTime="2026-09-24T11:21:53.9114354+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bccebc83-9a76-4765-a378-dfe85be35975" />
+    <UnitTestResult executionId="1dfe1723-ffda-4251-ad5c-6d7c3eccbc37" testId="2c28e9b0-5e4f-856e-6f77-bbe87b256b97" testName="HireYar.Tests.AuthTests.Expired_access_token_is_rejected" computerName="DESKTOP-I8QMJN3" duration="00:00:00.4840240" startTime="2026-09-24T11:21:56.0027888+03:30" endTime="2026-09-24T11:21:56.4878885+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1dfe1723-ffda-4251-ad5c-6d7c3eccbc37" />
+    <UnitTestResult executionId="7e32e5f4-b622-43a2-870c-89695779a99c" testId="cc33aefa-76e3-c8b1-b651-e35c3a3797df" testName="HireYar.Tests.AuthTests.Email_failure_leaves_complete_account_and_resend_can_recover" computerName="DESKTOP-I8QMJN3" duration="00:00:00.2260333" startTime="2026-09-24T11:21:53.1607844+03:30" endTime="2026-09-24T11:21:53.3876690+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7e32e5f4-b622-43a2-870c-89695779a99c" />
+    <UnitTestResult executionId="6f75e92e-3b7a-4672-a744-633371a8e2f5" testId="a2be8a68-2d26-065a-2400-9b6cf42814dc" testName="HireYar.Tests.AuthTests.Concurrent_refresh_has_one_successor_and_replay_revokes_it" computerName="DESKTOP-I8QMJN3" duration="00:00:00.3839466" startTime="2026-09-24T11:21:59.2814160+03:30" endTime="2026-09-24T11:21:59.6696291+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6f75e92e-3b7a-4672-a744-633371a8e2f5" />
+    <UnitTestResult executionId="54c29c18-1778-46fd-898b-c84c09d33105" testId="e0652d60-92f9-2ed6-7ddb-1d6b3fcca1b8" testName="HireYar.Tests.SecurityTests.Expired_refresh_token_is_rejected" computerName="DESKTOP-I8QMJN3" duration="00:00:02.5134575" startTime="2026-09-24T11:21:41.9496800+03:30" endTime="2026-09-24T11:21:44.4235109+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="54c29c18-1778-46fd-898b-c84c09d33105" />
+    <UnitTestResult executionId="5fcb92d4-27fb-4e8e-9bdb-35751d421c9b" testId="f9d98a7e-8ed8-0e93-df5d-0a01f3b9236a" testName="HireYar.Tests.AuthTests.Cookie_csrf_and_cors_contracts_are_enforced" computerName="DESKTOP-I8QMJN3" duration="00:00:00.4592291" startTime="2026-09-24T11:21:58.8209872+03:30" endTime="2026-09-24T11:21:59.2808347+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5fcb92d4-27fb-4e8e-9bdb-35751d421c9b" />
+    <UnitTestResult executionId="15b8bbe1-668d-4b0f-92f9-c29c6e28cced" testId="190ca403-829e-594d-e10d-ac28cd73afee" testName="HireYar.Tests.AuthTests.Wrong_password_lockout_inactive_and_invalid_access_are_rejected" computerName="DESKTOP-I8QMJN3" duration="00:00:01.2963658" startTime="2026-09-24T11:21:54.7052403+03:30" endTime="2026-09-24T11:21:56.0023241+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="15b8bbe1-668d-4b0f-92f9-c29c6e28cced" />
+    <UnitTestResult executionId="56adc932-0573-4d31-ac32-e7657684eb98" testId="6ee9e273-843e-3c2d-c0c2-b734c7873446" testName="HireYar.Tests.PanelTests.Job_and_template_stale_versions_conflict_and_question_order_swaps_preserve_ids" computerName="DESKTOP-I8QMJN3" duration="00:00:00.5895773" startTime="2026-09-24T11:21:49.1599495+03:30" endTime="2026-09-24T11:21:49.7500283+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="56adc932-0573-4d31-ac32-e7657684eb98" />
+    <UnitTestResult executionId="9bac22b2-f50d-4f24-95ce-46fbc7cdea57" testId="2908ad6e-3264-bb88-aeee-ee415d63020a" testName="HireYar.Tests.PanelTests.Existing_access_token_uses_current_role" computerName="DESKTOP-I8QMJN3" duration="00:00:00.3400607" startTime="2026-09-24T11:21:50.9513753+03:30" endTime="2026-09-24T11:21:51.2922372+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9bac22b2-f50d-4f24-95ce-46fbc7cdea57" />
+    <UnitTestResult executionId="60af35cd-2d26-4e5a-8b39-33afd6d32217" testId="8f4402c3-4e3e-8f9b-6277-ec574b369445" testName="HireYar.Tests.PanelTests.Template_validation_rejects_invalid_order_count_and_limits" computerName="DESKTOP-I8QMJN3" duration="00:00:00.2833151" startTime="2026-09-24T11:21:49.7504807+03:30" endTime="2026-09-24T11:21:50.0340376+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="60af35cd-2d26-4e5a-8b39-33afd6d32217" />
+    <UnitTestResult executionId="22ae04aa-a1f3-43df-8d5f-22009f904a99" testId="1d9ac743-533b-533e-5ea0-965a5e20071a" testName="HireYar.Tests.AuthTests.Openapi_and_health_are_available_and_panel_is_protected" computerName="DESKTOP-I8QMJN3" duration="00:00:00.3588430" startTime="2026-09-24T11:21:57.9345478+03:30" endTime="2026-09-24T11:21:58.2936840+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="22ae04aa-a1f3-43df-8d5f-22009f904a99" />
+    <UnitTestResult executionId="f6c6fce2-3c37-4d5d-958a-bc4877ab58fa" testId="02987fbc-5d9c-68e4-f479-ddbc390f9cff" testName="HireYar.Tests.SecurityTests.Concurrent_registration_enforces_database_email_uniqueness" computerName="DESKTOP-I8QMJN3" duration="00:00:00.2171486" startTime="2026-09-24T11:21:45.3508969+03:30" endTime="2026-09-24T11:21:45.5682988+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f6c6fce2-3c37-4d5d-958a-bc4877ab58fa" />
+    <UnitTestResult executionId="98f0b335-5c48-4b41-9700-d80a9cf6965e" testId="3bf635d5-c2bc-65cc-f2f4-9f9c4feb97ce" testName="HireYar.Tests.PanelTests.Tenant_reads_writes_dashboard_and_related_records_are_isolated" computerName="DESKTOP-I8QMJN3" duration="00:00:01.4560538" startTime="2026-09-24T11:21:47.7243557+03:30" endTime="2026-09-24T11:21:49.1594852+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="98f0b335-5c48-4b41-9700-d80a9cf6965e" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="HireYar.Tests.SecurityTests.Concurrent_registration_enforces_database_email_uniqueness" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="02987fbc-5d9c-68e4-f479-ddbc390f9cff">
+      <Execution id="f6c6fce2-3c37-4d5d-958a-bc4877ab58fa" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.SecurityTests" name="Concurrent_registration_enforces_database_email_uniqueness" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.PanelTests.Expired_cancelled_resent_and_cross_tenant_invitations_are_safe" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="c866a230-e661-7164-c4b3-df4265296550">
+      <Execution id="2964a341-cbaf-4b17-80b2-e2b78bf3bb7d" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.PanelTests" name="Expired_cancelled_resent_and_cross_tenant_invitations_are_safe" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Register_is_atomic_and_duplicate_email_is_rejected" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="f717cbb7-eabf-36ef-3a34-6d6bd83b6f60">
+      <Execution id="03ac5b6d-7451-4e5e-9625-37ed2061cfc2" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Register_is_atomic_and_duplicate_email_is_rejected" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.SecurityTests.Database_rejects_cross_tenant_template_even_without_service_checks" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="8376234e-1590-65f3-9931-a6395e3a81d9">
+      <Execution id="d267742c-56f0-450b-90a5-b7292e9b635b" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.SecurityTests" name="Database_rejects_cross_tenant_template_even_without_service_checks" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.SecurityTests.Missing_signing_key_fails_startup" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="fb780dd6-c469-99e2-fbfe-a886ef1f4e18">
+      <Execution id="5bc72f8c-b840-4da7-b392-c40528f58ebd" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.SecurityTests" name="Missing_signing_key_fails_startup" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Cookie_csrf_and_cors_contracts_are_enforced" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="f9d98a7e-8ed8-0e93-df5d-0a01f3b9236a">
+      <Execution id="5fcb92d4-27fb-4e8e-9bdb-35751d421c9b" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Cookie_csrf_and_cors_contracts_are_enforced" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.PanelTests.Invitations_are_single_use_and_recruiter_cannot_manage_members_or_organization" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="9de49b67-b19c-abc1-6da5-3da1be33c3fc">
+      <Execution id="9a6ec720-bfc0-49d3-8b03-f5764cc32378" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.PanelTests" name="Invitations_are_single_use_and_recruiter_cannot_manage_members_or_organization" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.PanelTests.Concurrent_invitation_acceptance_creates_one_recruiter" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="640a920a-2eb1-380f-e7d4-29dbe865d447">
+      <Execution id="69e97887-ecf9-46c5-a67a-3b647e304d3c" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.PanelTests" name="Concurrent_invitation_acceptance_creates_one_recruiter" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Expired_access_token_is_rejected" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="2c28e9b0-5e4f-856e-6f77-bbe87b256b97">
+      <Execution id="1dfe1723-ffda-4251-ad5c-6d7c3eccbc37" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Expired_access_token_is_rejected" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Email_failure_leaves_complete_account_and_resend_can_recover" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="cc33aefa-76e3-c8b1-b651-e35c3a3797df">
+      <Execution id="7e32e5f4-b622-43a2-870c-89695779a99c" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Email_failure_leaves_complete_account_and_resend_can_recover" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.PanelTests.Tenant_reads_writes_dashboard_and_related_records_are_isolated" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="3bf635d5-c2bc-65cc-f2f4-9f9c4feb97ce">
+      <Execution id="98f0b335-5c48-4b41-9700-d80a9cf6965e" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.PanelTests" name="Tenant_reads_writes_dashboard_and_related_records_are_isolated" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.PanelTests.Template_validation_rejects_invalid_order_count_and_limits" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="8f4402c3-4e3e-8f9b-6277-ec574b369445">
+      <Execution id="60af35cd-2d26-4e5a-8b39-33afd6d32217" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.PanelTests" name="Template_validation_rejects_invalid_order_count_and_limits" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.PanelTests.Job_and_template_stale_versions_conflict_and_question_order_swaps_preserve_ids" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="6ee9e273-843e-3c2d-c0c2-b734c7873446">
+      <Execution id="56adc932-0573-4d31-ac32-e7657684eb98" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.PanelTests" name="Job_and_template_stale_versions_conflict_and_question_order_swaps_preserve_ids" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Openapi_and_health_are_available_and_panel_is_protected" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="1d9ac743-533b-533e-5ea0-965a5e20071a">
+      <Execution id="22ae04aa-a1f3-43df-8d5f-22009f904a99" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Openapi_and_health_are_available_and_panel_is_protected" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Reset_is_single_use_and_revokes_existing_sessions" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="a527cbc0-548d-f65f-10c0-16e5bb6b3f86">
+      <Execution id="b9eaa560-5508-4229-a650-8adbfe7c478b" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Reset_is_single_use_and_revokes_existing_sessions" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.SecurityTests.Production_sets_secure_cookies_and_hides_openapi" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="5b1716bc-aef8-e511-9dc9-b44947897e28">
+      <Execution id="32b05edd-587a-4f90-a861-d5ce6dde427c" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.SecurityTests" name="Production_sets_secure_cookies_and_hides_openapi" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.PanelTests.Existing_access_token_uses_current_role" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="2908ad6e-3264-bb88-aeee-ee415d63020a">
+      <Execution id="9bac22b2-f50d-4f24-95ce-46fbc7cdea57" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.PanelTests" name="Existing_access_token_uses_current_role" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Change_password_revokes_sessions_and_profile_cannot_overpost" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="68d6ee2b-ddb8-30e6-170f-d12a8d7bf19a">
+      <Execution id="7ecdb8a5-7c4f-4e7a-8dda-4da80630af3e" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Change_password_revokes_sessions_and_profile_cannot_overpost" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Logout_and_logout_all_revoke_refresh_but_access_remains_until_expiry" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="da507191-7b1e-0b9b-5769-d6f1539730b0">
+      <Execution id="c06c92b3-3bfc-4d6d-968f-d7eaf91ae572" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Logout_and_logout_all_revoke_refresh_but_access_remains_until_expiry" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Refresh_rotation_replay_revokes_only_its_session_family" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="326ff1cd-08a6-2ef7-fcc8-cc396e9cb580">
+      <Execution id="f06a4462-f989-434c-bc5b-75d45b642cf5" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Refresh_rotation_replay_revokes_only_its_session_family" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Confirmation_is_required_and_single_use" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="878f9a84-0981-26ae-5532-37e7cfdd2bb4">
+      <Execution id="bccebc83-9a76-4765-a378-dfe85be35975" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Confirmation_is_required_and_single_use" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Wrong_password_lockout_inactive_and_invalid_access_are_rejected" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="190ca403-829e-594d-e10d-ac28cd73afee">
+      <Execution id="15b8bbe1-668d-4b0f-92f9-c29c6e28cced" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Wrong_password_lockout_inactive_and_invalid_access_are_rejected" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.SecurityTests.Expired_refresh_token_is_rejected" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="e0652d60-92f9-2ed6-7ddb-1d6b3fcca1b8">
+      <Execution id="54c29c18-1778-46fd-898b-c84c09d33105" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.SecurityTests" name="Expired_refresh_token_is_rejected" />
+    </UnitTest>
+    <UnitTest name="HireYar.Tests.AuthTests.Concurrent_refresh_has_one_successor_and_replay_revokes_it" storage="d:\projects\viravss\hireyar\tests\hireyar.tests\bin\release\net10.0\hireyar.tests.dll" id="a2be8a68-2d26-065a-2400-9b6cf42814dc">
+      <Execution id="6f75e92e-3b7a-4672-a744-633371a8e2f5" />
+      <TestMethod codeBase="D:\Projects\viravss\HireYar\tests\HireYar.Tests\bin\Release\net10.0\HireYar.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="HireYar.Tests.AuthTests" name="Concurrent_refresh_has_one_successor_and_replay_revokes_it" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="a527cbc0-548d-f65f-10c0-16e5bb6b3f86" executionId="b9eaa560-5508-4229-a650-8adbfe7c478b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8376234e-1590-65f3-9931-a6395e3a81d9" executionId="d267742c-56f0-450b-90a5-b7292e9b635b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9de49b67-b19c-abc1-6da5-3da1be33c3fc" executionId="9a6ec720-bfc0-49d3-8b03-f5764cc32378" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="640a920a-2eb1-380f-e7d4-29dbe865d447" executionId="69e97887-ecf9-46c5-a67a-3b647e304d3c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c866a230-e661-7164-c4b3-df4265296550" executionId="2964a341-cbaf-4b17-80b2-e2b78bf3bb7d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="da507191-7b1e-0b9b-5769-d6f1539730b0" executionId="c06c92b3-3bfc-4d6d-968f-d7eaf91ae572" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fb780dd6-c469-99e2-fbfe-a886ef1f4e18" executionId="5bc72f8c-b840-4da7-b392-c40528f58ebd" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="326ff1cd-08a6-2ef7-fcc8-cc396e9cb580" executionId="f06a4462-f989-434c-bc5b-75d45b642cf5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f717cbb7-eabf-36ef-3a34-6d6bd83b6f60" executionId="03ac5b6d-7451-4e5e-9625-37ed2061cfc2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5b1716bc-aef8-e511-9dc9-b44947897e28" executionId="32b05edd-587a-4f90-a861-d5ce6dde427c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="68d6ee2b-ddb8-30e6-170f-d12a8d7bf19a" executionId="7ecdb8a5-7c4f-4e7a-8dda-4da80630af3e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="878f9a84-0981-26ae-5532-37e7cfdd2bb4" executionId="bccebc83-9a76-4765-a378-dfe85be35975" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2c28e9b0-5e4f-856e-6f77-bbe87b256b97" executionId="1dfe1723-ffda-4251-ad5c-6d7c3eccbc37" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cc33aefa-76e3-c8b1-b651-e35c3a3797df" executionId="7e32e5f4-b622-43a2-870c-89695779a99c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a2be8a68-2d26-065a-2400-9b6cf42814dc" executionId="6f75e92e-3b7a-4672-a744-633371a8e2f5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e0652d60-92f9-2ed6-7ddb-1d6b3fcca1b8" executionId="54c29c18-1778-46fd-898b-c84c09d33105" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f9d98a7e-8ed8-0e93-df5d-0a01f3b9236a" executionId="5fcb92d4-27fb-4e8e-9bdb-35751d421c9b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="190ca403-829e-594d-e10d-ac28cd73afee" executionId="15b8bbe1-668d-4b0f-92f9-c29c6e28cced" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6ee9e273-843e-3c2d-c0c2-b734c7873446" executionId="56adc932-0573-4d31-ac32-e7657684eb98" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2908ad6e-3264-bb88-aeee-ee415d63020a" executionId="9bac22b2-f50d-4f24-95ce-46fbc7cdea57" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8f4402c3-4e3e-8f9b-6277-ec574b369445" executionId="60af35cd-2d26-4e5a-8b39-33afd6d32217" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1d9ac743-533b-533e-5ea0-965a5e20071a" executionId="22ae04aa-a1f3-43df-8d5f-22009f904a99" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="02987fbc-5d9c-68e4-f479-ddbc390f9cff" executionId="f6c6fce2-3c37-4d5d-958a-bc4877ab58fa" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3bf635d5-c2bc-65cc-f2f4-9f9c4feb97ce" executionId="98f0b335-5c48-4b41-9700-d80a9cf6965e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="24" executed="24" passed="23" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.11)&#xD;
+[xUnit.net 00:00:00.62]   Discovering: HireYar.Tests&#xD;
+[xUnit.net 00:00:00.66]   Discovered:  HireYar.Tests&#xD;
+[xUnit.net 00:00:00.69]   Starting:    HireYar.Tests&#xD;
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]&#xD;
+      No XML encryptor configured. Key {8b63f7f6-fa10-4f50-bfa6-2173ff2b2960} may be persisted to storage in unencrypted form.&#xD;
+info: Microsoft.Hosting.Lifetime[0]&#xD;
+      Application started. Press Ctrl+C to shut down.&#xD;
+info: Microsoft.Hosting.Lifetime[0]&#xD;
+      Hosting environment: Development&#xD;
+info: Microsoft.Hosting.Lifetime[0]&#xD;
+      Content root path: D:\Projects\viravss\HireYar\src\HireYar.Api&#xD;
+info: Microsoft.EntityFrameworkCore.Migrations[20411]&#xD;
+      Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.&#xD;
+info: Microsoft.EntityFrameworkCore.Migrations[20402]&#xD;
+      Applying migration '20260924065711_InitialCreate'.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+fail: Microsoft.EntityFrameworkCore.Update[10000]&#xD;
+      An exception occurred in the database while saving changes for context type 'HireYar.Infrastructure.Persistence.AppDbContext'.&#xD;
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.&#xD;
+       ---&gt; Microsoft.Data.SqlClient.SqlException (0x80131904): The INSERT statement conflicted with the FOREIGN KEY constraint "FK_InterviewTemplates_JobPositions_OrganizationId_JobPositionId". The conflict occurred in database "HireYar_Tests_484c7556f852401ab383cbc3102137c0", table "dbo.JobPositions".&#xD;
+         at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)&#xD;
+         at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)&#xD;
+         at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, SqlCommand command, Boolean callerHasConnectionLock, Boolean asyncClose)&#xD;
+         at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean&amp; dataReady)&#xD;
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreRows(Boolean&amp; moreRows)&#xD;
+         at Microsoft.Data.SqlClient.SqlDataReader.TryReadInternal(Boolean setTimeout, Boolean&amp; more)&#xD;
+         at Microsoft.Data.SqlClient.SqlDataReader.ReadAsyncExecute(Task task, Object state)&#xD;
+         at Microsoft.Data.SqlClient.SqlDataReader.InvokeAsyncCall[T](SqlDataReaderBaseAsyncCallContext`1 context)&#xD;
+      --- End of stack trace from previous location ---&#xD;
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeResultSetAsync(Int32 startCommandIndex, RelationalDataReader reader, CancellationToken cancellationToken)&#xD;
+      ClientConnectionId:3e30fa74-fc87-4d03-abc1-4b5c59f2e619&#xD;
+      Error Number:547,State:0,Class:16&#xD;
+         --- End of inner exception stack trace ---&#xD;
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeResultSetAsync(Int32 startCommandIndex, RelationalDataReader reader, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.SqlServer.Update.Internal.SqlServerModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)&#xD;
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.&#xD;
+       ---&gt; Microsoft.Data.SqlClient.SqlException (0x80131904): The INSERT statement conflicted with the FOREIGN KEY constraint "FK_InterviewTemplates_JobPositions_OrganizationId_JobPositionId". The conflict occurred in database "HireYar_Tests_484c7556f852401ab383cbc3102137c0", table "dbo.JobPositions".&#xD;
+         at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)&#xD;
+         at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)&#xD;
+         at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, SqlCommand command, Boolean callerHasConnectionLock, Boolean asyncClose)&#xD;
+         at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean&amp; dataReady)&#xD;
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreRows(Boolean&amp; moreRows)&#xD;
+         at Microsoft.Data.SqlClient.SqlDataReader.TryReadInternal(Boolean setTimeout, Boolean&amp; more)&#xD;
+         at Microsoft.Data.SqlClient.SqlDataReader.ReadAsyncExecute(Task task, Object state)&#xD;
+         at Microsoft.Data.SqlClient.SqlDataReader.InvokeAsyncCall[T](SqlDataReaderBaseAsyncCallContext`1 context)&#xD;
+      --- End of stack trace from previous location ---&#xD;
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeResultSetAsync(Int32 startCommandIndex, RelationalDataReader reader, CancellationToken cancellationToken)&#xD;
+      ClientConnectionId:3e30fa74-fc87-4d03-abc1-4b5c59f2e619&#xD;
+      Error Number:547,State:0,Class:16&#xD;
+         --- End of inner exception stack trace ---&#xD;
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeResultSetAsync(Int32 startCommandIndex, RelationalDataReader reader, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.SqlServer.Update.Internal.SqlServerModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)&#xD;
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]&#xD;
+      No XML encryptor configured. Key {47da387e-da72-42f2-8355-615c9841dfc5} may be persisted to storage in unencrypted form.&#xD;
+info: Microsoft.Hosting.Lifetime[0]&#xD;
+      Application started. Press Ctrl+C to shut down.&#xD;
+info: Microsoft.Hosting.Lifetime[0]&#xD;
+      Hosting environment: Production&#xD;
+info: Microsoft.Hosting.Lifetime[0]&#xD;
+      Content root path: D:\Projects\viravss\HireYar\src\HireYar.Api&#xD;
+info: Microsoft.EntityFrameworkCore.Migrations[20411]&#xD;
+      Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.&#xD;
+info: Microsoft.EntityFrameworkCore.Migrations[20402]&#xD;
+      Applying migration '20260924065711_InitialCreate'.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+info: Microsoft.Hosting.Lifetime[0]&#xD;
+      Application is shutting down...&#xD;
+[xUnit.net 00:00:09.04]       Assert.NotEqual() Failure: Values are equal&#xD;
+[xUnit.net 00:00:09.04]       Expected: Not OK&#xD;
+[xUnit.net 00:00:09.04]       Actual:       OK&#xD;
+[xUnit.net 00:00:09.05]       Stack Trace:&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+[xUnit.net 00:00:09.05]         D:\Projects\viravss\HireYar\tests\HireYar.Tests\SecurityTests.cs(51,0): at HireYar.Tests.SecurityTests.Production_sets_secure_cookies_and_hides_openapi()&#xD;
+[xUnit.net 00:00:09.05]         D:\Projects\viravss\HireYar\tests\HireYar.Tests\SecurityTests.cs(53,0): at HireYar.Tests.SecurityTests.Production_sets_secure_cookies_and_hides_openapi()&#xD;
+[xUnit.net 00:00:09.05]         --- End of stack trace from previous location ---&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: HireYar.Infrastructure.Auth.Accounts[0]&#xD;
+      Email delivery failed; retry is available. EventCode=email_delivery_failed&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+warn: Microsoft.AspNetCore.Antiforgery.DefaultAntiforgery[8]&#xD;
+      The 'Cache-Control' and 'Pragma' headers have been overridden and set to 'no-cache, no-store' and 'no-cache' respectively to prevent caching of this response. Any response that uses antiforgery should not be cached.&#xD;
+info: Microsoft.Hosting.Lifetime[0]&#xD;
+      Application is shutting down...&#xD;
+[xUnit.net 00:00:21.09]   Finished:    HireYar.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="DESKTOP-I8QMJN3" outcome="Error" timestamp="2026-09-24T11:21:47.7054651+03:30">
+        <Text>[xUnit.net 00:00:09.04]     HireYar.Tests.SecurityTests.Production_sets_secure_cookies_and_hides_openapi [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

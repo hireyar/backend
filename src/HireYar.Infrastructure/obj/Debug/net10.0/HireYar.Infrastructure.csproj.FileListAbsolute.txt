@@ -1,0 +1,17 @@
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\bin\Debug\net10.0\HireYar.Infrastructure.deps.json
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\bin\Debug\net10.0\HireYar.Infrastructure.dll
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\bin\Debug\net10.0\HireYar.Infrastructure.pdb
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\bin\Debug\net10.0\HireYar.Application.dll
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\bin\Debug\net10.0\HireYar.Domain.dll
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\bin\Debug\net10.0\HireYar.Application.pdb
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\bin\Debug\net10.0\HireYar.Domain.pdb
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\HireYar.Infrastructure.csproj.AssemblyReference.cache
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\HireYar.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\HireYar.Infrastructure.AssemblyInfoInputs.cache
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\HireYar.Infrastructure.AssemblyInfo.cs
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\HireYar.Infrastructure.csproj.CoreCompileInputs.cache
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\HireYar..7460F520.Up2Date
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\HireYar.Infrastructure.dll
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\refint\HireYar.Infrastructure.dll
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\HireYar.Infrastructure.pdb
+D:\Projects\viravss\HireYar\src\HireYar.Infrastructure\obj\Debug\net10.0\ref\HireYar.Infrastructure.dll
