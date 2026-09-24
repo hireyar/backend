@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  hireyar-api:
+    image: hireyar-api:latest
+    container_name: hireyar-api
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - "192.168.105.73:5080:8080"
+
+    env_file:
+      - .env
+
+    restart: unless-stopped
