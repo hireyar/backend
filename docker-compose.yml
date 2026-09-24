@@ -27,7 +27,7 @@ services:
       Security__AllowedOrigins__0: "https://hireyar.com"
 #      Security__AccessMinutes: "60"
 #      Security__RefreshDays: "30"
-#      Security__DataProtectionPath: "/keys"
+      Security__DataProtectionPath: "/keys"
 
 #      Smtp__Host: "mailpit"
 #      Smtp__Port: "1025"
