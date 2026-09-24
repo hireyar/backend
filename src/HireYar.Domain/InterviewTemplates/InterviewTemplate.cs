@@ -1,0 +1,26 @@
+namespace HireYar.Domain.InterviewTemplates;
+
+public sealed class InterviewTemplate
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid OrganizationId { get; set; }
+    public Guid JobPositionId { get; set; }
+    public string Title { get; set; } = "";
+    public string Language { get; set; } = "fa-IR";
+    public int DurationMinutes { get; set; }
+    public int MaxFollowUpQuestionsPerQuestion { get; set; }
+    public bool IsArchived { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+    public byte[] RowVersion { get; set; } = [];
+    public List<InterviewQuestion> Questions { get; set; } = [];
+}
+public sealed class InterviewQuestion
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid InterviewTemplateId { get; set; }
+    public string Text { get; set; } = "";
+    public int Order { get; set; }
+    public string Competency { get; set; } = "";
+    public string EvaluationGuidance { get; set; } = "";
+}

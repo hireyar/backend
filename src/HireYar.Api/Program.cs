@@ -1,0 +1,117 @@
+using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using HireYar.Api.Errors;
+using HireYar.Api.Security;
+using HireYar.Application.Auth;
+using HireYar.Application.Common;
+using HireYar.Application.Dashboard;
+using HireYar.Application.InterviewTemplates;
+using HireYar.Application.JobPositions;
+using HireYar.Application.Members;
+using HireYar.Application.Organizations;
+using HireYar.Infrastructure;
+using HireYar.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+var builder = WebApplication.CreateBuilder(args);
+var security = builder.Configuration.GetSection("Security").Get<SecurityOptions>() ?? new();
+if (Encoding.UTF8.GetByteCount(security.SigningKey) < 32 || string.IsNullOrWhiteSpace(security.Issuer) || string.IsNullOrWhiteSpace(security.Audience)
+    || security.AccessMinutes is < 1 or > 60 || security.RefreshDays is < 1 or > 30)
+    throw new InvalidOperationException("Security requires a signing key of at least 32 bytes, issuer, audience and valid token lifetimes.");
+static bool IsOrigin(string value, bool development) => Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == "https" || development && uri.Scheme == "http") && uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment);
+if (!IsOrigin(security.FrontendUrl, builder.Environment.IsDevelopment()) || security.AllowedOrigins.Length == 0 || security.AllowedOrigins.Any(x => !IsOrigin(x, builder.Environment.IsDevelopment()) || x.EndsWith('/')))
+    throw new InvalidOperationException("Security requires explicit frontend and CORS origins; HTTPS is mandatory outside Development and CORS origins must omit trailing slash.");
+if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Default"))) throw new InvalidOperationException("ConnectionStrings:Default is required.");
+if (string.IsNullOrWhiteSpace(security.DataProtectionPath)) throw new InvalidOperationException("Security:DataProtectionPath is required.");
+builder.Services.AddDataProtection().SetApplicationName("HireYar").PersistKeysToFileSystem(new DirectoryInfo(security.DataProtectionPath));
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHttpContextAccessor(); builder.Services.AddScoped<ICurrentUser, CurrentUser>(); builder.Services.AddScoped<CurrentAccountValidation>();
+builder.Services.AddScoped<AuthService>(); builder.Services.AddScoped<MemberService>(); builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
+builder.Services.AddControllers().AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
+builder.Services.Configure<ApiBehaviorOptions>(o => o.InvalidModelStateResponseFactory = c =>
+{
+    var problem = new ValidationProblemDetails(c.ModelState) { Status = 400, Title = "Request validation failed." };
+    problem.Extensions["code"] = "validation_failed"; problem.Extensions["traceId"] = c.HttpContext.TraceIdentifier;
+    return new BadRequestObjectResult(problem);
+});
+builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = c =>
+{
+    c.ProblemDetails.Extensions.TryAdd("traceId", c.HttpContext.TraceIdentifier);
+    c.ProblemDetails.Extensions.TryAdd("code", c.ProblemDetails.Status switch { 401 => "unauthorized", 403 => "forbidden", 404 => "not_found", 429 => "rate_limited", _ => "request_failed" });
+});
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
+{
+    o.MapInboundClaims = false; o.EventsType = typeof(CurrentAccountValidation);
+    o.TokenValidationParameters = new()
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        ValidateLifetime = true,
+        RequireExpirationTime = true,
+        RequireSignedTokens = true,
+        ValidIssuer = security.Issuer,
+        ValidAudience = security.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(security.SigningKey)),
+        ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+        ClockSkew = TimeSpan.FromSeconds(5),
+        NameClaimType = "sub",
+        RoleClaimType = "role"
+    };
+});
+builder.Services.AddAuthorization(o => o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(security.AllowedOrigins).AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
+builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "hireyar.csrf"; o.Cookie.HttpOnly = true; o.Cookie.Path = "/api/auth"; o.Cookie.SameSite = SameSiteMode.Strict; o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; });
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = 429;
+    o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("AuthRateLimit:PermitLimit") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
+builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
+{
+    doc.Info.Title = "HireYar API"; doc.Info.Version = "v1";
+    doc.Components ??= new(); doc.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+    doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
+    return Task.CompletedTask;
+}).AddOperationTransformer(async (operation, context, ct) =>
+{
+    if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
+        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = [] }];
+    if (context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true && context.Description.HttpMethod != "GET")
+    {
+        operation.Parameters ??= [];
+        operation.Parameters.Add(new OpenApiParameter { Name = "X-CSRF-TOKEN", In = ParameterLocation.Header, Required = true, Description = "Obtain from GET /api/auth/csrf using the same bearer identity and cookie jar.", Schema = new OpenApiSchema { Type = JsonSchemaType.String } });
+    }
+    var schema = await context.GetOrCreateSchemaAsync(typeof(ProblemDetails), null, ct);
+    operation.Responses ??= new();
+    foreach (var status in new[] { "400", "401", "403", "404", "409", "429", "500" })
+        operation.Responses.TryAdd(status, new OpenApiResponse { Description = "ProblemDetails with code and traceId; validation errors include errors.", Content = new Dictionary<string, OpenApiMediaType> { ["application/problem+json"] = new() { Schema = schema } } });
+}));
+var app = builder.Build();
+app.UseExceptionHandler(); app.UseStatusCodePages();
+if (!app.Environment.IsDevelopment()) { app.UseHsts(); app.UseHttpsRedirection(); }
+app.Use(async (context, next) => { context.Response.Headers.CacheControl = "no-store"; context.Response.Headers.XContentTypeOptions = "nosniff"; await next(); });
+// Swagger UI is middleware, not an endpoint with AllowAnonymous metadata.
+// Serve its development-only resources before the fallback authorization policy.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
+}
+app.UseRouting(); app.UseCors(); app.UseAuthentication(); app.UseRateLimiter(); app.UseAuthorization();
+app.MapControllers(); app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+//if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi().AllowAnonymous();
+    app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
+}
+app.Run();
+public partial class Program;
+
+
+

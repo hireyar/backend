@@ -1,93 +1,84 @@
-# backend
+# HireYar Backend
 
+پایه حساب‌های سازمانی و API پنل HR برای مصاحبه اولیه استخدام. تصمیم نهایی استخدام انسانی است؛ موتور مصاحبه و AI هنوز پیاده نشده‌اند.
 
+نقطه شروع توسعه: [AGENTS](AGENTS.md). مراجع: [محصول](docs/PROJECT.md)، [معماری](docs/ARCHITECTURE.md)، [وضعیت واقعی](docs/STATUS.md)، [Backlog](docs/BACKLOG.md)، [ادامه کار](docs/HANDOFF.md).
 
-## Getting started
+## پیش‌نیاز و راه‌اندازی
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+.NET SDK 10.0.400، SQL Server 2019 یا جدیدتر، و Mailpit محلی. Compose از SQL Server 2022 استفاده می‌کند. برای روش container، Docker با Linux containers لازم است.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin http://192.168.120.66/hireyar/backend.git
-git branch -M main
-git push -uf origin main
+```powershell
+Copy-Item .env.example .env
+# مقادیر placeholder را محلی با secret تصادفی جایگزین کن؛ .env وارد Git نشود.
+docker compose -f compose.dev.yaml up -d sql mailpit
+dotnet tool restore
+dotnet restore HireYar.slnx
 ```
 
-## Integrate with your tools
+اتصال SQL توسعه برای اجرای API روی میزبان: `Server=localhost,14333;Database=HireYar_Development;User Id=sa;Password=<local-password>;TrustServerCertificate=True`. این فقط الگو است. برای SQL محلی با Windows authentication می‌توان از `Server=localhost;Database=HireYar_Development;Integrated Security=True;TrustServerCertificate=True` استفاده کرد. دیتابیس توسعه باید مستقل از داده واقعی باشد.
 
-- [ ] [Set up project integrations](http://192.168.120.66/hireyar/backend/-/settings/integrations)
+```powershell
+dotnet user-secrets set 'ConnectionStrings:Default' '<development-connection-string>' --project src/HireYar.Api
+dotnet user-secrets set 'Security:SigningKey' '<random-secret-at-least-32-bytes>' --project src/HireYar.Api
+# EF factory عمداً فقط متغیر محیطی می‌خواند؛ مقدار را از تنظیم امن محلی بگیر.
+$env:ConnectionStrings__Default = '<development-connection-string>'
+dotnet ef database update --project src/HireYar.Infrastructure --startup-project src/HireYar.Api
+dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
+```
 
-## Collaborate with your team
+روش تمام-container پس از migration: `docker compose -f compose.dev.yaml up -d --build api`. API هیچ migration خودکاری در startup اجرا نمی‌کند. مقادیر `.env` صرفاً توسط compose خوانده می‌شوند؛ `dotnet run` خودکار آن فایل را نمی‌خواند.
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+- OpenAPI: `http://localhost:5080/openapi/v1.json`؛ UI: `http://localhost:5080/swagger`، فقط Development.
+- Mailpit: `http://localhost:8025`؛ SMTP محلی: پورت 1025.
+- health: `/health` فقط زنده‌بودن فرایند را نشان می‌دهد و آزمون آمادگی دیتابیس نیست.
+- نمونه جریان‌ها: [HireYar.Api.http](src/HireYar.Api/HireYar.Api.http). cookie jar ابزار HTTP باید فعال باشد. OpenAPI مرجع کامل endpointهاست.
 
-## Test and Deploy
+## تنظیمات
 
-Use the built-in continuous integration in GitLab.
+| کلید محیطی | کاربرد |
+|---|---|
+| `ConnectionStrings__Default` | اتصال SQL؛ در production کاربر دیتابیس کم‌مجوز و TLS معتبر |
+| `Security__SigningKey` | secret تصادفی حداقل ۳۲ بایت؛ بدون fallback |
+| `Security__Issuer`, `Security__Audience` | صادرکننده و مخاطب JWT |
+| `Security__AccessMinutes`, `Security__RefreshDays` | پیش‌فرض ۱۵ دقیقه و ۷ روز |
+| `Security__FrontendUrl` | origin پنل برای لینک‌های ایمیل |
+| `Security__AllowedOrigins__0` | origin دقیق بدون slash پایانی؛ برای چند origin اندیس‌های بعدی |
+| `Security__DataProtectionPath` | مسیر دائمی قابل نوشتن برای کلیدهای Identity/CSRF |
+| `Smtp__Host`, `Smtp__Port`, `Smtp__From` | سرویس ارسال ایمیل |
+| `Smtp__EnableSsl`, `Smtp__Username`, `Smtp__Password` | TLS و اطلاعات اتصال SMTP؛ خارج ریپو |
+| `AllowedHosts` | hostnameهای واقعی API؛ پیش‌فرض localhost |
+| `AuthRateLimit__PermitLimit` | پیش‌فرض ۲۰ درخواست در دقیقه برای هر IP روی مسیرهای auth/ارسال دعوت |
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+در production پنل و API باید HTTPS و زیر یک سایت باشند. گواهی TLS و reverse proxy مورد اعتماد باید در محیط استقرار تنظیم شوند؛ هدرهای forwarded از هر فرستنده پذیرفته نمی‌شوند. این تسک زیرساخت deployment نمی‌سازد. تنظیمات محیط Development را وارد production نکن.
 
-***
+کلیدهای Data Protection را روی volume دائمی، با دسترسی فقط حساب اجرای API، backup محدود و دیسک رمزگذاری‌شده نگه دار. ذخیره filesystem به‌تنهایی رمزگذاری در حالت سکون نیست؛ در production حفاظت volume یا certificate/KMS متناسب با میزبان الزامی است. حذف کلیدها لینک‌های Identity و CSRF را نامعتبر می‌کند. volume `protection-keys` در compose برای restart حفظ می‌شود. signing key JWT مستقل است.
 
-# Editing this README
+## اتصال Angular و جریان نمونه
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+۱. با `withCredentials: true` از `GET /api/auth/csrf` توکن بگیر؛ cookie مربوط به antiforgery خودکار ذخیره می‌شود. مقدار JSON را در حافظه نگه دار و در `X-CSRF-TOKEN` برای تمام درخواست‌های غیر GET مسیر auth بفرست.
+۲. register را با نام، سازمان، ایمیل و رمز بفرست. لینک Mailpit را در صفحه frontend بخوان و `userId` و `token` را با POST به confirm-email بده. هیچ JWT پیش از تأیید صادر نمی‌شود.
+۳. login، Access Token را در JSON و refresh را فقط در cookie HttpOnly می‌دهد. access در حافظه Angular نگه‌داری شود؛ در `Authorization: Bearer ...` ارسال شود.
+۴. پس از login یا تغییر هویت bearer، CSRF جدید با همان bearer دریافت کن. توکن CSRF وابسته به هویت درخواست است. هنگام انقضای access، برای دریافت CSRF و refresh هر دو Authorization را حذف کن؛ سپس access جدید و CSRF متناسب با هویت جدید بگیر. refresh هم‌زمان در چند tab را هماهنگ کن؛ بازپخش، خانواده همان نشست را باطل می‌کند.
+۵. موقعیت بساز، شناسه آن را برای ساخت قالب همراه سؤال‌ها استفاده کن. در ویرایش `rowVersion` پاسخ قبلی را بفرست؛ 409 نیازمند reload و تصمیم کاربر است. آرشیو موقعیت با `status=Archived` و آرشیو قالب با `isArchived=true` در PUT انجام می‌شود.
 
-## Suggestions for a good README
+refresh cookie، host-only، `Path=/api/auth`، `SameSite=Strict` و در production `Secure` است. CORS فقط originهای صریح و credentials را می‌پذیرد. CORS جای CSRF نیست. برای API با origin متفاوت، interceptor خودکار Angular لزوماً هدر XSRF را نمی‌فرستد؛ interceptor محدود به origin API خودتان برای `X-CSRF-TOKEN` بنویسید.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+logout فقط نشست refresh جاری را باطل می‌کند؛ logout-all همه نشست‌ها را. JWT صادرشده تا انقضای کوتاهش معتبر می‌ماند. غیرفعال‌شدن و تغییر نقش در هر درخواست از دیتابیس بررسی می‌شوند و بلافاصله اثر دارند. تغییر/بازیابی رمز همه refreshها را باطل می‌کند.
 
-## Name
-Choose a self-explaining name for your project.
+خطاها ProblemDetails با `code` و `traceId` هستند؛ validation دارای `errors` است. پاسخ generic برای forgot/resend تضمین ارسال نیست؛ شکست SMTP با رویداد بدون داده حساس ثبت می‌شود. register و دعوت فیلد وضعیت ارسال دارند و resend در دسترس است.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## تست و migration استقرار
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```powershell
+$env:HIREYAR_TEST_SQL = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+dotnet test HireYar.slnx --logger 'trx;LogFileName=integration.trx' --results-directory TestResults
+New-Item -ItemType Directory artifacts -Force
+dotnet ef migrations script --idempotent --project src/HireYar.Infrastructure --startup-project src/HireYar.Api --output artifacts/migrations.sql
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+تست‌ها SQL Server واقعی و دیتابیس تصادفی با پیشوند `HireYar_Tests_` می‌سازند؛ پس از اجرا فقط همان دیتابیس حذف می‌شود. اتصال فقط localhost، نقطه یا LocalDB مجاز است؛ بدون متغیر محیطی تست‌های SQL به‌صورت صریح Skip می‌شوند. SMTP در تست API جایگزین حافظه‌ای کنترل‌شده دارد و ایمیل واقعی ارسال نمی‌شود. نتیجه تست و محدودیت Docker/SMTP در [STATUS](docs/STATUS.md) ثبت است.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+SQL script باید قبل از انتشار بازبینی و با مجوز جداگانه اعمال شود. روی production خودکار اجرا نکن. برنچ `dev` محل توسعه است؛ `production` اکنون فقط نقطه پایه است و هنوز نسخه آماده انتشار ندارد.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+مراحل آینده: داوطلب و دعوت مصاحبه، جلسه صوتی، STT/LLM/TTS و گزارش مستند. حساب HR برای داوطلب ساخته نمی‌شود. هنگام ساخت جلسه باید از سؤال‌ها و معیارهای قالب snapshot گرفت تا ویرایش قالب روی جلسه قبلی اثر نگذارد. در این نسخه جلسه، snapshot engine، AI، فایل، OTP، social login، MFA، پرداخت، platform admin یا زیرساخت توزیع‌شده ساخته نشده است.
