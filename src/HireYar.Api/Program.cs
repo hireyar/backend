@@ -19,6 +19,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 var builder = WebApplication.CreateBuilder(args);
+// Developer-specific settings stay outside Git; environment variables retain final precedence.
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.local.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables();
 var security = builder.Configuration.GetSection("Security").Get<SecurityOptions>() ?? new();
 if (Encoding.UTF8.GetByteCount(security.SigningKey) < 32 || string.IsNullOrWhiteSpace(security.Issuer) || string.IsNullOrWhiteSpace(security.Audience)
     || security.AccessMinutes is < 1 or > 60 || security.RefreshDays is < 1 or > 30)

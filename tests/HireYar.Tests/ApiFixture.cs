@@ -51,7 +51,11 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("Smtp:Host", "localhost"); b.UseSetting("Smtp:Port", "1025"); b.UseSetting("Smtp:From", "no-reply@hireyar.test");
         b.UseSetting("Security:DataProtectionPath", Path.Combine(Path.GetTempPath(), database));
         b.UseSetting("AuthRateLimit:PermitLimit", "1000");
-        b.ConfigureServices(s => { s.RemoveAll<IEmailSender>(); s.AddSingleton<IEmailSender>(Email); s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock); });
+        b.ConfigureServices(s =>
+        {
+            s.RemoveAll<IEmailSender>();
+            s.AddSingleton<IEmailSender>(Email); s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
+        });
     }
     public async Task InitializeAsync()
     {

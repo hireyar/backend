@@ -19,10 +19,9 @@ dotnet restore HireYar.slnx
 اتصال SQL توسعه برای اجرای API روی میزبان: `Host=localhost;Port=5433;Database=hireyar_development;Username=hireyar;Password=<local-password>`. این فقط الگو است. برای PostgreSQL نصب‌شده روی میزبان، Host/Port/Username/Password همان instance را تنظیم کنید. دیتابیس توسعه باید مستقل از داده واقعی باشد.
 
 ```powershell
-dotnet user-secrets set 'ConnectionStrings:Default' '<development-connection-string>' --project src/HireYar.Api
-dotnet user-secrets set 'Security:SigningKey' '<random-secret-at-least-32-bytes>' --project src/HireYar.Api
-# EF factory عمداً فقط متغیر محیطی می‌خواند؛ مقدار را از تنظیم امن محلی بگیر.
-$env:ConnectionStrings__Default = '<development-connection-string>'
+# src/HireYar.Api/appsettings.Development.local.json را با این ساختار بساز:
+# {"ConnectionStrings":{"Default":"Host=localhost;Port=5433;Database=hireyar_development;Username=hireyar;Password=<local-password>"},"Security":{"SigningKey":"<random-secret-at-least-32-bytes>"}}
+# این فایل در Git نادیده گرفته می‌شود. مقدار رمز در .env و این فایل باید یکسان باشد.
 dotnet ef database update --project src/HireYar.Infrastructure --startup-project src/HireYar.Api
 dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 ```
@@ -89,11 +88,11 @@ SQL script باید قبل از انتشار بازبینی و با مجوز ج�
 
 با تأیید کاربر، PostgreSQL از صفر ساخته می‌شود و انتقال داده SQL Server لازم نیست. migration قبلی با InitialPostgres جایگزین شد؛ آن را روی دیتابیس PostgreSQL خالی اجرا کنید. دیتابیس SQL Server قبلی حذف یا تغییر داده نشده است.
 
-ConnectionStrings:Default در User Secrets یا ConnectionStrings__Default در محیط باید قالب Npgsql داشته باشد. برای TLS معتبر production از `SSL Mode=VerifyFull` و گواهی مورد اعتماد استفاده کنید؛ تنظیم توسعه را منتقل نکنید. کاربر runtime با کاربر migration/ایجاد دیتابیس جدا باشد.
+ConnectionStrings:Default در appsettings محلی یا ConnectionStrings__Default در محیط باید قالب Npgsql داشته باشد. برای TLS معتبر production از `SSL Mode=VerifyFull` و گواهی مورد اعتماد استفاده کنید؛ تنظیم توسعه را منتقل نکنید. کاربر runtime با کاربر migration/ایجاد دیتابیس جدا باشد.
 
 rowVersion همچنان رشته Base64 در JSON است، اما اکنون ۱۶ بایت تصادفی است و توسط AppDbContext هنگام ذخیره تغییر می‌کند. مصرف‌کننده باید مقدار پاسخ جدید را بدون تفسیر برگرداند؛ توکن ۸بایتی SQL Server معتبر نیست. تغییرات مستقیم SQL در جداول موقعیت/قالب باید RowVersion را نیز تغییر دهند؛ مسیر پشتیبانی‌شده نوشتن، API است.
 
-برای توسعه محلی انتخاب‌شده، `.env` و User Secrets روی PostgreSQL داخل Docker در localhost:5433 تنظیم می‌شوند. پس از روشن‌کردن Docker Desktop:
+برای توسعه محلی انتخاب‌شده، `.env` و `src/HireYar.Api/appsettings.Development.local.json` روی PostgreSQL داخل Docker در localhost:5433 تنظیم می‌شوند. پس از روشن‌کردن Docker Desktop:
 
 ```powershell
 docker compose -f compose.dev.yaml up -d postgres mailpit
@@ -101,4 +100,4 @@ pwsh -File scripts/Update-DevelopmentDatabase.ps1
 dotnet run --project src/HireYar.Api --launch-profile https
 ```
 
-اسکریپت migration فقط اتصال محلی Docker همین پروژه را از User Secrets می‌خواند و secret را چاپ نمی‌کند. برای یک checkout جدید ابتدا `.env` و User Secrets را طبق راهنمای بالا تنظیم کنید؛ فایل‌های محلی حاوی secrets همراه Git منتقل نمی‌شوند.
+اسکریپت migration فقط اتصال محلی Docker همین پروژه را از appsettings محلی می‌خواند و secret را چاپ نمی‌کند. برای یک checkout جدید ابتدا `.env` و appsettings محلی را طبق راهنمای بالا تنظیم کنید؛ فایل‌های محلی حاوی secrets همراه Git منتقل نمی‌شوند.
