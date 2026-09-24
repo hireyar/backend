@@ -1,4 +1,5 @@
-version: '3.8'
+```yaml
+name: hireyar
 
 services:
   hireyar-api:
@@ -12,7 +13,26 @@ services:
     ports:
       - "192.168.105.73:5080:8080"
 
-    env_file:
-      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      AllowedHosts: api.hireyar.com
+
+      ConnectionStrings__Default: "Host=192.168.105.73;Port=5432;Database=hireyar;Username=hireyar;Password=N5Na?d)J_S[>"
+
+      Security__SigningKey: "+5Wwyh9YAN4qKtUDW0cffTIcN5jkBixBiKi95K35X+3rOs7BIOLlbn6BNtZ7AvHs"
+      Security__Issuer: "HireYar"
+      Security__Audience: "HireYar.Panel"
+
+      Security__FrontendUrl: "https://hireyar.com"
+      Security__AllowedOrigins__0: "https://hireyar.com"
+
+      Security__DataProtectionPath: "/keys"
+
+    volumes:
+      - protection-keys:/keys
 
     restart: unless-stopped
+
+volumes:
+  protection-keys:
+```
