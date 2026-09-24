@@ -14,10 +14,10 @@
 | tenant isolation، FK مرکب و Dashboard | Verified | رد دسترسی و رابطه بین دو سازمان روی PostgreSQL |
 | موقعیت و قالب و سؤال | Verified | ایجاد، ویرایش، ترتیب، حفظ Id و تعارض نسخه موفق |
 | migration PostgreSQL | Verified | InitialPostgres روی DB خالی اعمال شد؛ script idempotent دو بار اجرا شد |
-| cookie، CSRF و CORS | Verified | تست‌ها موفق؛ تست ترکیبی production در بخش OpenAPI شکست می‌خورد |
-| OpenAPI در Production | InProgress | نقص قبلی HY-010: شرط Development در Program.cs کامنت شده؛ مستندات عمومی پاسخ 200 می‌دهند |
+| cookie، CSRF و CORS | Verified | تست‌های قبلی PostgreSQL موفق؛ تست ترکیبی Production با رفتار جدید OpenAPI هنوز دوباره اجرا نشده |
+| OpenAPI در Production | Verified | Swagger و JSON هر دو پاسخ 200؛ تست مستقل نشان داد API حساب بدون توکن 401 می‌ماند |
 | Docker و SMTP واقعی | Implemented | compose معتبر؛ Docker daemon در دسترس نیست و build/up/SMTP واقعی اجرا نشده |
-| اتصال توسعه و مستندات | Implemented | .env و appsettings.Development.local.json خارج Git برای localhost:5433؛ راهنما و scripts/Update-DevelopmentDatabase.ps1 |
+| اتصال توسعه و مستندات | Implemented | appsettings.Development.local.json خارج Git برای localhost:5433؛ اسکریپت‌های راه‌اندازی و migration |
 
 Verified به معنی اجرای بررسی مربوط است؛ Implemented تنها وجود کد را نشان می‌دهد. ایمیل تست جایگزین حافظه‌ای است؛ ارسال واقعی SMTP تأیید نشده است.
 
@@ -35,8 +35,12 @@ Verified به معنی اجرای بررسی مربوط است؛ Implemented ت�
 
 ## اجرا و محدودیت‌ها
 
-انتخاب کاربر برای استفاده روزمره PostgreSQL داخل Docker در localhost:5433 است. .env و appsettings محلی تنظیم شده‌اند؛ هیچ secret در Git یا گزارش ثبت نشده است. Docker Desktop باید اجرا شود و سپس postgres/mailpit بالا بیایند و migration توسعه اجرا شود. این کانتینرها و دیتابیس توسعه هنوز از این مسیر اجرا/ایجاد نشده‌اند. در بررسی جاری Docker daemon با خطای Access denied قابل اتصال نبود. Build پس از تغییر تنظیمات موفق شد؛ اجرای ۲۴ تست بدون HIREYAR_TEST_POSTGRES همگی Skip شدند. `dotnet tool restore` به دلیل Access denied به NuGet.Config اجرا نشد؛ اعتبارسنجی EF این نوبت انجام نشد.
+رفع خطای startup: `UserSecretsId` قدیمی از پروژه API حذف شد. ASP.NET Core دیگر در Development فایل User Secrets خراب/غیرقابل‌دسترس را پیش از بارگذاری appsettings محلی باز نمی‌کند. Build موفق؛ اجرای واقعی `dotnet run --launch-profile http` با `/health` و `/swagger/index.html` هر دو 200 بود. تست جاری ۱ موفق و ۲۴ Skip به علت نبود HIREYAR_TEST_POSTGRES است.
+
+انتخاب کاربر برای استفاده روزمره PostgreSQL داخل Docker در localhost:5433 است. appsettings محلی تنظیم شده، اما Docker daemon در این محیط Access denied می‌دهد و کانتینرها و SMTP واقعی تأیید نشده‌اند. `dotnet tool restore` به دلیل Access denied به NuGet.Config اجرا نشد؛ اعتبارسنجی EF این نوبت انجام نشد.
+
+بررسی تازه: کاربر `.env` را خالی کرد و Compose به‌درستی متغیرهای اجباری را نیافت. `scripts/Start-DevelopmentContainers.ps1` اکنون رمز دیتابیس و signing key را از appsettings محلی می‌خواند و فقط برای اجرای Compose در محیط فرایند قرار می‌دهد. `.env` از فهرست فایل‌های تحت پیگیری Git خارج شد، ولی محتوای نسخه‌های قبلی هنوز در تاریخچه است و مقادیر قبلی باید در محیط‌های مربوط چرخانده شوند. appsettings محلی از Docker context و خروجی publish کنار گذاشته شد؛ publish Release موفق و نبود فایل محلی در خروجی بررسی شد. اجرای اسکریپت تا فراخوانی Docker تأیید شد؛ daemon با Access denied مانع up واقعی شد. Build موفق و نتیجهٔ تست جاری ۱ موفق، ۲۴ Skip به دلیل نبود HIREYAR_TEST_POSTGRES بود. تست مستقل Production Swagger موفق شد. اجرای API روی میزبان و `/health` پاسخ 200 داشت؛ `/api/auth/me` بدون توکن پاسخ 401 داد.
 
 rowVersion اکنون Base64 از ۱۶ بایت است؛ توکن قبلی SQL Server قابل استفاده نیست. جزئیات در ARCHITECTURE و README است. setup production/TLS و frontend همچنان خارج دامنه‌اند.
 
-برنچ فعال dev و با origin/dev همگام است؛ HEAD برابر e33528f و مهاجرت PostgreSQL در آن commit شده است. تغییرات تنظیمات این نوبت commit/push نشده‌اند؛ دو تغییر محلی پیشین در MembersController و ApiFixture حفظ شده‌اند. production تغییر نکرد.
+برنچ فعال dev است. تغییرات جاری مربوط به اجرای بدون `.env` و Swagger هنوز commit/push نشده‌اند؛ production تغییر نکرد.

@@ -3,6 +3,7 @@
 .git
 .env
 .env.*
+**/appsettings.*.local.json
 TestResults
 artifacts
 **/keys
