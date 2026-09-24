@@ -1,0 +1,81 @@
+using HireYar.Domain.Organizations;
+using HireYar.Domain.JobPositions;
+using HireYar.Domain.InterviewTemplates;
+using HireYar.Infrastructure.Auth;
+using HireYar.Infrastructure.Members;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+namespace HireYar.Infrastructure.Persistence;
+
+public sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organization>
+{
+    public void Configure(EntityTypeBuilder<Organization> b) { b.HasKey(x => x.Id); b.Property(x => x.Name).HasMaxLength(200).IsRequired(); }
+}
+public sealed class UserConfiguration : IEntityTypeConfiguration<ApplicationUser>
+{
+    public void Configure(EntityTypeBuilder<ApplicationUser> b)
+    {
+        b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
+        b.Property(x => x.Email).HasMaxLength(256).IsRequired(); b.Property(x => x.NormalizedEmail).HasMaxLength(256).IsRequired();
+        b.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
+        b.HasIndex(x => x.NormalizedEmail).IsUnique(); b.HasIndex(x => new { x.OrganizationId, x.IsActive });
+        b.HasIndex(x => x.OrganizationId).IsUnique().HasFilter("[Role] = 'Owner'");
+        b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
+        b.ToTable(t => t.HasCheckConstraint("CK_User_Role", "[Role] IN ('Owner','Recruiter')"));
+    }
+}
+public sealed class JobConfiguration : IEntityTypeConfiguration<JobPosition>
+{
+    public void Configure(EntityTypeBuilder<JobPosition> b)
+    {
+        b.HasKey(x => x.Id); b.HasAlternateKey(x => new { x.OrganizationId, x.Id });
+        b.Property(x => x.Title).HasMaxLength(200).IsRequired(); b.Property(x => x.Description).HasMaxLength(10000).IsRequired();
+        b.Property(x => x.Seniority).HasMaxLength(100).IsRequired(); b.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(x => x.RowVersion).IsRowVersion(); b.HasIndex(x => new { x.OrganizationId, x.Status, x.CreatedAtUtc, x.Id });
+        b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
+        b.ToTable(t => t.HasCheckConstraint("CK_Job_Status", "[Status] IN ('Draft','Active','Archived')"));
+    }
+}
+public sealed class TemplateConfiguration : IEntityTypeConfiguration<InterviewTemplate>
+{
+    public void Configure(EntityTypeBuilder<InterviewTemplate> b)
+    {
+        b.HasKey(x => x.Id); b.Property(x => x.Title).HasMaxLength(200).IsRequired(); b.Property(x => x.Language).HasMaxLength(20).IsRequired();
+        b.Property(x => x.RowVersion).IsRowVersion(); b.HasIndex(x => new { x.OrganizationId, x.JobPositionId, x.CreatedAtUtc, x.Id });
+        b.HasOne<JobPosition>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.JobPositionId }).HasPrincipalKey(x => new { x.OrganizationId, x.Id });
+        b.ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_Template_Duration", "[DurationMinutes] BETWEEN 5 AND 60");
+            t.HasCheckConstraint("CK_Template_FollowUps", "[MaxFollowUpQuestionsPerQuestion] BETWEEN 0 AND 3");
+        });
+    }
+}
+public sealed class QuestionConfiguration : IEntityTypeConfiguration<InterviewQuestion>
+{
+    public void Configure(EntityTypeBuilder<InterviewQuestion> b)
+    {
+        b.HasKey(x => x.Id); b.Property(x => x.Text).HasMaxLength(2000).IsRequired(); b.Property(x => x.Competency).HasMaxLength(200).IsRequired();
+        b.Property(x => x.EvaluationGuidance).HasMaxLength(4000).IsRequired(); b.HasIndex(x => new { x.InterviewTemplateId, x.Order }).IsUnique();
+        b.HasOne<InterviewTemplate>().WithMany(x => x.Questions).HasForeignKey(x => x.InterviewTemplateId);
+        b.ToTable(t => t.HasCheckConstraint("CK_Question_Order", "[Order] BETWEEN 1 AND 30"));
+    }
+}
+public sealed class RefreshConfiguration : IEntityTypeConfiguration<RefreshToken>
+{
+    public void Configure(EntityTypeBuilder<RefreshToken> b)
+    {
+        b.HasKey(x => x.Id); b.Property(x => x.Hash).HasMaxLength(64).IsUnicode(false).IsRequired(); b.HasIndex(x => x.Hash).IsUnique();
+        b.HasIndex(x => new { x.UserId, x.FamilyId }); b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId);
+        b.HasOne<RefreshToken>().WithMany().HasForeignKey(x => x.ReplacedById);
+    }
+}
+public sealed class InvitationConfiguration : IEntityTypeConfiguration<TeamInvitation>
+{
+    public void Configure(EntityTypeBuilder<TeamInvitation> b)
+    {
+        b.HasKey(x => x.Id); b.Property(x => x.Email).HasMaxLength(256).IsRequired(); b.Property(x => x.NormalizedEmail).HasMaxLength(256).IsRequired();
+        b.Property(x => x.TokenHash).HasMaxLength(64).IsUnicode(false).IsRequired(); b.HasIndex(x => x.TokenHash).IsUnique();
+        b.HasIndex(x => new { x.OrganizationId, x.NormalizedEmail }).IsUnique().HasFilter("[AcceptedAtUtc] IS NULL AND [CancelledAtUtc] IS NULL");
+        b.HasIndex(x => new { x.OrganizationId, x.ExpiresAtUtc }); b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
+    }
+}

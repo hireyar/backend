@@ -1,0 +1,88 @@
+@baseUrl = http://localhost:5080
+@email = owner@example.test
+@password = <set-local-test-password>
+@csrf = <copy-token-from-csrf-response>
+@access = <copy-access-token-from-login-response>
+@userId = <copy-user-id-from-registration-response>
+@confirmation = <copy-token-from-mailpit-confirmation-link>
+@jobId = <copy-job-id>
+@templateId = <copy-template-id>
+@rowVersion = <copy-base64-row-version>
+
+### Keep the cookie jar enabled. Fetch CSRF again after changing bearer identity.
+GET {{baseUrl}}/api/auth/csrf
+
+### Register: server determines organization, role and active/confirmed flags
+POST {{baseUrl}}/api/auth/register
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"fullName":"Test Owner","organizationName":"Test Organization","email":"{{email}}","password":"{{password}}"}
+
+### Confirm email (POST; token is never put in the API URL)
+POST {{baseUrl}}/api/auth/confirm-email
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"userId":"{{userId}}","token":"{{confirmation}}"}
+
+### Login: refresh token is returned only as an HttpOnly cookie
+POST {{baseUrl}}/api/auth/login
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"email":"{{email}}","password":"{{password}}"}
+
+### Get CSRF for authenticated requests and copy the new token to @csrf
+GET {{baseUrl}}/api/auth/csrf
+Authorization: Bearer {{access}}
+
+### Current profile
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{access}}
+
+### Create job
+POST {{baseUrl}}/api/job-positions
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{"title":"Backend Engineer","description":"Build reliable APIs","seniority":"Senior","status":"Draft"}
+
+### Create template
+POST {{baseUrl}}/api/interview-templates
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{"jobPositionId":"{{jobId}}","title":"Technical interview","language":"fa-IR","durationMinutes":30,"maxFollowUpQuestionsPerQuestion":2,"questions":[{"text":"Explain a technical decision","order":1,"competency":"Judgement","evaluationGuidance":"Look for evidence and trade-offs"}]}
+
+### Archive job with its current rowVersion
+PUT {{baseUrl}}/api/job-positions/{{jobId}}
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{"job":{"title":"Backend Engineer","description":"Build reliable APIs","seniority":"Senior","status":"Archived"},"rowVersion":"{{rowVersion}}"}
+
+### Invite recruiter
+POST {{baseUrl}}/api/members/invitations
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{"email":"recruiter@example.test"}
+
+### Refresh: same bearer identity as the CSRF fetch; after access expires fetch anonymous CSRF and omit Authorization from both
+POST {{baseUrl}}/api/auth/refresh
+Authorization: Bearer {{access}}
+X-CSRF-TOKEN: {{csrf}}
+
+### Logout all
+POST {{baseUrl}}/api/auth/logout-all
+Authorization: Bearer {{access}}
+X-CSRF-TOKEN: {{csrf}}
+
+### Forgot password: generic response does not assert delivery
+POST {{baseUrl}}/api/auth/forgot-password
+Authorization: Bearer {{access}}
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"email":"{{email}}"}
