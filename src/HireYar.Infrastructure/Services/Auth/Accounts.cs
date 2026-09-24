@@ -121,7 +121,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
         var u = await users.FindByIdAsync(userId.ToString()) ?? throw AppException.Unauthorized();
         u.FullName = r.FullName.Trim(); u.UpdatedAtUtc = Now; Check(await users.UpdateAsync(u)); return await GetAsync(userId, ct);
     }
-    private Task<ApplicationUser?> LockUser(Guid id, CancellationToken ct) => db.Users.FromSqlInterpolated($"SELECT * FROM [AspNetUsers] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {id}").SingleOrDefaultAsync(ct);
+    private Task<ApplicationUser?> LockUser(Guid id, CancellationToken ct) => db.Users.FromSqlInterpolated($"SELECT * FROM \"AspNetUsers\" WHERE \"Id\" = {id} FOR UPDATE").SingleOrDefaultAsync(ct);
     private Task<int> Revoke(Guid userId, Guid? family, CancellationToken ct) => db.RefreshTokens.Where(x => x.UserId == userId && (!family.HasValue || x.FamilyId == family) && x.RevokedAtUtc == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAtUtc, Now), ct);
     private SessionResult Issue(ApplicationUser u, Guid family)
     {

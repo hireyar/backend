@@ -8,6 +8,6 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<App
     public AppDbContext CreateDbContext(string[] args)
     {
         var connection = Environment.GetEnvironmentVariable("ConnectionStrings__Default") ?? throw new InvalidOperationException("Set ConnectionStrings__Default for EF tooling.");
-        return new(new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(connection).Options);
+        return new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connection).Options);
     }
 }

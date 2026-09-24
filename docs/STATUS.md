@@ -1,57 +1,42 @@
 # وضعیت جاری
 
-آخرین به‌روزرسانی: 2026-09-24. مرحله ۱: بک‌اند حساب‌های سازمانی و API پنل HR.
-هدف پایان: تمام APIهای این مرحله، جداسازی سازمان، نشست امن، migration، مستندات و تست ریسک‌های اصلی؛ صحت اجرای container و SMTP محلی هنوز نیازمند محیط قابل اجرا است.
+آخرین به‌روزرسانی: 2026-09-24. مرحله ۱، بک‌اند سازمان و پنل HR. پایگاه داده جاری **PostgreSQL 18** است؛ تصمیم SQL Server با درخواست صریح کاربر جایگزین شد و داده قبلی نیاز به انتقال ندارد.
 
-Implemented یعنی کد موجود است؛ Verified یعنی بررسی مربوط واقعاً اجرا شده است. تست API با ایمیل جایگزین، صحت ارسال واقعی SMTP را ثابت نمی‌کند.
+## وضعیت قابلیت‌ها
 
-| قابلیت | وضعیت | مسیر و شواهد |
+| قابلیت | وضعیت | شواهد |
 |---|---|---|
-| Solution .NET 10 و مرز پروژه‌ها | Verified | `src/` و `HireYar.slnx`؛ restore/build موفق |
-| ثبت‌نام اتمیک، ایمیل یکتا و تأیید یک‌بارمصرف | Verified | `Infrastructure/Services/Auth/Accounts.cs` زیر src؛ تست transaction، duplicate و رقابت ثبت‌نام |
-| ورود، lockout و مجوز جاری | Verified | `Api/Security/CurrentAccountValidation.cs` و Accounts؛ نقش جاری، کاربر غیرفعال و JWT نامعتبر/منقضی بررسی شد |
-| refresh rotation/replay/هم‌زمانی | Verified | Accounts؛ فقط یک جانشین و ابطال خانواده در replay روی SQL واقعی |
-| logout/all، reset/change، پروفایل | Verified | `Api/Controllers/AuthController.cs`؛ ابطال refreshها و overposting بررسی شد |
-| سازمان و دعوت/اعضا | Verified | `Application/Services/Organizations/` و `Infrastructure/Services/Members/`؛ نقش، لغو، انقضا، resend و پذیرش هم‌زمان |
-| جداسازی سازمان و Dashboard | Verified | `Application/Services/Dashboard/`؛ دسترسی بین دو سازمان و FK مرکب روی SQL واقعی |
-| موقعیت، قالب، سؤال و RowVersion | Verified | `Application/Services/JobPositions/` و `Application/Services/InterviewTemplates/`؛ ترتیب، حفظ Id، افزودن/حذف و 409 |
-| cookie/CSRF/CORS و startup امن | Verified | `Api/Program.cs`, `Api/Security/`؛ Secure در production، CSRF ناقص، origin غیرمجاز، نبود کلید |
-| OpenAPI و UI توسعه | Implemented | OpenAPI JSON در integration بررسی شد؛ UI مرورگر دستی بررسی نشده |
-| SMTP فارسی و مدیریت شکست | Implemented | `Infrastructure/Services/Email/SmtpEmailSender.cs`؛ شکست/بازیابی با test double بررسی شد؛ Mailpit واقعی اجرا نشده |
-| Dockerfile و compose توسعه | Implemented | فایل‌های ریشه؛ Docker Linux engine روی میزبان در اجرا نبود؛ build/up انجام نشده |
-| مستندات و نمونه HTTP | Implemented | README، AGENTS، docs و `src/HireYar.Api/HireYar.Api.http` |
+| ساختار، Controller، Services/DTOs/Interfaces | Verified | build Release با صفر warning/error |
+| ثبت‌نام اتمیک، ایمیل یکتا، تأیید، ورود و lockout | Verified | تست روی PostgreSQL واقعی 18.3 |
+| refresh rotation/replay و هم‌زمانی، logout/all | Verified | تک‌جانشینی و ابطال خانواده نشست روی PostgreSQL |
+| reset/change password، پروفایل | Verified | تست موجود روی PostgreSQL موفق |
+| سازمان، نقش، دعوت، انقضا/لغو/resend و فعال‌سازی | Verified | تست نقش جاری و پذیرش هم‌زمان موفق |
+| tenant isolation، FK مرکب و Dashboard | Verified | رد دسترسی و رابطه بین دو سازمان روی PostgreSQL |
+| موقعیت و قالب و سؤال | Verified | ایجاد، ویرایش، ترتیب، حفظ Id و تعارض نسخه موفق |
+| migration PostgreSQL | Verified | InitialPostgres روی DB خالی اعمال شد؛ script idempotent دو بار اجرا شد |
+| cookie، CSRF و CORS | Verified | تست‌ها موفق؛ تست ترکیبی production در بخش OpenAPI شکست می‌خورد |
+| OpenAPI در Production | InProgress | نقص قبلی HY-010: شرط Development در Program.cs کامنت شده؛ مستندات عمومی پاسخ 200 می‌دهند |
+| Docker و SMTP واقعی | Implemented | compose معتبر؛ Docker daemon در دسترس نیست و build/up/SMTP واقعی اجرا نشده |
+| اتصال توسعه و مستندات | Implemented | .env خارج Git و User Secrets برای localhost:5433؛ راهنما و scripts/Update-DevelopmentDatabase.ps1 |
 
-مسیرهای کوتاه در جدول نسبت به `src/HireYar.*` هستند؛ برای مثال `Infrastructure/Auth` یعنی `src/HireYar.Infrastructure/Auth`.
+Verified به معنی اجرای بررسی مربوط است؛ Implemented تنها وجود کد را نشان می‌دهد. ایمیل تست جایگزین حافظه‌ای است؛ ارسال واقعی SMTP تأیید نشده است.
 
-## migration و بررسی‌ها
+## نتیجه واقعی آخرین بررسی‌ها
 
-- migration موجود: `src/HireYar.Infrastructure/Persistence/Migrations/20260924065711_InitialCreate.cs` و snapshot متناظر.
-- migration در دیتابیس‌های تست تصادفی SQL Server 2019 محلی اعمال شد؛ هیچ دیتابیس موجود/production تغییر نکرد.
-- `dotnet restore`: موفق؛ وابستگی‌های Microsoft مربوط به EF/ASP.NET همگی 10.0.12، SwaggerUI برابر 10.0.1.
-- `dotnet build --no-restore`: موفق، صفر warning و error.
-- `HIREYAR_TEST_SQL` برای localhost تنظیم و `dotnet test --logger 'trx;LogFileName=integration.trx' --results-directory TestResults` اجرا شد: **۲۴ موفق، صفر شکست، صفر Skip**.
-- بررسی نهایی پس از مرتب‌سازی فایل‌ها: `dotnet build HireYar.slnx -c Release --no-restore` موفق با صفر warning/error؛ `dotnet test HireYar.slnx -c Release --no-build --logger 'trx;LogFileName=integration-release.trx' --results-directory TestResults` با ۲۴ موفق، صفر شکست و صفر Skip.
-- گزارش‌های محلی: `TestResults/integration.trx` و `TestResults/integration-release.trx` (خارج Git).
-- `dotnet ef migrations script --idempotent ...`: موفق؛ `artifacts/migrations.sql` برای بازبینی تولید شد (خارج Git).
-- `dotnet ef migrations has-pending-model-changes ...`: بدون اختلاف مدل و migration.
-- اجرای نخست خطای validation record داشت؛ انتقال attributeها به پارامتر constructor مشکل را رفع کرد و تست‌ها دوباره موفق شدند.
+- `dotnet restore HireYar.slnx`: موفق. provider برابر Npgsql.EntityFrameworkCore.PostgreSQL 10.0.3؛ EF/ASP.NET نسخه 10.0.12 و SDK 10.0.400.
+- `dotnet build HireYar.slnx -c Release --no-restore`: موفق، صفر warning/error.
+- `dotnet test HireYar.slnx -c Release --logger 'trx;LogFileName=postgres.trx' --results-directory TestResults` با HIREYAR_TEST_POSTGRES: **۲۳ موفق، ۱ شکست، صفر Skip**.
+- شکست همان `Production_sets_secure_cookies_and_hides_openapi` است که پیش از مهاجرت هم وجود داشت؛ Program.cs در این تغییر دست‌نخورده است. نتیجه قدیمی ۲۴/۲۴ مرجع checkout فعلی نیست.
+- تست‌ها با باینری PostgreSQL 18.3 نصب‌شده و یک cluster جدا در artifacts/pg-validation روی loopback:55432 اجرا شدند؛ سرویس PostgreSQL موجود و SQL Server قبلی تغییر نکردند. instance آزمایشی پس از کار متوقف شد؛ دیتابیس‌های تصادفی تست حذف شدند.
+- migration جاری: `src/HireYar.Infrastructure/Persistence/Migrations/20260924081519_InitialPostgres.cs` و snapshot متناظر. InitialCreate مخصوص SQL Server جایگزین شده است؛ migration داده بین دو provider انجام نمی‌شود.
+- `dotnet ef migrations has-pending-model-changes ... --configuration Release`: بدون اختلاف.
+- `dotnet ef migrations script --idempotent ... --output artifacts/postgres-migrations.sql`: موفق؛ اسکریپت دو بار روی DB تصادفی مستقل با psql و ON_ERROR_STOP اجرا شد؛ هر دو موفق. DB بررسی حذف شد.
+- `docker compose --env-file .env.example -f compose.dev.yaml config --quiet`: موفق؛ فقط اعتبارسنجی ساختار است.
 
-## محدودیت‌ها و بررسی‌های باقی‌مانده
+## اجرا و محدودیت‌ها
 
-Docker build/compose و ارسال واقعی SMTP به Mailpit اجرا نشده‌اند چون Docker Linux engine در دسترس نبود. ایمیل واقعی به هیچ کاربری ارسال نشد. TLS/reverse proxy، کلیدگذاری و deployment واقعی خارج دامنه این مرحله هستند. تست‌ها رفتار HTTP را با TestServer می‌سنجند؛ مرورگر Angular و دامنه‌های واقعی هنوز آزموده نشده‌اند. هیچ نقص شناخته‌شدهٔ شکست‌خورده در مجموعه تست جاری باقی نمانده؛ این ادعا معادل ممیزی کامل امنیت یا آماده‌بودن production نیست.
+انتخاب کاربر برای استفاده روزمره PostgreSQL داخل Docker در localhost:5433 است. .env و User Secrets محلی تنظیم شده‌اند؛ هیچ secret در Git یا گزارش ثبت نشده است. Docker Desktop باید اجرا شود و سپس postgres/mailpit بالا بیایند و migration توسعه اجرا شود. این کانتینرها و دیتابیس توسعه هنوز از این مسیر اجرا/ایجاد نشده‌اند.
 
-برنچ فعال `dev`؛ `production` و `main` روی commit اولیه باقی‌اند. تغییرات پیاده‌سازی commit/push نشده‌اند.
+rowVersion اکنون Base64 از ۱۶ بایت است؛ توکن قبلی SQL Server قابل استفاده نیست. جزئیات در ARCHITECTURE و README است. setup production/TLS و frontend همچنان خارج دامنه‌اند.
 
- 
-بررسی ساختار compose: `docker compose --env-file .env.example -f compose.dev.yaml config --quiet` موفق؛ این فقط اعتبارسنجی پیکربندی است و به معنی اجرای سرویس‌ها نیست.
-`2026-09-24`: خطای startup محلی ناشی از نبود SigningKey بود؛ کلید تصادفی در User Secrets ذخیره و اتصال توسعهٔ محلی تنظیم شد. اجرای Development و GET /health با HTTP 200 بررسی شد؛ دیتابیس توسعه یا migration در این بررسی تغییر نکرد.
-`2026-09-24`، رفع 401 روی Swagger: middleware مربوط به UI در Development قبل از fallback authorization قرار گرفت. تست redirect /swagger، HTML، CSS، OpenAPI و محافظت API پاس شد؛ تست محدودیت Production نیز پاس شد (۲ تست منتخب Release؛ TestResults/swagger-fix.trx). فرایند در حال اجرای قبلی باید برای دریافت اصلاح rebuild/restart شود.
-
-
-## آخرین بررسی پس از مرتب‌سازی پوشه‌ها
-
-طبق انتخاب کاربر فقط فایل‌بندی تغییر کرد: Controllers، Services، DTOs و Interfaces جدا شدند؛ مسیر Service → IApplicationDbContext حفظ شد. `dotnet build HireYar.slnx -c Release --no-restore`: موفق با صفر warning/error.
-
-`dotnet test HireYar.slnx -c Release --no-build --logger 'trx;LogFileName=folder-structure.trx' --results-directory TestResults`: ۲۳ موفق، ۱ شکست، صفر Skip. این نتیجه جایگزین نتیجه ۲۴/۲۴ قبلی برای checkout فعلی است.
-
-شکست `Production_sets_secure_cookies_and_hides_openapi` به شرط `//if (app.Environment.IsDevelopment())` در Program.cs مربوط است که در commit پایه 1b86ec4 وجود داشت. OpenAPI در Production پاسخ 200 می‌دهد. Program.cs در این بازآرایی تغییر نکرد؛ رفتار موجود کاربر حفظ شد. ادعای قبلی «هیچ تست شکست‌خورده‌ای باقی نمانده» دیگر برای checkout فعلی معتبر نیست؛ HY-010 ثبت شد.
+برنچ فعال dev؛ مبنای این نوبت dc61cd2 است. تغییرات PostgreSQL commit/push نشده‌اند. main و production در این نوبت تغییر نکردند.

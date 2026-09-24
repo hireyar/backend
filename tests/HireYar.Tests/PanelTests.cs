@@ -9,13 +9,13 @@ using HireYar.Domain.Organizations;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Tests;
 
-[Collection("Sql")]
+[Collection("Postgres")]
 public sealed class PanelTests(ApiFixture f)
 {
     private static async Task<JsonElement> Job(Browser c, string title = "Backend")
     { var response = await c.Send(HttpMethod.Post, "/api/job-positions", new { title, description = "Job description", seniority = "Senior", status = "Draft" }); Assert.Equal(HttpStatusCode.Created, response.StatusCode); return await response.Content.ReadFromJsonAsync<JsonElement>(); }
     private static object Template(Guid job, IEnumerable<object>? questions = null) => new { jobPositionId = job, title = "Interview", durationMinutes = 30, maxFollowUpQuestionsPerQuestion = 2, language = "fa-IR", isArchived = false, questions = questions ?? new[] { new { text = "Explain a decision", order = 1, competency = "Judgement", evaluationGuidance = "Evidence" } } };
-    [SqlFact]
+    [PostgresFact]
     public async Task Tenant_reads_writes_dashboard_and_related_records_are_isolated()
     {
         var a = await f.RegisterConfirmed(); var b = await f.RegisterConfirmed(); var job = await Job(a.Client); var id = job.GetProperty("id").GetGuid();
@@ -28,7 +28,7 @@ public sealed class PanelTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.NotFound, (await b.Client.Send(HttpMethod.Get, $"/api/interview-templates/{template.GetProperty("id").GetGuid()}")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Get, "/api/job-positions?pageSize=101")).StatusCode);
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Job_and_template_stale_versions_conflict_and_question_order_swaps_preserve_ids()
     {
         var a = await f.RegisterConfirmed(); var job = await Job(a.Client); var id = job.GetProperty("id").GetGuid();
@@ -48,14 +48,14 @@ public sealed class PanelTests(ApiFixture f)
         var foreign = new { template = Template(id, new[] { new { id = Guid.NewGuid(), text = "Unknown", order = 1, competency = "A", evaluationGuidance = "A" } }), rowVersion = final.RowVersion };
         Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Put, $"/api/interview-templates/{template.Id}", foreign)).StatusCode);
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Template_validation_rejects_invalid_order_count_and_limits()
     {
         var a = await f.RegisterConfirmed(); var job = await Job(a.Client); var id = job.GetProperty("id").GetGuid();
         Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Post, "/api/interview-templates", Template(id, Array.Empty<object>()))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Post, "/api/interview-templates", Template(id, new[] { new { text = "A", order = 1, competency = "A", evaluationGuidance = "A" }, new { text = "B", order = 1, competency = "A", evaluationGuidance = "A" } }))).StatusCode);
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Invitations_are_single_use_and_recruiter_cannot_manage_members_or_organization()
     {
         var owner = await f.RegisterConfirmed(); var email = $"{Guid.NewGuid():N}@example.test";
@@ -75,7 +75,7 @@ public sealed class PanelTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.NoContent, (await owner.Client.Send(HttpMethod.Put, $"/api/members/{id}/active", new ActiveRequest(true))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Put, $"/api/members/{owner.Id}/active", new ActiveRequest(false))).StatusCode);
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Expired_cancelled_resent_and_cross_tenant_invitations_are_safe()
     {
         var a = await f.RegisterConfirmed(); var b = await f.RegisterConfirmed(); var email = $"{Guid.NewGuid():N}@example.test";
@@ -90,7 +90,7 @@ public sealed class PanelTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.BadRequest, (await f.Browser().Send(HttpMethod.Post, "/api/auth/invitations/accept", new AcceptInviteRequest(current, "Name", "Valid-test-password1!"))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await a.Client.Send(HttpMethod.Post, "/api/members/invitations", new InviteRequest(b.Email))).StatusCode);
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Concurrent_invitation_acceptance_creates_one_recruiter()
     {
         var a = await f.RegisterConfirmed(); var email = $"{Guid.NewGuid():N}@example.test"; await a.Client.Send(HttpMethod.Post, "/api/members/invitations", new InviteRequest(email));
@@ -99,7 +99,7 @@ public sealed class PanelTests(ApiFixture f)
         Assert.Single(responses, x => x.StatusCode == HttpStatusCode.NoContent); Assert.Single(responses, x => x.StatusCode == HttpStatusCode.BadRequest);
         await f.Db(async db => Assert.Equal(1, await db.Users.CountAsync(x => x.Email == email)));
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Existing_access_token_uses_current_role()
     {
         var a = await f.RegisterConfirmed(); await f.Db(async db => { var u = await db.Users.FindAsync(a.Id); u!.Role = OrganizationRole.Recruiter; await db.SaveChangesAsync(); });
