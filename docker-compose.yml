@@ -18,7 +18,7 @@ services:
       AllowedHosts: api.hireyar.com
 
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=hireyar_development;Username=hireyar;Password=${POSTGRES_PASSWORD}"
-      Security__SigningKey: ${JWT_SIGNING_KEY}
+      Security__SigningKey: "nv7jG+aGuL3dtTeXsHUsuQRFhrDl36QwHSpNvY5S9bGryNWvMA6wsndFa+l8bR1g"
 
       Security__Issuer: "HireYar"
       Security__Audience: "HireYar.Panel"
