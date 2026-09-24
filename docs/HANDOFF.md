@@ -1,6 +1,6 @@
 # ادامه کار
 
-آخرین کار: انتقال بک‌اند از SQL Server به PostgreSQL طبق درخواست کاربر؛ داده SQL Server مهم نیست و مهاجرت از دیتابیس خالی انجام می‌شود. SQL Server و PostgreSQL نصب‌شده قبلی دست‌نخورده‌اند.
+آخرین کار: تنظیم JWT signing key و اتصال PostgreSQL در `src/HireYar.Api/appsettings.Development.local.json` طبق درخواست کاربر؛ فایل محلی در Git نادیده گرفته شده و مقادیر آن از `.env` توسعه گرفته شده‌اند. Program و EF design-time این فایل را می‌خوانند؛ متغیر محیطی بر آن مقدم است. اسکریپت migration هم همین appsettings محلی را می‌خواند. تغییرات پیشین کاربر در MembersController و ApiFixture حفظ شده‌اند.
 
 ابتدا AGENTS، PROJECT، ARCHITECTURE (ADR-012)، STATUS و BACKLOG را بخوان. provider اکنون Npgsql EF Core 10.0.3 است. migration InitialPostgres جای InitialCreate را گرفته؛ از script قبلی artifacts/migrations.sql استفاده نکن، script جدید artifacts/postgres-migrations.sql است.
 
@@ -10,4 +10,4 @@ build Release موفق؛ تست‌ها ۲۳ موفق و ۱ شکست قبلی Ope
 
 کاربر برای توسعه روزمره Docker PostgreSQL روی localhost:5433 را انتخاب کرد. .env خارج Git و User Secrets به این اتصال تنظیم شده‌اند. Docker daemon در دسترس نبود؛ قدم بعد HY-006: Docker Desktop را روشن کن، `docker compose -f compose.dev.yaml up -d postgres mailpit` سپس `pwsh -File scripts/Update-DevelopmentDatabase.ps1`. اسکریپت فقط اتصال همین دیتابیس توسعه را می‌پذیرد و secret چاپ نمی‌کند. اجرای واقعی compose/SMTP و خود helper هنوز تأیید اجرایی نشده‌اند.
 
-برنچ dev بر پایه dc61cd2؛ همه تغییرات این نوبت commit نشده‌اند. هیچ push/deploy انجام نشده است. main در آغاز فعال بود و به dev برگشتیم؛ فایل‌های IDE باز دست‌نخورده باقی ماندند. namespaceها و ساختار Controllers/Services/DTOs/Interfaces حفظ شدند؛ Repository اضافه نشده است.
+برنچ dev اکنون بر پایه e33528f و با origin/dev همگام است؛ مهاجرت PostgreSQL commit شده، تغییرات تنظیمات این نوبت commit نشده‌اند. هیچ push/deploy انجام نشده است. build موفق؛ تست جاری بدون HIREYAR_TEST_POSTGRES همگی Skip شدند. `dotnet tool restore` در این محیط به NuGet.Config دسترسی نداشت؛ بررسی EF اجرا نشد. Docker daemon هم Access denied داد. HY-006، HY-007 و HY-010 هنوز باز هستند.

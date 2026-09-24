@@ -5,6 +5,7 @@
 .env
 .env.*
 !.env.example
+**/appsettings.*.local.json
 TestResults/
 artifacts/
 keys/

@@ -1,6 +1,6 @@
 # وضعیت جاری
 
-آخرین به‌روزرسانی: 2026-09-24. مرحله ۱، بک‌اند سازمان و پنل HR. پایگاه داده جاری **PostgreSQL 18** است؛ تصمیم SQL Server با درخواست صریح کاربر جایگزین شد و داده قبلی نیاز به انتقال ندارد.
+آخرین به‌روزرسانی: 2026-09-24. مرحله ۱، بک‌اند سازمان و پنل HR. پایگاه داده جاری **PostgreSQL 18** است؛ تصمیم SQL Server با درخواست صریح کاربر جایگزین شد و داده قبلی نیاز به انتقال ندارد. تنظیمات محلی JWT و اتصال دیتابیس اکنون در `src/HireYar.Api/appsettings.Development.local.json` قرار می‌گیرند؛ فایل در Git نادیده گرفته می‌شود و متغیرهای محیطی اولویت بالاتر دارند.
 
 ## وضعیت قابلیت‌ها
 
@@ -17,7 +17,7 @@
 | cookie، CSRF و CORS | Verified | تست‌ها موفق؛ تست ترکیبی production در بخش OpenAPI شکست می‌خورد |
 | OpenAPI در Production | InProgress | نقص قبلی HY-010: شرط Development در Program.cs کامنت شده؛ مستندات عمومی پاسخ 200 می‌دهند |
 | Docker و SMTP واقعی | Implemented | compose معتبر؛ Docker daemon در دسترس نیست و build/up/SMTP واقعی اجرا نشده |
-| اتصال توسعه و مستندات | Implemented | .env خارج Git و User Secrets برای localhost:5433؛ راهنما و scripts/Update-DevelopmentDatabase.ps1 |
+| اتصال توسعه و مستندات | Implemented | .env و appsettings.Development.local.json خارج Git برای localhost:5433؛ راهنما و scripts/Update-DevelopmentDatabase.ps1 |
 
 Verified به معنی اجرای بررسی مربوط است؛ Implemented تنها وجود کد را نشان می‌دهد. ایمیل تست جایگزین حافظه‌ای است؛ ارسال واقعی SMTP تأیید نشده است.
 
@@ -35,8 +35,8 @@ Verified به معنی اجرای بررسی مربوط است؛ Implemented ت�
 
 ## اجرا و محدودیت‌ها
 
-انتخاب کاربر برای استفاده روزمره PostgreSQL داخل Docker در localhost:5433 است. .env و User Secrets محلی تنظیم شده‌اند؛ هیچ secret در Git یا گزارش ثبت نشده است. Docker Desktop باید اجرا شود و سپس postgres/mailpit بالا بیایند و migration توسعه اجرا شود. این کانتینرها و دیتابیس توسعه هنوز از این مسیر اجرا/ایجاد نشده‌اند.
+انتخاب کاربر برای استفاده روزمره PostgreSQL داخل Docker در localhost:5433 است. .env و appsettings محلی تنظیم شده‌اند؛ هیچ secret در Git یا گزارش ثبت نشده است. Docker Desktop باید اجرا شود و سپس postgres/mailpit بالا بیایند و migration توسعه اجرا شود. این کانتینرها و دیتابیس توسعه هنوز از این مسیر اجرا/ایجاد نشده‌اند. در بررسی جاری Docker daemon با خطای Access denied قابل اتصال نبود. Build پس از تغییر تنظیمات موفق شد؛ اجرای ۲۴ تست بدون HIREYAR_TEST_POSTGRES همگی Skip شدند. `dotnet tool restore` به دلیل Access denied به NuGet.Config اجرا نشد؛ اعتبارسنجی EF این نوبت انجام نشد.
 
 rowVersion اکنون Base64 از ۱۶ بایت است؛ توکن قبلی SQL Server قابل استفاده نیست. جزئیات در ARCHITECTURE و README است. setup production/TLS و frontend همچنان خارج دامنه‌اند.
 
-برنچ فعال dev؛ مبنای این نوبت dc61cd2 است. تغییرات PostgreSQL commit/push نشده‌اند. main و production در این نوبت تغییر نکردند.
+برنچ فعال dev و با origin/dev همگام است؛ HEAD برابر e33528f و مهاجرت PostgreSQL در آن commit شده است. تغییرات تنظیمات این نوبت commit/push نشده‌اند؛ دو تغییر محلی پیشین در MembersController و ApiFixture حفظ شده‌اند. production تغییر نکرد.
