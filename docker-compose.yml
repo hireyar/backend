@@ -17,8 +17,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       AllowedHosts: api.hireyar.com
 
-      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=hireyar_development;Username=hireyar;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
-      Security__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=hireyar_development;Username=hireyar;Password=${POSTGRES_PASSWORD}"
+      Security__SigningKey: ${JWT_SIGNING_KEY}
 
       Security__Issuer: "HireYar"
       Security__Audience: "HireYar.Panel"
