@@ -38,6 +38,8 @@ public sealed class TestClock : TimeProvider
 public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public bool Production { get; init; }
+    public bool UpgradeFromStageOne { get; init; }
+    public Guid UpgradeOrganizationId { get; } = Guid.NewGuid();
     public TestEmail Email { get; } = new(); public TestClock Clock { get; } = new();
     private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
     private string? connection;
@@ -59,7 +61,15 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         var parsed = new NpgsqlConnectionStringBuilder(raw);
         if (!new[] { "localhost", "127.0.0.1", "::1" }.Contains(parsed.Host, StringComparer.OrdinalIgnoreCase)) throw new InvalidOperationException("Tests only accept a local PostgreSQL.");
         parsed.Database = database; connection = parsed.ConnectionString;
-        await using var scope = Services.CreateAsyncScope(); await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+        await using var scope = Services.CreateAsyncScope(); 
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (UpgradeFromStageOne)
+        {
+            var migrator = db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>();
+            await migrator.MigrateAsync("20260924081519_InitialPostgres");
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"Organizations\" (\"Id\", \"Name\", \"CreatedAtUtc\") VALUES ({UpgradeOrganizationId}, {'S' + "tage one test"}, {DateTimeOffset.UtcNow})");
+        }
+        await db.Database.MigrateAsync();
     }
     async Task IAsyncLifetime.DisposeAsync()
     {
@@ -97,9 +107,9 @@ public sealed class Browser(HttpClient client)
     public async Task<HttpResponseMessage> Send(HttpMethod method, string url, object? body = null, bool csrf = true, string? origin = null)
     {
         string? token = null;
-        if (csrf && method != HttpMethod.Get && url.StartsWith("/api/auth", StringComparison.Ordinal))
+        if (csrf && method != HttpMethod.Get && (url.StartsWith("/api/auth", StringComparison.Ordinal) || url.StartsWith("/api/candidate-interview", StringComparison.Ordinal)))
         {
-            using var csrfRequest = Request(HttpMethod.Get, "/api/auth/csrf"); using var response = await client.SendAsync(csrfRequest); Capture(response);
+            using var csrfRequest = Request(HttpMethod.Get, url.StartsWith("/api/candidate-interview", StringComparison.Ordinal) ? "/api/candidate-interview/csrf" : "/api/auth/csrf"); using var response = await client.SendAsync(csrfRequest); Capture(response);
             var doc = await response.Content.ReadFromJsonAsync<JsonElement>(); token = doc.GetProperty("token").GetString();
         }
         using var request = Request(method, url, body); if (token is not null) request.Headers.Add("X-CSRF-TOKEN", token); if (origin is not null) request.Headers.Add("Origin", origin);

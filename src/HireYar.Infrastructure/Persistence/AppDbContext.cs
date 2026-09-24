@@ -11,6 +11,26 @@ namespace HireYar.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options), IApplicationDbContext
 {
+    public DbSet<HireYar.Domain.Hiring.Candidate> Candidates => Set<HireYar.Domain.Hiring.Candidate>();
+    public DbSet<HireYar.Domain.Hiring.JobApplication> JobApplications => Set<HireYar.Domain.Hiring.JobApplication>();
+    public DbSet<HireYar.Domain.Hiring.InterviewSession> InterviewSessions => Set<HireYar.Domain.Hiring.InterviewSession>();
+    public DbSet<HireYar.Domain.Hiring.InterviewInvitation> InterviewInvitations => Set<HireYar.Domain.Hiring.InterviewInvitation>();
+    public DbSet<HireYar.Domain.Hiring.InterviewAnswer> InterviewAnswers => Set<HireYar.Domain.Hiring.InterviewAnswer>();
+    public async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginHiringTransactionAsync(Guid organizationId, CancellationToken ct)
+    {
+        var tx = await Database.BeginTransactionAsync(ct);
+        try
+        {
+            await Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM \"Organizations\" WHERE \"Id\" = {organizationId} FOR UPDATE", ct);
+            return tx;
+        }
+        catch { await tx.DisposeAsync(); throw; }
+    }
+    public async Task LockInterviewSourcesAsync(Guid organizationId, Guid jobId, Guid templateId, CancellationToken ct)
+    {
+        await Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM \"JobPositions\" WHERE \"Id\" = {jobId} AND \"OrganizationId\" = {organizationId} FOR UPDATE", ct);
+        await Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM \"InterviewTemplates\" WHERE \"Id\" = {templateId} AND \"OrganizationId\" = {organizationId} FOR UPDATE", ct);
+    }
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<JobPosition> JobPositions => Set<JobPosition>();
     public DbSet<InterviewTemplate> InterviewTemplates => Set<InterviewTemplate>();
@@ -30,7 +50,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
         // and rotate a 128-bit application-managed concurrency token on every write.
         foreach (var entry in ChangeTracker.Entries().Where(e =>
             e.State is EntityState.Added or EntityState.Modified &&
-            (e.Entity is JobPosition || e.Entity is InterviewTemplate)))
+            e.Metadata.FindProperty("RowVersion") is not null))
             entry.Property("RowVersion").CurrentValue = Guid.NewGuid().ToByteArray();
         return base.SaveChangesAsync(ct);
     }

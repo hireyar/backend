@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using HireYar.Api.Errors;
 using HireYar.Api.Security;
 using HireYar.Application.Auth;
+using HireYar.Application.Hiring;
 using HireYar.Application.Common;
 using HireYar.Application.Dashboard;
 using HireYar.Application.InterviewTemplates;
@@ -31,6 +32,7 @@ if (string.IsNullOrWhiteSpace(security.DataProtectionPath)) throw new InvalidOpe
 builder.Services.AddDataProtection().SetApplicationName("HireYar").PersistKeysToFileSystem(new DirectoryInfo(security.DataProtectionPath));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor(); builder.Services.AddScoped<ICurrentUser, CurrentUser>(); builder.Services.AddScoped<CurrentAccountValidation>();
+builder.Services.AddScoped<CandidateService>(); builder.Services.AddScoped<InterviewManagementService>(); builder.Services.AddScoped<CandidateInterviewService>();
 builder.Services.AddScoped<AuthService>(); builder.Services.AddScoped<MemberService>(); builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
 builder.Services.AddControllers().AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
 builder.Services.Configure<ApiBehaviorOptions>(o => o.InvalidModelStateResponseFactory = c =>
@@ -67,7 +69,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 });
 builder.Services.AddAuthorization(o => o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(security.AllowedOrigins).AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
-builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "hireyar.csrf"; o.Cookie.HttpOnly = true; o.Cookie.Path = "/api/auth"; o.Cookie.SameSite = SameSiteMode.Strict; o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; });
+builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "hireyar.csrf.v2"; o.Cookie.HttpOnly = true; o.Cookie.Path = "/api"; o.Cookie.SameSite = SameSiteMode.Strict; o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; });
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
@@ -83,10 +85,10 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
 {
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
         operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = [] }];
-    if (context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true && context.Description.HttpMethod != "GET")
+    if ((context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true || context.Description.RelativePath?.StartsWith("api/candidate-interview", StringComparison.Ordinal) == true) && context.Description.HttpMethod != "GET")
     {
         operation.Parameters ??= [];
-        operation.Parameters.Add(new OpenApiParameter { Name = "X-CSRF-TOKEN", In = ParameterLocation.Header, Required = true, Description = "Obtain from GET /api/auth/csrf using the same bearer identity and cookie jar.", Schema = new OpenApiSchema { Type = JsonSchemaType.String } });
+        operation.Parameters.Add(new OpenApiParameter { Name = "X-CSRF-TOKEN", In = ParameterLocation.Header, Required = true, Description = "Obtain from the matching /api/auth/csrf or /api/candidate-interview/csrf with the same identity and cookie jar. Candidate routes use only the hireyar.candidate cookie; omit HR bearer tokens.", Schema = new OpenApiSchema { Type = JsonSchemaType.String } });
     }
     var schema = await context.GetOrCreateSchemaAsync(typeof(ProblemDetails), null, ct);
     operation.Responses ??= new();
@@ -105,13 +107,13 @@ if (app.Environment.IsDevelopment())
 }
 app.UseRouting(); app.UseCors(); app.UseAuthentication(); app.UseRateLimiter(); app.UseAuthorization();
 app.MapControllers(); app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
-//if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
-    app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
 }
 app.Run();
 public partial class Program;
+
 
 
 

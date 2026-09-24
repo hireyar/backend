@@ -17,6 +17,7 @@ public static class DependencyInjection
     {
         services.AddDbContext<AppDbContext>(o => o.UseNpgsql(config.GetConnectionString("Default")));
         services.AddScoped<IApplicationDbContext>(s => s.GetRequiredService<AppDbContext>());
+        services.AddScoped<HireYar.Application.Hiring.IInterviewEmail, HireYar.Infrastructure.Hiring.InterviewEmailSender>();
         services.AddIdentityCore<ApplicationUser>(o =>
         {
             o.User.RequireUniqueEmail = true; o.Password.RequiredLength = 12; o.Password.RequireNonAlphanumeric = true;
