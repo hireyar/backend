@@ -1,0 +1,52 @@
+
+name: hireyar
+
+services:
+  hireyar-api:
+    image: hireyar-api:latest
+    container_name: hireyar-api
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - "192.168.105.73:5080:8080"
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      AllowedHosts: api.hireyar.com
+
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=hireyar_development;Username=hireyar;Password=${POSTGRES_PASSWORD}"
+      Security__SigningKey: "nv7jG+aGuL3dtTeXsHUsuQRFhrDl36QwHSpNvY5S9bGryNWvMA6wsndFa+l8bR1g"
+
+      Security__Issuer: "HireYar"
+      Security__Audience: "HireYar.Panel"
+
+      Security__FrontendUrl: "https://hireyar.com"
+      Security__AllowedOrigins__0: "https://hireyar.com"
+      Security__AccessMinutes: "60"
+      Security__RefreshDays: "30"
+      Security__DataProtectionPath: "/keys"
+
+      Smtp__Host: "mailpit"
+      Smtp__Port: "1025"
+      Smtp__From: "no-reply@hireyar.com"
+      Smtp__EnableSsl: "false"
+
+    volumes:
+      - protection-keys:/keys
+
+    depends_on:
+      - mailpit
+
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27.10
+    container_name: hireyar-mailpit
+    restart: unless-stopped
+
+volumes:
+  protection-keys:
+
