@@ -17,9 +17,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       AllowedHosts: api.hireyar.com
 
-      ConnectionStrings__Default: "Host=192.168.105.73;Port=5432;Database=hireyar;Username=hireyar;Password=N5Na?d)J_S[>"
+      ConnectionStrings__Default: "Host=192.168.105.73;Port=5432;Database=hireyar;Username=hireyar;Password=YOUR_POSTGRES_PASSWORD"
 
-      Security__SigningKey: "+5Wwyh9YAN4qKtUDW0cffTIcN5jkBixBiKi95K35X+3rOs7BIOLlbn6BNtZ7AvHs"
+      Security__SigningKey: "YOUR_JWT_SIGNING_KEY"
       Security__Issuer: "HireYar"
       Security__Audience: "HireYar.Panel"
 
@@ -28,9 +28,22 @@ services:
 
       Security__DataProtectionPath: "/keys"
 
+      Smtp__Host: "mailpit"
+      Smtp__Port: "1025"
+      Smtp__From: "no-reply@hireyar.com"
+      Smtp__EnableSsl: "false"
+
     volumes:
       - protection-keys:/keys
 
+    depends_on:
+      - mailpit
+
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27.10
+    container_name: hireyar-mailpit
     restart: unless-stopped
 
 volumes:
