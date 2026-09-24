@@ -4,12 +4,35 @@ using HireYar.Application.Auth;
 using HireYar.Domain.InterviewTemplates;
 using HireYar.Domain.JobPositions;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Tests;
 
 [Collection("Postgres")]
 public sealed class SecurityTests(ApiFixture f)
 {
+    [Fact]
+    public async Task Production_serves_swagger_anonymously_but_protects_account_api()
+    {
+        using var production = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            builder.UseSetting("ConnectionStrings:Default", "Host=localhost;Database=hireyar_test;Username=test;Password=test");
+            builder.UseSetting("Security:SigningKey", new string('x', 32));
+            builder.UseSetting("Security:Issuer", "HireYar.Tests");
+            builder.UseSetting("Security:Audience", "HireYar.Tests");
+            builder.UseSetting("Security:FrontendUrl", "https://localhost:4200");
+            builder.UseSetting("Security:AllowedOrigins:0", "https://localhost:4200");
+            builder.UseSetting("Security:DataProtectionPath", Path.Combine(Path.GetTempPath(), "hireyar-swagger-" + Guid.NewGuid().ToString("N")));
+            builder.UseSetting("Smtp:Host", "localhost");
+            builder.UseSetting("Smtp:Port", "1025");
+            builder.UseSetting("Smtp:From", "no-reply@hireyar.test");
+        });
+        using var client = production.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/swagger/index.html")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/openapi/v1.json")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
+    }
     [PostgresFact]
     public async Task Concurrent_registration_enforces_database_email_uniqueness()
     {
@@ -40,7 +63,7 @@ public sealed class SecurityTests(ApiFixture f)
         });
     }
     [PostgresFact]
-    public async Task Production_sets_secure_cookies_and_hides_openapi()
+    public async Task Production_sets_secure_cookies_and_serves_openapi()
     {
         var production = new ApiFixture { Production = true }; await production.InitializeAsync();
         try
@@ -48,7 +71,8 @@ public sealed class SecurityTests(ApiFixture f)
             var account = await production.RegisterConfirmed(); var browser = production.Browser();
             var response = await browser.Send(HttpMethod.Post, "/api/auth/login", new LoginRequest(account.Email, account.Password));
             Assert.Equal(HttpStatusCode.OK, response.StatusCode); Assert.Contains(response.Headers.GetValues("Set-Cookie"), x => x.StartsWith("hireyar.refresh=", StringComparison.Ordinal) && x.Contains("secure", StringComparison.OrdinalIgnoreCase));
-            Assert.NotEqual(HttpStatusCode.OK, (await browser.Send(HttpMethod.Get, "/openapi/v1.json")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Get, "/openapi/v1.json")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Get, "/swagger/index.html")).StatusCode);
         }
         finally { await ((IAsyncLifetime)production).DisposeAsync(); }
     }

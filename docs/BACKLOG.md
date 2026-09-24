@@ -24,6 +24,6 @@
 
 | HY-009 | مرتب‌سازی Controllers/Services/DTOs/Interfaces | ۱ | Verified | HY-001 | build پس از جابه‌جایی موفق و دسترسی دیتابیس فعلی حفظ شود |
 
-| HY-010 | تعیین تکلیف انتشار OpenAPI در Production | ۱ | NotStarted | تصمیم مورد نظر کاربر | رفع ناسازگاری شرط کامنت‌شده در Program.cs با تست و قرارداد مستندات؛ تغییر قبل از مرتب‌سازی وجود داشت |
+| HY-010 | تعیین تکلیف انتشار OpenAPI در Production | ۱ | Verified | درخواست دسترسی Swagger روی سرور | Swagger و OpenAPI عمومی در Production؛ تست مستقل دسترسی 200 و حفاظت API 401 موفق |
 
 | HY-011 | انتقال از SQL Server به PostgreSQL | ۱ | Verified | تأیید عدم نیاز به داده قدیمی | provider، migration جدید، قفل و RowVersion، compose و ۲۳ تست مرتبط PostgreSQL موفق؛ شکست مستقل HY-010 پابرجاست |

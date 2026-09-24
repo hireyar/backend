@@ -4,7 +4,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>e53b52c8-9cc2-4c97-97a2-eb5fecf25a7f</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +14,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HireYar.Infrastructure\HireYar.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="appsettings.*.local.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>

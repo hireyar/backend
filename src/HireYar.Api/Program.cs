@@ -100,19 +100,11 @@ var app = builder.Build();
 app.UseExceptionHandler(); app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment()) { app.UseHsts(); app.UseHttpsRedirection(); }
 app.Use(async (context, next) => { context.Response.Headers.CacheControl = "no-store"; context.Response.Headers.XContentTypeOptions = "nosniff"; await next(); });
-// Swagger UI is middleware, not an endpoint with AllowAnonymous metadata.
-// Serve its development-only resources before the fallback authorization policy.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
-}
+// Swagger UI is middleware, so serve it before fallback authorization in every environment.
+app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
 app.UseRouting(); app.UseCors(); app.UseAuthentication(); app.UseRateLimiter(); app.UseAuthorization();
 app.MapControllers(); app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
-//if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi().AllowAnonymous();
-    app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
-}
+app.MapOpenApi().AllowAnonymous();
 app.Run();
 public partial class Program;
 

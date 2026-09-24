@@ -9,9 +9,8 @@
 .NET SDK 10.0.400، PostgreSQL 18، و Mailpit محلی. Compose از PostgreSQL 18.3 استفاده می‌کند. برای روش container، Docker با Linux containers لازم است.
 
 ```powershell
-Copy-Item .env.example .env
-# مقادیر placeholder را محلی با secret تصادفی جایگزین کن؛ .env وارد Git نشود.
-docker compose -f compose.dev.yaml up -d postgres mailpit
+# src/HireYar.Api/appsettings.Development.local.json را با مقادیر توسعه بساز.
+pwsh -File scripts/Start-DevelopmentContainers.ps1
 dotnet tool restore
 dotnet restore HireYar.slnx
 ```
@@ -21,14 +20,14 @@ dotnet restore HireYar.slnx
 ```powershell
 # src/HireYar.Api/appsettings.Development.local.json را با این ساختار بساز:
 # {"ConnectionStrings":{"Default":"Host=localhost;Port=5433;Database=hireyar_development;Username=hireyar;Password=<local-password>"},"Security":{"SigningKey":"<random-secret-at-least-32-bytes>"}}
-# این فایل در Git نادیده گرفته می‌شود. مقدار رمز در .env و این فایل باید یکسان باشد.
+# این فایل در Git نادیده گرفته می‌شود و منبع تنظیمات توسعه برای اجرای میزبان و Compose است.
 dotnet ef database update --project src/HireYar.Infrastructure --startup-project src/HireYar.Api
 dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 ```
 
-روش تمام-container پس از migration: `docker compose -f compose.dev.yaml up -d --build api`. API هیچ migration خودکاری در startup اجرا نمی‌کند. مقادیر `.env` صرفاً توسط compose خوانده می‌شوند؛ `dotnet run` خودکار آن فایل را نمی‌خواند.
+روش تمام-container پس از migration: `pwsh -File scripts/Start-DevelopmentContainers.ps1 -IncludeApi`. اسکریپت مقدارهای لازم Compose را از appsettings محلی می‌خواند و فقط در محیط همان فرایند قرار می‌دهد؛ `.env` لازم نیست. API هیچ migration خودکاری در startup اجرا نمی‌کند.
 
-- OpenAPI: `http://localhost:5080/openapi/v1.json`؛ UI: `http://localhost:5080/swagger`، فقط Development. در checkout فعلی JSON مستندات به علت تغییر قبلی در Production هم باز است؛ HY-010 باید پیش از انتشار تعیین تکلیف شود.
+- OpenAPI: `http://localhost:5080/openapi/v1.json`؛ UI: `http://localhost:5080/swagger`. هر دو در Development و Production بدون توکن در دسترس‌اند؛ endpointهای حساب و داده همچنان مجوز خود را می‌خواهند.
 - Mailpit: `http://localhost:8025`؛ SMTP محلی: پورت 1025.
 - health: `/health` فقط زنده‌بودن فرایند را نشان می‌دهد و آزمون آمادگی دیتابیس نیست.
 - نمونه جریان‌ها: [HireYar.Api.http](src/HireYar.Api/HireYar.Api.http). cookie jar ابزار HTTP باید فعال باشد. OpenAPI مرجع کامل endpointهاست.
@@ -50,6 +49,8 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 | `AuthRateLimit__PermitLimit` | پیش‌فرض ۲۰ درخواست در دقیقه برای هر IP روی مسیرهای auth/ارسال دعوت |
 
 در production پنل و API باید HTTPS و زیر یک سایت باشند. گواهی TLS و reverse proxy مورد اعتماد باید در محیط استقرار تنظیم شوند؛ هدرهای forwarded از هر فرستنده پذیرفته نمی‌شوند. این تسک زیرساخت deployment نمی‌سازد. تنظیمات محیط Development را وارد production نکن.
+
+برای اجرای سرور با `ASPNETCORE_ENVIRONMENT=Production`، فایل نادیده‌گرفته‌شدهٔ `appsettings.Production.local.json` را کنار فایل‌های منتشرشدهٔ API قرار دهید، یا تنظیمات معادل را با متغیر محیطی بدهید. حداقل `ConnectionStrings:Default`، `Security:SigningKey`، `Security:Issuer`، `Security:Audience`، `Security:FrontendUrl`، `Security:AllowedOrigins`، `Security:DataProtectionPath` و تنظیمات SMTP لازم‌اند. فایل Development محلی همراه Git منتقل نمی‌شود. پس از انتشار نسخهٔ جدید، `/swagger` باید بدون Bearer باز شود؛ پاسخ 401 از `/api/auth/me` بدون Bearer رفتار درست است. کلید JWT سرور را ثابت و اختصاصی همان محیط نگه دارید؛ تغییر آن توکن‌های صادرشدهٔ قبلی را نامعتبر می‌کند.
 
 کلیدهای Data Protection را روی volume دائمی، با دسترسی فقط حساب اجرای API، backup محدود و دیسک رمزگذاری‌شده نگه دار. ذخیره filesystem به‌تنهایی رمزگذاری در حالت سکون نیست؛ در production حفاظت volume یا certificate/KMS متناسب با میزبان الزامی است. حذف کلیدها لینک‌های Identity و CSRF را نامعتبر می‌کند. volume `protection-keys` در compose برای restart حفظ می‌شود. signing key JWT مستقل است.
 
@@ -92,12 +93,12 @@ ConnectionStrings:Default در appsettings محلی یا ConnectionStrings__Defa
 
 rowVersion همچنان رشته Base64 در JSON است، اما اکنون ۱۶ بایت تصادفی است و توسط AppDbContext هنگام ذخیره تغییر می‌کند. مصرف‌کننده باید مقدار پاسخ جدید را بدون تفسیر برگرداند؛ توکن ۸بایتی SQL Server معتبر نیست. تغییرات مستقیم SQL در جداول موقعیت/قالب باید RowVersion را نیز تغییر دهند؛ مسیر پشتیبانی‌شده نوشتن، API است.
 
-برای توسعه محلی انتخاب‌شده، `.env` و `src/HireYar.Api/appsettings.Development.local.json` روی PostgreSQL داخل Docker در localhost:5433 تنظیم می‌شوند. پس از روشن‌کردن Docker Desktop:
+برای توسعه محلی انتخاب‌شده، `src/HireYar.Api/appsettings.Development.local.json` روی PostgreSQL داخل Docker در localhost:5433 تنظیم می‌شود. پس از روشن‌کردن Docker Desktop:
 
 ```powershell
-docker compose -f compose.dev.yaml up -d postgres mailpit
+pwsh -File scripts/Start-DevelopmentContainers.ps1
 pwsh -File scripts/Update-DevelopmentDatabase.ps1
 dotnet run --project src/HireYar.Api --launch-profile https
 ```
 
-اسکریپت migration فقط اتصال محلی Docker همین پروژه را از appsettings محلی می‌خواند و secret را چاپ نمی‌کند. برای یک checkout جدید ابتدا `.env` و appsettings محلی را طبق راهنمای بالا تنظیم کنید؛ فایل‌های محلی حاوی secrets همراه Git منتقل نمی‌شوند.
+اسکریپت migration فقط اتصال محلی Docker همین پروژه را از appsettings محلی می‌خواند و secret را چاپ نمی‌کند. برای یک checkout جدید ابتدا appsettings محلی را طبق راهنمای بالا تنظیم کنید؛ فایل محلی حاوی secrets همراه Git منتقل نمی‌شود.
