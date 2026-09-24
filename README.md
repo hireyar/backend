@@ -6,17 +6,17 @@
 
 ## پیش‌نیاز و راه‌اندازی
 
-.NET SDK 10.0.400، SQL Server 2019 یا جدیدتر، و Mailpit محلی. Compose از SQL Server 2022 استفاده می‌کند. برای روش container، Docker با Linux containers لازم است.
+.NET SDK 10.0.400، PostgreSQL 18، و Mailpit محلی. Compose از PostgreSQL 18.3 استفاده می‌کند. برای روش container، Docker با Linux containers لازم است.
 
 ```powershell
 Copy-Item .env.example .env
 # مقادیر placeholder را محلی با secret تصادفی جایگزین کن؛ .env وارد Git نشود.
-docker compose -f compose.dev.yaml up -d sql mailpit
+docker compose -f compose.dev.yaml up -d postgres mailpit
 dotnet tool restore
 dotnet restore HireYar.slnx
 ```
 
-اتصال SQL توسعه برای اجرای API روی میزبان: `Server=localhost,14333;Database=HireYar_Development;User Id=sa;Password=<local-password>;TrustServerCertificate=True`. این فقط الگو است. برای SQL محلی با Windows authentication می‌توان از `Server=localhost;Database=HireYar_Development;Integrated Security=True;TrustServerCertificate=True` استفاده کرد. دیتابیس توسعه باید مستقل از داده واقعی باشد.
+اتصال SQL توسعه برای اجرای API روی میزبان: `Host=localhost;Port=5433;Database=hireyar_development;Username=hireyar;Password=<local-password>`. این فقط الگو است. برای PostgreSQL نصب‌شده روی میزبان، Host/Port/Username/Password همان instance را تنظیم کنید. دیتابیس توسعه باید مستقل از داده واقعی باشد.
 
 ```powershell
 dotnet user-secrets set 'ConnectionStrings:Default' '<development-connection-string>' --project src/HireYar.Api
@@ -29,7 +29,7 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 
 روش تمام-container پس از migration: `docker compose -f compose.dev.yaml up -d --build api`. API هیچ migration خودکاری در startup اجرا نمی‌کند. مقادیر `.env` صرفاً توسط compose خوانده می‌شوند؛ `dotnet run` خودکار آن فایل را نمی‌خواند.
 
-- OpenAPI: `http://localhost:5080/openapi/v1.json`؛ UI: `http://localhost:5080/swagger`، فقط Development.
+- OpenAPI: `http://localhost:5080/openapi/v1.json`؛ UI: `http://localhost:5080/swagger`، فقط Development. در checkout فعلی JSON مستندات به علت تغییر قبلی در Production هم باز است؛ HY-010 باید پیش از انتشار تعیین تکلیف شود.
 - Mailpit: `http://localhost:8025`؛ SMTP محلی: پورت 1025.
 - health: `/health` فقط زنده‌بودن فرایند را نشان می‌دهد و آزمون آمادگی دیتابیس نیست.
 - نمونه جریان‌ها: [HireYar.Api.http](src/HireYar.Api/HireYar.Api.http). cookie jar ابزار HTTP باید فعال باشد. OpenAPI مرجع کامل endpointهاست.
@@ -71,15 +71,34 @@ logout فقط نشست refresh جاری را باطل می‌کند؛ logout-all
 ## تست و migration استقرار
 
 ```powershell
-$env:HIREYAR_TEST_SQL = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+$env:HIREYAR_TEST_POSTGRES = 'Host=localhost;Port=5433;Username=hireyar;Password=<local-password>;Database=postgres'
 dotnet test HireYar.slnx --logger 'trx;LogFileName=integration.trx' --results-directory TestResults
 New-Item -ItemType Directory artifacts -Force
 dotnet ef migrations script --idempotent --project src/HireYar.Infrastructure --startup-project src/HireYar.Api --output artifacts/migrations.sql
 ```
 
-تست‌ها SQL Server واقعی و دیتابیس تصادفی با پیشوند `HireYar_Tests_` می‌سازند؛ پس از اجرا فقط همان دیتابیس حذف می‌شود. اتصال فقط localhost، نقطه یا LocalDB مجاز است؛ بدون متغیر محیطی تست‌های SQL به‌صورت صریح Skip می‌شوند. SMTP در تست API جایگزین حافظه‌ای کنترل‌شده دارد و ایمیل واقعی ارسال نمی‌شود. نتیجه تست و محدودیت Docker/SMTP در [STATUS](docs/STATUS.md) ثبت است.
+تست‌ها PostgreSQL واقعی و دیتابیس تصادفی با پیشوند `hireyar_tests_` می‌سازند؛ پس از اجرا فقط همان دیتابیس حذف می‌شود. اتصال فقط localhost، 127.0.0.1 یا ::1 مجاز است؛ بدون متغیر محیطی تست‌های SQL به‌صورت صریح Skip می‌شوند. SMTP در تست API جایگزین حافظه‌ای کنترل‌شده دارد و ایمیل واقعی ارسال نمی‌شود. نتیجه تست و محدودیت Docker/SMTP در [STATUS](docs/STATUS.md) ثبت است.
 
 SQL script باید قبل از انتشار بازبینی و با مجوز جداگانه اعمال شود. روی production خودکار اجرا نکن. برنچ `dev` محل توسعه است؛ `production` اکنون فقط نقطه پایه است و هنوز نسخه آماده انتشار ندارد.
 
 مراحل آینده: داوطلب و دعوت مصاحبه، جلسه صوتی، STT/LLM/TTS و گزارش مستند. حساب HR برای داوطلب ساخته نمی‌شود. هنگام ساخت جلسه باید از سؤال‌ها و معیارهای قالب snapshot گرفت تا ویرایش قالب روی جلسه قبلی اثر نگذارد. در این نسخه جلسه، snapshot engine، AI، فایل، OTP، social login، MFA، پرداخت، platform admin یا زیرساخت توزیع‌شده ساخته نشده است.
 
+
+
+## انتقال از SQL Server
+
+با تأیید کاربر، PostgreSQL از صفر ساخته می‌شود و انتقال داده SQL Server لازم نیست. migration قبلی با InitialPostgres جایگزین شد؛ آن را روی دیتابیس PostgreSQL خالی اجرا کنید. دیتابیس SQL Server قبلی حذف یا تغییر داده نشده است.
+
+ConnectionStrings:Default در User Secrets یا ConnectionStrings__Default در محیط باید قالب Npgsql داشته باشد. برای TLS معتبر production از `SSL Mode=VerifyFull` و گواهی مورد اعتماد استفاده کنید؛ تنظیم توسعه را منتقل نکنید. کاربر runtime با کاربر migration/ایجاد دیتابیس جدا باشد.
+
+rowVersion همچنان رشته Base64 در JSON است، اما اکنون ۱۶ بایت تصادفی است و توسط AppDbContext هنگام ذخیره تغییر می‌کند. مصرف‌کننده باید مقدار پاسخ جدید را بدون تفسیر برگرداند؛ توکن ۸بایتی SQL Server معتبر نیست. تغییرات مستقیم SQL در جداول موقعیت/قالب باید RowVersion را نیز تغییر دهند؛ مسیر پشتیبانی‌شده نوشتن، API است.
+
+برای توسعه محلی انتخاب‌شده، `.env` و User Secrets روی PostgreSQL داخل Docker در localhost:5433 تنظیم می‌شوند. پس از روشن‌کردن Docker Desktop:
+
+```powershell
+docker compose -f compose.dev.yaml up -d postgres mailpit
+pwsh -File scripts/Update-DevelopmentDatabase.ps1
+dotnet run --project src/HireYar.Api --launch-profile https
+```
+
+اسکریپت migration فقط اتصال محلی Docker همین پروژه را از User Secrets می‌خواند و secret را چاپ نمی‌کند. برای یک checkout جدید ابتدا `.env` و User Secrets را طبق راهنمای بالا تنظیم کنید؛ فایل‌های محلی حاوی secrets همراه Git منتقل نمی‌شوند.

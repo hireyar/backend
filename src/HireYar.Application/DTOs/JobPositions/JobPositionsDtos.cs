@@ -11,5 +11,5 @@ public sealed record JobRequest(
     [EnumDataType(typeof(JobStatus))] JobStatus Status);
 public sealed record UpdateJobRequest(
     [Required] JobRequest Job,
-    [Required, MinLength(8), MaxLength(8)] byte[] RowVersion);
+    [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
 public sealed record JobDto(Guid Id, string Title, string Description, string Seniority, JobStatus Status, DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, byte[] RowVersion);

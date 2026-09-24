@@ -8,15 +8,15 @@ using HireYar.Application.Common;
 using HireYar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace HireYar.Tests;
 
-public sealed class SqlFactAttribute : FactAttribute
+public sealed class PostgresFactAttribute : FactAttribute
 {
-    public SqlFactAttribute() { if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("HIREYAR_TEST_SQL"))) Skip = "Set HIREYAR_TEST_SQL to a local SQL Server test connection; no database substitute is used."; }
+    public PostgresFactAttribute() { if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("HIREYAR_TEST_POSTGRES"))) Skip = "Set HIREYAR_TEST_POSTGRES to a local PostgreSQL test connection; no database substitute is used."; }
 }
 public sealed class TestEmail : IEmailSender
 {
@@ -39,7 +39,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public bool Production { get; init; }
     public TestEmail Email { get; } = new(); public TestClock Clock { get; } = new();
-    private readonly string database = "HireYar_Tests_" + Guid.NewGuid().ToString("N");
+    private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
     private string? connection;
     protected override void ConfigureWebHost(IWebHostBuilder b)
     {
@@ -55,10 +55,10 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     }
     public async Task InitializeAsync()
     {
-        var raw = Environment.GetEnvironmentVariable("HIREYAR_TEST_SQL"); if (string.IsNullOrEmpty(raw)) return;
-        var parsed = new SqlConnectionStringBuilder(raw);
-        if (!new[] { "localhost", ".", "(localdb)\\MSSQLLocalDB" }.Contains(parsed.DataSource, StringComparer.OrdinalIgnoreCase)) throw new InvalidOperationException("Tests only accept a local SQL Server.");
-        parsed.InitialCatalog = database; connection = parsed.ConnectionString;
+        var raw = Environment.GetEnvironmentVariable("HIREYAR_TEST_POSTGRES"); if (string.IsNullOrEmpty(raw)) return;
+        var parsed = new NpgsqlConnectionStringBuilder(raw);
+        if (!new[] { "localhost", "127.0.0.1", "::1" }.Contains(parsed.Host, StringComparer.OrdinalIgnoreCase)) throw new InvalidOperationException("Tests only accept a local PostgreSQL.");
+        parsed.Database = database; connection = parsed.ConnectionString;
         await using var scope = Services.CreateAsyncScope(); await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
     }
     async Task IAsyncLifetime.DisposeAsync()
@@ -106,5 +106,4 @@ public sealed class Browser(HttpClient client)
         var result = await client.SendAsync(request); Capture(result); return result;
     }
 }
-[CollectionDefinition("Sql", DisableParallelization = true)] public sealed class SqlCollection : ICollectionFixture<ApiFixture>;
-
+[CollectionDefinition("Postgres", DisableParallelization = true)] public sealed class PostgresCollection : ICollectionFixture<ApiFixture>;

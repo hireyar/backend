@@ -71,7 +71,7 @@ public sealed class TeamMembers(AppDbContext db, UserManager<ApplicationUser> us
     public async Task SetActiveAsync(Guid org, Guid id, bool active, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var u = await db.Users.FromSqlInterpolated($"SELECT * FROM [AspNetUsers] WITH (UPDLOCK,HOLDLOCK) WHERE [Id]={id} AND [OrganizationId]={org}").SingleOrDefaultAsync(ct) ?? throw AppException.NotFound();
+        var u = await db.Users.FromSqlInterpolated($"SELECT * FROM \"AspNetUsers\" WHERE \"Id\"={id} AND \"OrganizationId\"={org} FOR UPDATE").SingleOrDefaultAsync(ct) ?? throw AppException.NotFound();
         if (u.Role == OrganizationRole.Owner) throw AppException.Invalid("owner_cannot_be_changed");
         u.IsActive = active; u.UpdatedAtUtc = Now; await db.SaveChangesAsync(ct);
         if (!active) await db.RefreshTokens.Where(x => x.UserId == id && x.RevokedAtUtc == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAtUtc, Now), ct);
@@ -80,7 +80,7 @@ public sealed class TeamMembers(AppDbContext db, UserManager<ApplicationUser> us
     public Task<int> ActiveCountAsync(Guid org, CancellationToken ct) => db.Users.CountAsync(x => x.OrganizationId == org && x.IsActive, ct);
     public Task<int> PendingCountAsync(Guid org, CancellationToken ct) => db.TeamInvitations.CountAsync(x => x.OrganizationId == org && x.AcceptedAtUtc == null && x.CancelledAtUtc == null && x.ExpiresAtUtc > Now, ct);
     private async Task<TeamInvitation> Find(Guid org, Guid id, CancellationToken ct) => await db.TeamInvitations.SingleOrDefaultAsync(x => x.Id == id && x.OrganizationId == org, ct) ?? throw AppException.NotFound();
-    private async Task LockOrganization(Guid org, CancellationToken ct) => _ = await db.Organizations.FromSqlInterpolated($"SELECT * FROM [Organizations] WITH (UPDLOCK,HOLDLOCK) WHERE [Id]={org}").SingleAsync(ct);
+    private async Task LockOrganization(Guid org, CancellationToken ct) => _ = await db.Organizations.FromSqlInterpolated($"SELECT * FROM \"Organizations\" WHERE \"Id\"={org} FOR UPDATE").SingleAsync(ct);
     private async Task<bool> Send(string recipient, string raw, CancellationToken ct)
     {
         try { await email.SendAsync(recipient, "دعوت به تیم HireYar", $"برای پیوستن به تیم، لینک زیر را باز کنید. اعتبار لینک سه روز است:\n{settings.Value.FrontendUrl.TrimEnd('/')}/accept-invitation?token={Uri.EscapeDataString(raw)}", ct); return true; }
@@ -88,4 +88,3 @@ public sealed class TeamMembers(AppDbContext db, UserManager<ApplicationUser> us
         catch (Exception) { logger.LogWarning("Invitation email delivery failed. EventCode={EventCode}", "email_delivery_failed"); return false; }
     }
 }
-

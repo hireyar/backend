@@ -7,10 +7,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Tests;
 
-[Collection("Sql")]
+[Collection("Postgres")]
 public sealed class SecurityTests(ApiFixture f)
 {
-    [SqlFact]
+    [PostgresFact]
     public async Task Concurrent_registration_enforces_database_email_uniqueness()
     {
         var email = $"{Guid.NewGuid():N}@example.test"; var request = new RegisterRequest("Name", "Org", email, "Valid-test-password1!");
@@ -19,14 +19,14 @@ public sealed class SecurityTests(ApiFixture f)
         Assert.Single(results, x => x.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.BadRequest);
         await f.Db(async db => Assert.Equal(1, await db.Users.CountAsync(x => x.Email == email)));
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Expired_refresh_token_is_rejected()
     {
         var a = await f.RegisterConfirmed(); a.Client.AccessToken = null; f.Clock.Offset = TimeSpan.FromDays(8);
         try { Assert.Equal(HttpStatusCode.Unauthorized, (await a.Client.Send(HttpMethod.Post, "/api/auth/refresh")).StatusCode); }
         finally { f.Clock.Offset = TimeSpan.Zero; }
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Database_rejects_cross_tenant_template_even_without_service_checks()
     {
         var a = await f.RegisterConfirmed(); var b = await f.RegisterConfirmed();
@@ -39,7 +39,7 @@ public sealed class SecurityTests(ApiFixture f)
             await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
         });
     }
-    [SqlFact]
+    [PostgresFact]
     public async Task Production_sets_secure_cookies_and_hides_openapi()
     {
         var production = new ApiFixture { Production = true }; await production.InitializeAsync();
@@ -52,7 +52,7 @@ public sealed class SecurityTests(ApiFixture f)
         }
         finally { await ((IAsyncLifetime)production).DisposeAsync(); }
     }
-    [SqlFact]
+    [PostgresFact]
     public void Missing_signing_key_fails_startup()
     {
         using var invalid = f.WithWebHostBuilder(b => b.UseSetting("Security:SigningKey", ""));
