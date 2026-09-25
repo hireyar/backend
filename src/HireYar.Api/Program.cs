@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using HireYar.Api.Errors;
+using HireYar.Api.OpenApi;
 using HireYar.Api.Security;
 using HireYar.Application.Auth;
 using HireYar.Application.Common;
@@ -78,12 +79,16 @@ builder.Services.AddRateLimiter(o =>
 });
 builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
 {
-    doc.Info.Title = "HireYar API"; doc.Info.Version = "v1";
+    doc.Info.Title = "HireYar API"; doc.Info.Version = "v1"; doc.Info.Description = OpenApiText.Introduction;
     doc.Components ??= new(); doc.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
     doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
     return Task.CompletedTask;
 }).AddOperationTransformer(async (operation, context, ct) =>
 {
+    var routeValues = context.Description.ActionDescriptor.RouteValues;
+    routeValues.TryGetValue("controller", out var controller);
+    routeValues.TryGetValue("action", out var action);
+    operation.Summary = OpenApiText.Summary(controller, action);
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
         operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = [] }];
     if (context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true && context.Description.HttpMethod != "GET")

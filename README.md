@@ -27,7 +27,7 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 
 روش تمام-container پس از migration: `pwsh -File scripts/Start-DevelopmentContainers.ps1 -IncludeApi`. اسکریپت مقدارهای لازم Compose را از appsettings محلی می‌خواند و فقط در محیط همان فرایند قرار می‌دهد؛ `.env` لازم نیست. API هیچ migration خودکاری در startup اجرا نمی‌کند.
 
-- OpenAPI: `http://localhost:5080/openapi/v1.json`؛ UI: `http://localhost:5080/swagger`. هر دو در Development و Production بدون توکن در دسترس‌اند؛ endpointهای حساب و داده همچنان مجوز خود را می‌خواهند.
+- OpenAPI: `http://localhost:5080/openapi/v1.json`؛ UI: `http://localhost:5080/swagger`. راهنمای کوتاه فارسیِ شروع و عنوان فارسی هر API بالای صفحه و کنار عملیات‌ها دیده می‌شود. هر دو در Development و Production بدون توکن در دسترس‌اند؛ endpointهای حساب و داده همچنان مجوز خود را می‌خواهند.
 - Mailpit: `http://localhost:8025`؛ SMTP محلی: پورت 1025.
 - health: `/health` فقط زنده‌بودن فرایند را نشان می‌دهد و آزمون آمادگی دیتابیس نیست.
 - نمونه جریان‌ها: [HireYar.Api.http](src/HireYar.Api/HireYar.Api.http). cookie jar ابزار HTTP باید فعال باشد. OpenAPI مرجع کامل endpointهاست.

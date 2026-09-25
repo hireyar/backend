@@ -1,6 +1,6 @@
 # وضعیت جاری
 
-آخرین به‌روزرسانی: 2026-09-24. مرحله ۱، بک‌اند سازمان و پنل HR. پایگاه داده جاری **PostgreSQL 18** است؛ تصمیم SQL Server با درخواست صریح کاربر جایگزین شد و داده قبلی نیاز به انتقال ندارد. تنظیمات محلی JWT و اتصال دیتابیس اکنون در `src/HireYar.Api/appsettings.Development.local.json` قرار می‌گیرند؛ فایل در Git نادیده گرفته می‌شود و متغیرهای محیطی اولویت بالاتر دارند.
+آخرین به‌روزرسانی: 2026-09-25. مرحله ۱، بک‌اند سازمان و پنل HR. پایگاه داده جاری **PostgreSQL 18** است؛ تصمیم SQL Server با درخواست صریح کاربر جایگزین شد و داده قبلی نیاز به انتقال ندارد. تنظیمات محلی JWT و اتصال دیتابیس اکنون در `src/HireYar.Api/appsettings.Development.local.json` قرار می‌گیرند؛ فایل در Git نادیده گرفته می‌شود و متغیرهای محیطی اولویت بالاتر دارند.
 
 ## وضعیت قابلیت‌ها
 
@@ -15,7 +15,7 @@
 | موقعیت و قالب و سؤال | Verified | ایجاد، ویرایش، ترتیب، حفظ Id و تعارض نسخه موفق |
 | migration PostgreSQL | Verified | InitialPostgres روی DB خالی اعمال شد؛ script idempotent دو بار اجرا شد |
 | cookie، CSRF و CORS | Verified | تست‌های قبلی PostgreSQL موفق؛ تست ترکیبی Production با رفتار جدید OpenAPI هنوز دوباره اجرا نشده |
-| OpenAPI در Production | Verified | Swagger و JSON هر دو پاسخ 200؛ تست مستقل نشان داد API حساب بدون توکن 401 می‌ماند |
+| OpenAPI در Production | Verified | Swagger و JSON هر دو پاسخ 200؛ راهنمای شروع و عنوان همهٔ عملیات‌ها به فارسی در JSON بررسی شد |
 | Docker و SMTP واقعی | Implemented | compose معتبر؛ Docker daemon در دسترس نیست و build/up/SMTP واقعی اجرا نشده |
 | اتصال توسعه و مستندات | Implemented | appsettings.Development.local.json خارج Git برای localhost:5433؛ اسکریپت‌های راه‌اندازی و migration |
 
@@ -35,6 +35,8 @@ Verified به معنی اجرای بررسی مربوط است؛ Implemented ت�
 
 ## اجرا و محدودیت‌ها
 
+Swagger اکنون راهنمای فارسی کوتاه برای مسیر `csrf → register → confirm-email → login` و مسیر ورود حساب موجود دارد. عنوان همهٔ عملیات‌های API فارسی است. Build بدون warning/error و تست مستقل Production OpenAPI موفق شد؛ تست‌های وابسته به PostgreSQL در این نوبت اجرا نشدند.
+
 رفع خطای startup: `UserSecretsId` قدیمی از پروژه API حذف شد. ASP.NET Core دیگر در Development فایل User Secrets خراب/غیرقابل‌دسترس را پیش از بارگذاری appsettings محلی باز نمی‌کند. Build موفق؛ اجرای واقعی `dotnet run --launch-profile http` با `/health` و `/swagger/index.html` هر دو 200 بود. تست جاری ۱ موفق و ۲۴ Skip به علت نبود HIREYAR_TEST_POSTGRES است.
 
 انتخاب کاربر برای استفاده روزمره PostgreSQL داخل Docker در localhost:5433 است. appsettings محلی تنظیم شده، اما Docker daemon در این محیط Access denied می‌دهد و کانتینرها و SMTP واقعی تأیید نشده‌اند. `dotnet tool restore` به دلیل Access denied به NuGet.Config اجرا نشد؛ اعتبارسنجی EF این نوبت انجام نشد.
@@ -43,4 +45,4 @@ Verified به معنی اجرای بررسی مربوط است؛ Implemented ت�
 
 rowVersion اکنون Base64 از ۱۶ بایت است؛ توکن قبلی SQL Server قابل استفاده نیست. جزئیات در ARCHITECTURE و README است. setup production/TLS و frontend همچنان خارج دامنه‌اند.
 
-برنچ فعال dev است. تغییرات جاری مربوط به اجرای بدون `.env` و Swagger هنوز commit/push نشده‌اند؛ production تغییر نکرد.
+برنچ فعال dev و در شروع این نوبت با origin/dev همگام بود. تغییرات راهنمای فارسی Swagger هنوز commit/push نشده‌اند؛ production تغییر نکرد.

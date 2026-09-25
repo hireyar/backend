@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using HireYar.Application.Auth;
 using HireYar.Domain.InterviewTemplates;
 using HireYar.Domain.JobPositions;
@@ -30,7 +31,17 @@ public sealed class SecurityTests(ApiFixture f)
         });
         using var client = production.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/swagger/index.html")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/openapi/v1.json")).StatusCode);
+        var openApiResponse = await client.GetAsync("/openapi/v1.json");
+        Assert.Equal(HttpStatusCode.OK, openApiResponse.StatusCode);
+        var openApi = await openApiResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains("شروع با حساب جدید", openApi.GetProperty("info").GetProperty("description").GetString());
+        Assert.Contains("ثبت‌نام", openApi.GetProperty("paths").GetProperty("/api/auth/register").GetProperty("post").GetProperty("summary").GetString());
+        foreach (var path in openApi.GetProperty("paths").EnumerateObject())
+        {
+            if (path.Name == "/health") continue;
+            foreach (var method in path.Value.EnumerateObject())
+                Assert.False(string.IsNullOrWhiteSpace(method.Value.GetProperty("summary").GetString()), $"Missing Persian summary: {method.Name} {path.Name}");
+        }
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
     }
     [PostgresFact]
