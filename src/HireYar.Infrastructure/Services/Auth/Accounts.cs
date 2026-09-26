@@ -19,16 +19,25 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
     private DateTimeOffset Now => time.GetUtcNow();
     public async Task<RegistrationResult> RegisterAsync(RegisterRequest r, CancellationToken ct)
     {
-        var normalized = users.NormalizeEmail(r.Email.Trim());
-        if (await db.Users.AnyAsync(x => x.NormalizedEmail == normalized, ct)) throw AppException.Conflict();
-        var org = new Organization { Name = r.OrganizationName.Trim(), CreatedAtUtc = Now, UpdatedAtUtc = Now };
-        var user = new ApplicationUser { Id = Guid.NewGuid(), FullName = r.FullName.Trim(), Email = r.Email.Trim(), UserName = r.Email.Trim(), OrganizationId = org.Id, Role = OrganizationRole.Owner, CreatedAtUtc = Now, UpdatedAtUtc = Now };
-        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        try
         {
-            db.Organizations.Add(org); await db.SaveChangesAsync(ct);
-            Check(await users.CreateAsync(user, r.Password)); await tx.CommitAsync(ct);
+
+            var normalized = users.NormalizeEmail(r.Email.Trim());
+            if (await db.Users.AnyAsync(x => x.NormalizedEmail == normalized, ct)) throw AppException.Conflict();
+            var org = new Organization { Name = r.OrganizationName.Trim(), CreatedAtUtc = Now, UpdatedAtUtc = Now };
+            var user = new ApplicationUser { Id = Guid.NewGuid(), FullName = r.FullName.Trim(), Email = r.Email.Trim(), UserName = r.Email.Trim(), OrganizationId = org.Id, Role = OrganizationRole.Owner, CreatedAtUtc = Now, UpdatedAtUtc = Now };
+            await using (var tx = await db.Database.BeginTransactionAsync(ct))
+            {
+                db.Organizations.Add(org); await db.SaveChangesAsync(ct);
+                Check(await users.CreateAsync(user, r.Password)); await tx.CommitAsync(ct);
+            }
+            return new(user.Id, await SendConfirmation(user, ct));
         }
-        return new(user.Id, await SendConfirmation(user, ct));
+        catch (Exception exp)
+        {
+            var test = exp;
+            throw;
+        }
     }
     public async Task ConfirmAsync(TokenRequest r, CancellationToken ct)
     {
