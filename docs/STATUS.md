@@ -1,6 +1,6 @@
 # وضعیت جاری
 
-بررسی 2026-09-26: stack trace واقعی سرور خطای `DefaultAntiforgery.CheckSSLConfig` را تأیید کرد؛ `IsHttps=False` با وجود هدر forwarded. `docker-compose.yml` مقدار `ReverseProxy__KnownProxies__0` نداشت، پس middleware فعال نمی‌شد. Compose اکنون `HIREYAR_TRUSTED_PROXY_IP` را برای این مقدار الزام می‌کند؛ اعتبارسنجی Compose با IP آزمایشی موفق و بدون آن طبق انتظار ناموفق بود. build صفر هشدار/خطا و مجموعه تست بدون PostgreSQL: ۲ موفق، ۲۴ Skip. IP واقعی proxy و مقدار هدر هنوز روی سرور بررسی نشده‌اند؛ push/deploy انجام نشده و رفع خطای سرور تأیید نشده است.
+بررسی 2026-09-26: stack trace سرور خطای `DefaultAntiforgery.CheckSSLConfig` را تأیید کرد؛ `IsHttps=False` با وجود هدر forwarded. طبق درخواست صریح کاربر، `KnownProxies` و متغیر IP از کد و Compose حذف شدند؛ API در Production فقط مقدار دقیق و یکتای `X-Forwarded-Proto: https` را بدون بررسی مبدأ برای scheme اعمال می‌کند. الزام کوکی Secure حفظ شد. دسترسی مستقیم به پورت HTTP داخلی باید در شبکه سرور محدود باشد. build بدون هشدار/خطا و تست: ۲ موفق، ۲۴ Skip به علت نبود PostgreSQL تست. رفتار سرور پس از انتشار هنوز تأیید نشده؛ push/deploy انجام نشده است.
 
 آخرین به‌روزرسانی: 2026-09-25. مرحله ۱، بک‌اند سازمان و پنل HR. پایگاه داده جاری **PostgreSQL 18** است؛ تصمیم SQL Server با درخواست صریح کاربر جایگزین شد و داده قبلی نیاز به انتقال ندارد. تنظیمات محلی JWT و اتصال دیتابیس اکنون در `src/HireYar.Api/appsettings.Development.local.json` قرار می‌گیرند؛ فایل در Git نادیده گرفته می‌شود و متغیرهای محیطی اولویت بالاتر دارند.
 

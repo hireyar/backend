@@ -43,17 +43,14 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 | `Security__FrontendUrl` | origin پنل برای لینک‌های ایمیل |
 | `Security__AllowedOrigins__0` | origin دقیق بدون slash پایانی؛ برای چند origin اندیس‌های بعدی |
 | `Security__DataProtectionPath` | مسیر دائمی قابل نوشتن برای کلیدهای Identity/CSRF |
-| `ReverseProxy__KnownProxies__0` | IP مبدأ reverse proxy از دید کانتینر API، وقتی TLS پیش از Kestrel خاتمه می‌یابد؛ برای چند proxy اندیس‌های بعدی |
 | `Smtp__Host`, `Smtp__Port`, `Smtp__From` | سرویس ارسال ایمیل |
 | `Smtp__EnableSsl`, `Smtp__Username`, `Smtp__Password` | TLS و اطلاعات اتصال SMTP؛ خارج ریپو |
 | `AllowedHosts` | hostnameهای واقعی API؛ پیش‌فرض localhost |
 | `AuthRateLimit__PermitLimit` | پیش‌فرض ۲۰ درخواست در دقیقه برای هر IP روی مسیرهای auth/ارسال دعوت |
 
-در production پنل و API باید HTTPS و زیر یک سایت باشند. گواهی TLS و reverse proxy مورد اعتماد باید در محیط استقرار تنظیم شوند؛ هدرهای forwarded از هر فرستنده پذیرفته نمی‌شوند. این تسک زیرساخت deployment نمی‌سازد. تنظیمات محیط Development را وارد production نکن.
+در production پنل و API باید HTTPS و زیر یک سایت باشند. گواهی TLS و reverse proxy باید در محیط استقرار تنظیم شوند؛ مسیر HTTP داخلی API فقط برای proxy در دسترس باشد. تنظیمات محیط Development را وارد production نکن.
 
-اگر proxy درخواست HTTPS را با HTTP به کانتینر می‌رساند، باید هدر `X-Forwarded-Proto: https` را ارسال کند و IP مبدأ آن در `ReverseProxy__KnownProxies__0` ثبت شود. API فقط از IPهای ثبت‌شده scheme اصلی را می‌پذیرد. بدون این تنظیم، `GET /api/auth/csrf` در Production به علت الزام کوکی Secure خطای 500 می‌دهد. IP عمومی دامنه یا IP کاربر را به جای IP proxy قرار ندهید. پس از انتشار، پاسخ HTTPS این مسیر باید 200 و کوکی `hireyar.csrf` دارای `Secure` باشد.
-
-`docker-compose.yml` این مقدار را از `HIREYAR_TRUSTED_PROXY_IP` می‌گیرد و اگر تنظیم نشده باشد اجرا را متوقف می‌کند. آن را در `.env` فقط روی سرور یا در متغیر محیطی job استقرار قرار دهید. `docker inspect hireyar-api --format '{{json .NetworkSettings.Networks}}'` شبکه و gateway کانتینر را نشان می‌دهد؛ gateway فقط وقتی IP درست است که proxy روی میزبان Docker اجرا شود. اگر proxy کانتینر یا میزبان دیگری است، IP مبدأ همان اتصال را تنظیم کنید. مقدار هدر باید `https` باشد.
+اگر proxy درخواست HTTPS را با HTTP به کانتینر می‌رساند، باید هدر دقیق `X-Forwarded-Proto: https` را ارسال کند. API در Production تنها همین مقدار را برای scheme درخواست اعمال می‌کند تا کوکی CSRF با `Secure` صادر شود؛ هدرهای چندمقداری یا سایر مقادیر پذیرفته نمی‌شوند. مسیر HTTP داخلی API باید با firewall یا شبکه خصوصی فقط برای proxy قابل دسترس باشد؛ هر فرستنده‌ای که مستقیم به آن برسد می‌تواند مقدار این هدر را جعل کند. پس از انتشار، پاسخ HTTPS `GET /api/auth/csrf` باید 200 و کوکی `hireyar.csrf` دارای `Secure` باشد.
 
 برای اجرای سرور با `ASPNETCORE_ENVIRONMENT=Production`، فایل نادیده‌گرفته‌شدهٔ `appsettings.Production.local.json` را کنار فایل‌های منتشرشدهٔ API قرار دهید، یا تنظیمات معادل را با متغیر محیطی بدهید. حداقل `ConnectionStrings:Default`، `Security:SigningKey`، `Security:Issuer`، `Security:Audience`، `Security:FrontendUrl`، `Security:AllowedOrigins`، `Security:DataProtectionPath` و تنظیمات SMTP لازم‌اند. فایل Development محلی همراه Git منتقل نمی‌شود. پس از انتشار نسخهٔ جدید، `/swagger` باید بدون Bearer باز شود؛ پاسخ 401 از `/api/auth/me` بدون Bearer رفتار درست است. کلید JWT سرور را ثابت و اختصاصی همان محیط نگه دارید؛ تغییر آن توکن‌های صادرشدهٔ قبلی را نامعتبر می‌کند.
 
