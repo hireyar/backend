@@ -11,6 +11,23 @@ namespace HireYar.Tests;
 public sealed class AuthTests(ApiFixture f)
 {
     [PostgresFact]
+    public async Task Registration_without_smtp_is_confirmed_and_can_login()
+    {
+        var fixture = new ApiFixture { AutoConfirmEmailOnRegistration = true };
+        await fixture.InitializeAsync();
+        try
+        {
+            var client = fixture.Browser(); var address = $"{Guid.NewGuid():N}@example.test"; const string password = "Valid-test-password1!";
+            var response = await client.Send(HttpMethod.Post, "/api/auth/register", new RegisterRequest("Name", "Org", address, password));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.False((await response.Content.ReadFromJsonAsync<RegistrationResult>())!.ConfirmationEmailSent);
+            Assert.False(fixture.Email.Messages.ContainsKey(address));
+            await fixture.Db(async db => Assert.True((await db.Users.SingleAsync(x => x.Email == address)).EmailConfirmed));
+            Assert.Equal(HttpStatusCode.OK, (await client.Send(HttpMethod.Post, "/api/auth/login", new LoginRequest(address, password))).StatusCode);
+        }
+        finally { await ((IAsyncLifetime)fixture).DisposeAsync(); }
+    }
+    [PostgresFact]
     public async Task Register_is_atomic_and_duplicate_email_is_rejected()
     {
         var c = f.Browser(); var email = $"{Guid.NewGuid():N}@example.test"; var r = new RegisterRequest("Name", "Org", email, "invalidpassword");
