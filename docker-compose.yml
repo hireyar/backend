@@ -16,7 +16,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       AllowedHosts: api.hireyar.com
-      ConnectionStrings__Default: "${HIREYAR_DB_CONNECTION:?Set the production PostgreSQL connection string outside Git}"
+#      ConnectionStrings__Default: "${HIREYAR_DB_CONNECTION:?Set the production PostgreSQL connection string outside Git}"
       Security__SigningKey: "${HIREYAR_SIGNING_KEY:?Set the production JWT signing key outside Git}"
 
 #      Security__Issuer: "HireYar"
