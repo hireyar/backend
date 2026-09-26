@@ -54,6 +54,8 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 
 برای اجرای سرور با `ASPNETCORE_ENVIRONMENT=Production`، فایل نادیده‌گرفته‌شدهٔ `appsettings.Production.local.json` را کنار فایل‌های منتشرشدهٔ API قرار دهید، یا تنظیمات معادل را با متغیر محیطی بدهید. حداقل `ConnectionStrings:Default`، `Security:SigningKey`، `Security:Issuer`، `Security:Audience`، `Security:FrontendUrl`، `Security:AllowedOrigins`، `Security:DataProtectionPath` و تنظیمات SMTP لازم‌اند. فایل Development محلی همراه Git منتقل نمی‌شود. پس از انتشار نسخهٔ جدید، `/swagger` باید بدون Bearer باز شود؛ پاسخ 401 از `/api/auth/me` بدون Bearer رفتار درست است. کلید JWT سرور را ثابت و اختصاصی همان محیط نگه دارید؛ تغییر آن توکن‌های صادرشدهٔ قبلی را نامعتبر می‌کند.
 
+برای اجرای همین `docker-compose.yml`، دو مقدار `HIREYAR_DB_CONNECTION` و `HIREYAR_SIGNING_KEY` را در محیط سرور یا فایل `.env` خارج Git تنظیم کنید. Compose بدون این دو مقدار اجرا نمی‌شود. پیش از بررسی ثبت‌نام، دسترسی API به PostgreSQL و اعمال migration را با تنظیمات همان محیط بررسی کنید؛ `GET /api/auth/csrf` به دیتابیس متصل نمی‌شود و موفقیت آن صحت اتصال را ثابت نمی‌کند.
+
 کلیدهای Data Protection را روی volume دائمی، با دسترسی فقط حساب اجرای API، backup محدود و دیسک رمزگذاری‌شده نگه دار. ذخیره filesystem به‌تنهایی رمزگذاری در حالت سکون نیست؛ در production حفاظت volume یا certificate/KMS متناسب با میزبان الزامی است. حذف کلیدها لینک‌های Identity و CSRF را نامعتبر می‌کند. volume `protection-keys` در compose برای restart حفظ می‌شود. signing key JWT مستقل است.
 
 ## اتصال Angular و جریان نمونه
@@ -70,7 +72,7 @@ logout فقط نشست refresh جاری را باطل می‌کند؛ logout-all
 
 خطاها ProblemDetails با `code` و `traceId` هستند؛ validation دارای `errors` است. پاسخ generic برای forgot/resend تضمین ارسال نیست؛ شکست SMTP با رویداد بدون داده حساس ثبت می‌شود. register و دعوت فیلد وضعیت ارسال دارند و resend در دسترس است.
 
-برای خطای 500، لاگ سرور با همان `traceId` نوع خطا و خطای داخلی، stack trace، وضعیت HTTPS و فقط وجود هدر forwarded proto را ثبت می‌کند. متن exception، مقدار هدر، cookie، token و body ثبت نمی‌شوند؛ پاسخ عمومی نیز جزئیات داخلی را نشان نمی‌دهد.
+برای خطای 500، لاگ سرور با همان `traceId` نوع خطا و خطای داخلی، SQLSTATE در صورت وجود، stack trace، وضعیت HTTPS و فقط وجود هدر forwarded proto را ثبت می‌کند. با جست‌وجوی `traceId` پاسخ در `docker logs hireyar-api` خطای همان درخواست را پیدا کنید. متن exception، مقدار هدر، cookie، token و body ثبت نمی‌شوند؛ پاسخ عمومی نیز جزئیات داخلی را نشان نمی‌دهد.
 
 ## تست و migration استقرار
 

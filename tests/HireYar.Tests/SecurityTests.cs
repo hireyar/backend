@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -15,6 +16,23 @@ namespace HireYar.Tests;
 [Collection("Postgres")]
 public sealed class SecurityTests(ApiFixture f)
 {
+    private sealed class ErrorLogProvider : ILoggerProvider
+    {
+        public ConcurrentQueue<string> Entries { get; } = new();
+        public ILogger CreateLogger(string categoryName) => new ErrorLogger(Entries);
+        public void Dispose() { }
+
+        private sealed class ErrorLogger(ConcurrentQueue<string> entries) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                if (IsEnabled(logLevel)) entries.Enqueue(formatter(state, exception));
+            }
+        }
+    }
+
     private sealed class ProxyRequestStartupFilter : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -31,9 +49,10 @@ public sealed class SecurityTests(ApiFixture f)
     [Fact]
     public async Task Production_csrf_uses_forwarded_https_without_proxy_ip_configuration()
     {
+        using var logs = new ErrorLogProvider();
         using var production = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            builder.ConfigureLogging(logging => logging.ClearProviders());
+            builder.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddProvider(logs); });
             builder.UseEnvironment("Production");
             builder.UseSetting("ConnectionStrings:Default", "Host=localhost;Database=hireyar_test;Username=test;Password=test");
             builder.UseSetting("Security:SigningKey", new string('x', 32));
@@ -57,6 +76,9 @@ public sealed class SecurityTests(ApiFixture f)
         using var plainRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/csrf");
         using var plainResponse = await client.SendAsync(plainRequest);
         Assert.Equal(HttpStatusCode.InternalServerError, plainResponse.StatusCode);
+        var problem = await plainResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var traceId = problem.GetProperty("traceId").GetString();
+        Assert.Contains(logs.Entries, entry => entry.Contains($"TraceId={traceId}", StringComparison.Ordinal));
 
         using var ambiguousRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/csrf");
         ambiguousRequest.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https,http");

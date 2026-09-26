@@ -33,6 +33,8 @@ ADR-013: Swagger UI و OpenAPI JSON در همه محیط‌ها بدون توک�
 
 ADR-014: طبق انتخاب صریح کاربر، `KnownProxies` و تنظیم IP proxy حذف شد. یک middleware کوچک در Production فقط مقدار دقیق و یکتای `X-Forwarded-Proto: https` را برای scheme درخواست اعمال می‌کند؛ سایر مقادیر نادیده گرفته می‌شوند. `CookieSecurePolicy.Always` حفظ شد. این سادگی به معنی امکان جعل هدر توسط هر اتصال مستقیم به پورت داخلی است؛ دسترسی به آن پورت باید در شبکه یا firewall به proxy محدود شود. برای عیب‌یابی 500، نوع exception، inner type، stack trace و نشانه‌های بولی HTTPS/forwarded proto با traceId و بدون متن exception یا داده درخواست لاگ می‌شوند.
 
+ADR-015: شناسهٔ `Activity.Current.Id` در پاسخ ProblemDetails و لاگ خطای 500 یکسان است؛ در نبود Activity از `HttpContext.TraceIdentifier` استفاده می‌شود. جزئیات exception در پاسخ عمومی منتشر نمی‌شوند. برای خطای PostgreSQL فقط SQLSTATE به لاگ ساخت‌یافته اضافه می‌شود. connection string و signing key در تنظیمات تحت Git نگهداری نمی‌شوند؛ Compose آن‌ها را از محیط استقرار می‌گیرد.
+
 موضوع باز محیطی: صحت Docker و SMTP واقعی محلی تا اجرای آن‌ها قابل تأیید نیست؛ [STATUS](STATUS.md). روش حفاظت کلیدها و TLS میزبان production باید هنگام تسک deployment تعیین شود. این موارد تصمیم پیاده‌شده تلقی نمی‌شوند.
 
 توسعه آینده AI و فایل از قرارداد مصرف‌شده Application و implementation Infrastructure انجام می‌شود؛ اکنون abstraction یا جدول آن‌ها نداریم. جلسه آینده به snapshot سؤال و معیار نیاز دارد؛ engine نسخه‌بندی اکنون ساخته نمی‌شود.
