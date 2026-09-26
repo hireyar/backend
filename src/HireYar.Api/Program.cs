@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -17,7 +16,6 @@ using HireYar.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -34,22 +32,6 @@ if (!IsOrigin(security.FrontendUrl, builder.Environment.IsDevelopment()) || secu
     throw new InvalidOperationException("Security requires explicit frontend and CORS origins; HTTPS is mandatory outside Development and CORS origins must omit trailing slash.");
 if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Default"))) throw new InvalidOperationException("ConnectionStrings:Default is required.");
 if (string.IsNullOrWhiteSpace(security.DataProtectionPath)) throw new InvalidOperationException("Security:DataProtectionPath is required.");
-var trustedProxyAddresses = builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [];
-if (trustedProxyAddresses.Length > 0)
-{
-    var trustedProxies = trustedProxyAddresses.Select(address => IPAddress.TryParse(address, out var ip)
-        ? ip : throw new InvalidOperationException("ReverseProxy:KnownProxies must contain IP addresses.")).ToArray();
-    builder.Services.Configure<ForwardedHeadersOptions>(options =>
-    {
-        options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
-        foreach (var proxy in trustedProxies)
-        {
-            options.KnownProxies.Add(proxy);
-            if (proxy.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                options.KnownProxies.Add(proxy.MapToIPv6());
-        }
-    });
-}
 builder.Services.AddDataProtection().SetApplicationName("HireYar").PersistKeysToFileSystem(new DirectoryInfo(security.DataProtectionPath));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor(); builder.Services.AddScoped<ICurrentUser, CurrentUser>(); builder.Services.AddScoped<CurrentAccountValidation>();
@@ -120,7 +102,13 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
         operation.Responses.TryAdd(status, new OpenApiResponse { Description = "ProblemDetails with code and traceId; validation errors include errors.", Content = new Dictionary<string, OpenApiMediaType> { ["application/problem+json"] = new() { Schema = schema } } });
 }));
 var app = builder.Build();
-if (trustedProxyAddresses.Length > 0) app.UseForwardedHeaders();
+if (!app.Environment.IsDevelopment())
+    app.Use((context, next) =>
+    {
+        if (context.Request.Headers.TryGetValue("X-Forwarded-Proto", out var proto) && proto.Count == 1 && string.Equals(proto[0], "https", StringComparison.OrdinalIgnoreCase))
+            context.Request.Scheme = Uri.UriSchemeHttps;
+        return next(context);
+    });
 app.UseExceptionHandler(); app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment()) { app.UseHsts(); app.UseHttpsRedirection(); }
 app.Use(async (context, next) => { context.Response.Headers.CacheControl = "no-store"; context.Response.Headers.XContentTypeOptions = "nosniff"; await next(); });

@@ -30,4 +30,4 @@
 
 | HY-011 | انتقال از SQL Server به PostgreSQL | ۱ | Verified | تأیید عدم نیاز به داده قدیمی | provider، migration جدید، قفل و RowVersion، compose و ۲۳ تست مرتبط PostgreSQL موفق؛ شکست مستقل HY-010 پابرجاست |
 
-| HY-012 | CSRF پشت reverse proxy | ۱ | Implemented | مقدار `HIREYAR_TRUSTED_PROXY_IP` و هدر `X-Forwarded-Proto: https` در سرور | تست محلی Production با proxy مورداعتماد 200 و کوکی Secure؛ Compose بدون IP اجرا نشود؛ پس از انتشار پاسخ واقعی سرور بررسی شود |
+| HY-012 | CSRF پشت reverse proxy | ۱ | Implemented | هدر `X-Forwarded-Proto: https` و محدودیت شبکه پورت داخلی در سرور | تست محلی Production با forwarded HTTPS پاسخ 200 و کوکی Secure؛ پس از انتشار پاسخ واقعی سرور بررسی شود |
