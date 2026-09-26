@@ -24,6 +24,7 @@ services:
 
       Security__FrontendUrl: "https://hireyar.com"
       Security__AllowedOrigins__0: "https://hireyar.com"
+      ReverseProxy__KnownProxies__0: "192.168.105.73"
 #      Security__AccessMinutes: "60"
 #      Security__RefreshDays: "30"
       Security__DataProtectionPath: "/keys"
