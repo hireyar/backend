@@ -1,5 +1,9 @@
 # معماری و تصمیم‌ها
 
+## تصمیم موقت ثبت‌نام بدون SMTP
+
+گزینهٔ `Security:AutoConfirmEmailOnRegistration` هنگام ثبت‌نام Owner جدید، `EmailConfirmed` را در همان تراکنش ساخت حساب برابر true می‌کند و ایمیل تأیید نمی‌فرستد. پیش‌فرض کد false است؛ فعلاً در `appsettings.json` مقدار true دارد. این گزینه تنها برای حساب‌های تازه است و حساب‌های قدیمیِ تأییدنشده را تغییر نمی‌دهد. پس از آماده‌شدن SMTP باید false شود تا جریان تأیید ایمیل دوباره فعال شود. تا آن زمان مالکیت نشانی ایمیل بررسی نمی‌شود.
+
 ## ساختار واقعی
 
 `HireYar.slnx` شامل Domain (Organizations/JobPositions/InterviewTemplates)، Application (سرویس‌ها، DTO، validation و قراردادها)، Infrastructure (Identity، SQL/DbContext/mapping/migrations، JWT، SMTP، دعوت) و Api (Controller، HTTP، مجوزها، CSRF، composition) و `tests/HireYar.Tests` است.

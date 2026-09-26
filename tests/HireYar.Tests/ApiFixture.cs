@@ -38,6 +38,7 @@ public sealed class TestClock : TimeProvider
 public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public bool Production { get; init; }
+    public bool AutoConfirmEmailOnRegistration { get; init; }
     public TestEmail Email { get; } = new(); public TestClock Clock { get; } = new();
     private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
     private string? connection;
@@ -46,6 +47,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseEnvironment(Production ? "Production" : "Development");
         b.UseSetting("ConnectionStrings:Default", connection!);
         b.UseSetting("Security:SigningKey", Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+        b.UseSetting("Security:AutoConfirmEmailOnRegistration", AutoConfirmEmailOnRegistration.ToString());
         b.UseSetting("Security:Issuer", "HireYar.Tests"); b.UseSetting("Security:Audience", "HireYar.Tests");
         b.UseSetting("Security:FrontendUrl", Production ? "https://localhost:4200" : "http://localhost:4200"); b.UseSetting("Security:AllowedOrigins:0", Production ? "https://localhost:4200" : "http://localhost:4200");
         b.UseSetting("Smtp:Host", "localhost"); b.UseSetting("Smtp:Port", "1025"); b.UseSetting("Smtp:From", "no-reply@hireyar.test");

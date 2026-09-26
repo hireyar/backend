@@ -1,5 +1,7 @@
 # HireYar Backend
 
+تا زمان فراهم‌شدن SMTP، `Security:AutoConfirmEmailOnRegistration=true` در تنظیمات مشترک فعال است: حساب‌های Owner تازه بدون ایمیل تأیید، قابل ورود هستند. این گزینه مالکیت ایمیل را بررسی نمی‌کند و پس از راه‌اندازی SMTP باید false شود. این تنظیم جای اجرای migration PostgreSQL را نمی‌گیرد.
+
 پایه حساب‌های سازمانی و API پنل HR برای مصاحبه اولیه استخدام. تصمیم نهایی استخدام انسانی است؛ موتور مصاحبه و AI هنوز پیاده نشده‌اند.
 
 نقطه شروع توسعه: [AGENTS](AGENTS.md). مراجع: [محصول](docs/PROJECT.md)، [معماری](docs/ARCHITECTURE.md)، [وضعیت واقعی](docs/STATUS.md)، [Backlog](docs/BACKLOG.md)، [ادامه کار](docs/HANDOFF.md).

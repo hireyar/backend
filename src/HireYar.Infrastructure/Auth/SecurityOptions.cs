@@ -9,6 +9,7 @@ public sealed class SecurityOptions
     public string Audience { get; set; } = "";
     public int AccessMinutes { get; set; } = 15;
     public int RefreshDays { get; set; } = 7;
+    public bool AutoConfirmEmailOnRegistration { get; set; }
     public string FrontendUrl { get; set; } = "";
     public string[] AllowedOrigins { get; set; } = [];
     public string DataProtectionPath { get; set; } = "";
