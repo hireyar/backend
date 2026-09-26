@@ -43,12 +43,15 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 | `Security__FrontendUrl` | origin پنل برای لینک‌های ایمیل |
 | `Security__AllowedOrigins__0` | origin دقیق بدون slash پایانی؛ برای چند origin اندیس‌های بعدی |
 | `Security__DataProtectionPath` | مسیر دائمی قابل نوشتن برای کلیدهای Identity/CSRF |
+| `ReverseProxy__KnownProxies__0` | IP مبدأ reverse proxy از دید کانتینر API، وقتی TLS پیش از Kestrel خاتمه می‌یابد؛ برای چند proxy اندیس‌های بعدی |
 | `Smtp__Host`, `Smtp__Port`, `Smtp__From` | سرویس ارسال ایمیل |
 | `Smtp__EnableSsl`, `Smtp__Username`, `Smtp__Password` | TLS و اطلاعات اتصال SMTP؛ خارج ریپو |
 | `AllowedHosts` | hostnameهای واقعی API؛ پیش‌فرض localhost |
 | `AuthRateLimit__PermitLimit` | پیش‌فرض ۲۰ درخواست در دقیقه برای هر IP روی مسیرهای auth/ارسال دعوت |
 
 در production پنل و API باید HTTPS و زیر یک سایت باشند. گواهی TLS و reverse proxy مورد اعتماد باید در محیط استقرار تنظیم شوند؛ هدرهای forwarded از هر فرستنده پذیرفته نمی‌شوند. این تسک زیرساخت deployment نمی‌سازد. تنظیمات محیط Development را وارد production نکن.
+
+اگر proxy درخواست HTTPS را با HTTP به کانتینر می‌رساند، باید هدر `X-Forwarded-Proto: https` را ارسال کند و IP مبدأ آن در `ReverseProxy__KnownProxies__0` ثبت شود. API فقط از IPهای ثبت‌شده scheme اصلی را می‌پذیرد. بدون این تنظیم، `GET /api/auth/csrf` در Production به علت الزام کوکی Secure خطای 500 می‌دهد. IP عمومی دامنه یا IP کاربر را به جای IP proxy قرار ندهید. پس از انتشار، پاسخ HTTPS این مسیر باید 200 و کوکی `hireyar.csrf` دارای `Secure` باشد.
 
 برای اجرای سرور با `ASPNETCORE_ENVIRONMENT=Production`، فایل نادیده‌گرفته‌شدهٔ `appsettings.Production.local.json` را کنار فایل‌های منتشرشدهٔ API قرار دهید، یا تنظیمات معادل را با متغیر محیطی بدهید. حداقل `ConnectionStrings:Default`، `Security:SigningKey`، `Security:Issuer`، `Security:Audience`، `Security:FrontendUrl`، `Security:AllowedOrigins`، `Security:DataProtectionPath` و تنظیمات SMTP لازم‌اند. فایل Development محلی همراه Git منتقل نمی‌شود. پس از انتشار نسخهٔ جدید، `/swagger` باید بدون Bearer باز شود؛ پاسخ 401 از `/api/auth/me` بدون Bearer رفتار درست است. کلید JWT سرور را ثابت و اختصاصی همان محیط نگه دارید؛ تغییر آن توکن‌های صادرشدهٔ قبلی را نامعتبر می‌کند.
 
@@ -67,6 +70,8 @@ refresh cookie، host-only، `Path=/api/auth`، `SameSite=Strict` و در produc
 logout فقط نشست refresh جاری را باطل می‌کند؛ logout-all همه نشست‌ها را. JWT صادرشده تا انقضای کوتاهش معتبر می‌ماند. غیرفعال‌شدن و تغییر نقش در هر درخواست از دیتابیس بررسی می‌شوند و بلافاصله اثر دارند. تغییر/بازیابی رمز همه refreshها را باطل می‌کند.
 
 خطاها ProblemDetails با `code` و `traceId` هستند؛ validation دارای `errors` است. پاسخ generic برای forgot/resend تضمین ارسال نیست؛ شکست SMTP با رویداد بدون داده حساس ثبت می‌شود. register و دعوت فیلد وضعیت ارسال دارند و resend در دسترس است.
+
+برای خطای 500، لاگ سرور با همان `traceId` نوع خطا و خطای داخلی، stack trace، وضعیت HTTPS و فقط وجود هدر forwarded proto را ثبت می‌کند. متن exception، مقدار هدر، cookie، token و body ثبت نمی‌شوند؛ پاسخ عمومی نیز جزئیات داخلی را نشان نمی‌دهد.
 
 ## تست و migration استقرار
 

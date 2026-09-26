@@ -1,5 +1,7 @@
 # وضعیت جاری
 
+بررسی 2026-09-26: خطای 500 سرور در `GET /api/auth/csrf` با `InvalidOperationException` با مسیر HTTPS پشت reverse proxy سازگار است. در Production کوکی antiforgery الزام Secure دارد ولی کانتینر درخواست را HTTP می‌بیند. پردازش `X-Forwarded-Proto` فقط برای `ReverseProxy:KnownProxies` و لاگ امن stack trace برای 500 اضافه شد. build Debug با صفر هشدار/خطا و تست مستقل Production با proxy مورداعتماد (200 و کوکی Secure) و مبدأ نامعتبر (500) موفق بود. اجرای `dotnet test HireYar.slnx --no-restore`: ۲ موفق، ۲۴ Skip به دلیل نبود PostgreSQL تست. IP واقعی proxy و ارسال هدر در سرور هنوز تعیین و تأیید نشده‌اند؛ push/deploy انجام نشده و رفع خطای سرور هنوز تأیید نشده است.
+
 آخرین به‌روزرسانی: 2026-09-25. مرحله ۱، بک‌اند سازمان و پنل HR. پایگاه داده جاری **PostgreSQL 18** است؛ تصمیم SQL Server با درخواست صریح کاربر جایگزین شد و داده قبلی نیاز به انتقال ندارد. تنظیمات محلی JWT و اتصال دیتابیس اکنون در `src/HireYar.Api/appsettings.Development.local.json` قرار می‌گیرند؛ فایل در Git نادیده گرفته می‌شود و متغیرهای محیطی اولویت بالاتر دارند.
 
 ## وضعیت قابلیت‌ها

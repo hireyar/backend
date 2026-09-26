@@ -1,5 +1,7 @@
 # ادامه کار
 
+بررسی 2026-09-26: `GET /api/auth/csrf` در سرور 500 و لاگ `InvalidOperationException` داد. Production کوکی CSRF را با `SecurePolicy.Always` می‌سازد اما درخواست داخلی کانتینر از reverse proxy با HTTP می‌رسد؛ کد فعلی روی dev پردازش `X-Forwarded-Proto` را فقط از IPهای `ReverseProxy:KnownProxies` پیش از antiforgery انجام می‌دهد. `ApiExceptionHandler` برای 500 نوع خطا، inner type، stack trace، traceId و وضعیت HTTPS/وجود هدر را بدون متن exception یا داده درخواست ثبت می‌کند. build و تست مستقل Production موفق شدند. برای سرور باید IP مبدأ proxy از دید کانتینر و ارسال `X-Forwarded-Proto: https` تعیین شود. push/deploy انجام نشده است.
+
 آخرین تغییر (2026-09-25): راهنمای کوتاه فارسی شروع در `OpenApiText` افزوده شد و عنوان همهٔ عملیات‌های Controller در OpenAPI فارسی شد. ترتیب پیشنهادی حساب جدید: CSRF، ثبت‌نام، تأیید ایمیل، ورود؛ حساب موجود: CSRF، ورود، Bearer و مشاهده حساب. بعد از ورود CSRF جدید با Bearer لازم است؛ refresh با کوکی و بدون Bearer انجام می‌شود. Build موفق و تست مستقل Production Swagger/OpenAPI شامل وجود راهنما و عنوان همهٔ عملیات‌ها موفق شد. تست PostgreSQL در این نوبت اجرا نشد. تغییرات این نوبت commit/push/deploy نشده‌اند.
 
 رفع جدید: کاربر در Development خطای `Failed to load configuration ... UserSecrets/.../secrets.json` گزارش کرد. `UserSecretsId` از `src/HireYar.Api/HireYar.Api.csproj` حذف شد؛ تنظیمات از appsettings.Development.local.json خوانده می‌شوند. Build موفق، اجرای واقعی API موفق، `/health` و `/swagger/index.html` هر دو 200؛ تست جاری ۱ موفق و ۲۴ Skip بدون PostgreSQL بود. فایل User Secrets کاربر تغییر داده نشد.

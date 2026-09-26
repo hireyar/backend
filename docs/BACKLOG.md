@@ -29,3 +29,5 @@
 | HY-010 | تعیین تکلیف انتشار OpenAPI در Production | ۱ | Verified | درخواست دسترسی Swagger روی سرور | Swagger و OpenAPI عمومی در Production؛ تست مستقل دسترسی 200 و حفاظت API 401 موفق |
 
 | HY-011 | انتقال از SQL Server به PostgreSQL | ۱ | Verified | تأیید عدم نیاز به داده قدیمی | provider، migration جدید، قفل و RowVersion، compose و ۲۳ تست مرتبط PostgreSQL موفق؛ شکست مستقل HY-010 پابرجاست |
+
+| HY-012 | CSRF پشت reverse proxy | ۱ | Implemented | IP مبدأ proxy و هدر `X-Forwarded-Proto` در سرور | تست محلی Production با proxy مورداعتماد 200 و کوکی Secure؛ لاگ 500 stack trace امن بدهد؛ پس از انتشار پاسخ واقعی سرور بررسی شود |
