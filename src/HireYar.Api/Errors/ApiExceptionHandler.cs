@@ -17,7 +17,15 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problems, ILogger
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.SerializationFailure } } => (409, "concurrency_conflict", "Concurrent operation; retry the request."),
             _ => (500, "unexpected_error", "An unexpected error occurred.")
         };
-        if (status == 500) logger.LogError("Unhandled request error. ExceptionType={ExceptionType} TraceId={TraceId}", exception.GetType().Name, context.TraceIdentifier);
+        if (status == 500)
+            logger.LogError(
+                "Unhandled request error. ExceptionType={ExceptionType} InnerExceptionType={InnerExceptionType} TraceId={TraceId} IsHttps={IsHttps} ForwardedProtoPresent={ForwardedProtoPresent} StackTrace={StackTrace}",
+                exception.GetType().FullName,
+                exception.InnerException?.GetType().FullName,
+                context.TraceIdentifier,
+                context.Request.IsHttps,
+                context.Request.Headers.ContainsKey("X-Forwarded-Proto"),
+                exception.StackTrace);
         context.Response.StatusCode = status;
         return await problems.TryWriteAsync(new() { HttpContext = context, ProblemDetails = new() { Status = status, Title = message, Extensions = { ["code"] = code } } });
     }
