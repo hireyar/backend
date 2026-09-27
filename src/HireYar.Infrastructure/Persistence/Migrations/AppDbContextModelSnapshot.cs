@@ -203,7 +203,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
@@ -225,7 +224,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("NormalizedEmail")
-                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
@@ -240,7 +238,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("PhoneNumber")
-                        .HasColumnType("text");
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)");
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
@@ -273,6 +272,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
+                    b.HasIndex("PhoneNumber")
+                        .IsUnique()
+                        .HasFilter("\"PhoneNumber\" IS NOT NULL");
+
                     b.HasIndex("OrganizationId")
                         .IsUnique()
                         .HasFilter("\"Role\" = 'Owner'");
@@ -283,6 +286,21 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_User_Role", "\"Role\" IN ('Owner','Recruiter')");
                         });
+                });
+
+            modelBuilder.Entity("HireYar.Infrastructure.Auth.OtpChallenge", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("Mobile").IsRequired().HasMaxLength(11).HasColumnType("character varying(11)");
+                    b.Property<string>("CodeHash").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset>("ExpiresAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset?>("ConsumedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<bool>("Delivered").HasColumnType("boolean");
+                    b.Property<int>("FailedAttempts").HasColumnType("integer");
+                    b.HasKey("Id");
+                    b.HasIndex("Mobile").IsUnique();
+                    b.ToTable("OtpChallenges");
                 });
 
             modelBuilder.Entity("HireYar.Infrastructure.Auth.RefreshToken", b =>

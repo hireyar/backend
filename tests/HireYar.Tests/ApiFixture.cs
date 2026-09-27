@@ -12,6 +12,7 @@ using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 namespace HireYar.Tests;
 
 public sealed class PostgresFactAttribute : FactAttribute
@@ -30,6 +31,12 @@ public sealed class TestEmail : IEmailSender
         return Uri.UnescapeDataString(body[start..].Split('\n')[0].Trim());
     }
 }
+public sealed class TestPhoneOtp : IPhoneOtpSender
+{
+    public ConcurrentDictionary<string, string> Codes { get; } = new();
+    public Task SendAsync(string mobile, string code, CancellationToken ct)
+    { Codes[mobile] = code; return Task.CompletedTask; }
+}
 public sealed class TestClock : TimeProvider
 {
     public TimeSpan Offset { get; set; }
@@ -39,15 +46,21 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public bool Production { get; init; }
     public bool AutoConfirmEmailOnRegistration { get; init; }
+    public bool UseFixedOtp { get; init; }
     public TestEmail Email { get; } = new(); public TestClock Clock { get; } = new();
+    public TestPhoneOtp PhoneOtp { get; } = new();
     private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
     private string? connection;
     protected override void ConfigureWebHost(IWebHostBuilder b)
     {
+        b.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddConsole(); });
         b.UseEnvironment(Production ? "Production" : "Development");
+        b.UseSetting("SkipLocalSettings", "true");
         b.UseSetting("ConnectionStrings:Default", connection!);
         b.UseSetting("Security:SigningKey", Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
         b.UseSetting("Security:AutoConfirmEmailOnRegistration", AutoConfirmEmailOnRegistration.ToString());
+        b.UseSetting("Kavenegar:UseFixedOtp", UseFixedOtp.ToString());
+        b.UseSetting("Kavenegar:FixedOtpCode", "123456");
         b.UseSetting("Security:Issuer", "HireYar.Tests"); b.UseSetting("Security:Audience", "HireYar.Tests");
         b.UseSetting("Security:FrontendUrl", Production ? "https://localhost:4200" : "http://localhost:4200"); b.UseSetting("Security:AllowedOrigins:0", Production ? "https://localhost:4200" : "http://localhost:4200");
         b.UseSetting("Smtp:Host", "localhost"); b.UseSetting("Smtp:Port", "1025"); b.UseSetting("Smtp:From", "no-reply@hireyar.test");
@@ -57,6 +70,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         {
             s.RemoveAll<IEmailSender>();
             s.AddSingleton<IEmailSender>(Email); s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
+            s.RemoveAll<IPhoneOtpSender>(); s.AddSingleton<IPhoneOtpSender>(PhoneOtp);
         });
     }
     public async Task InitializeAsync()

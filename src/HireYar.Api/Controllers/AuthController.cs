@@ -16,6 +16,10 @@ public sealed class AuthController(AuthService service, MemberService members, I
     [AllowAnonymous, HttpGet("csrf")]
     public ActionResult<CsrfResponse> Csrf([FromServices] IAntiforgery antiforgery)
     { Response.Headers.CacheControl = "no-store"; return new CsrfResponse(antiforgery.GetAndStoreTokens(HttpContext).RequestToken!); }
+    [AllowAnonymous, HttpPost("otp/request")]
+    public Task<OtpRequestResult> RequestOtp(RequestOtpRequest r, CancellationToken ct) => service.RequestOtpAsync(r, ct);
+    [AllowAnonymous, HttpPost("otp/verify")]
+    public async Task<AccessResponse> VerifyOtp(VerifyOtpRequest r, CancellationToken ct) => Session(await service.VerifyOtpAsync(r, ct));
     [AllowAnonymous, HttpPost("register")]
     public Task<RegistrationResult> Register(RegisterRequest r, CancellationToken ct) => service.RegisterAsync(r, ct);
     [AllowAnonymous, HttpPost("confirm-email")]

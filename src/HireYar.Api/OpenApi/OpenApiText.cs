@@ -3,6 +3,10 @@ namespace HireYar.Api.OpenApi;
 internal static class OpenApiText
 {
     public const string Introduction = """
+        **ورود با موبایل:** `GET /api/auth/csrf` ← `POST /api/auth/otp/request` ← دریافت پیامک ← `POST /api/auth/otp/verify`. اگر موبایل حسابی نداشته باشد، حساب Owner و سازمان اولیه ساخته می‌شود؛ نام سازمان را با `PUT /api/organization` تکمیل کنید. API key و نام قالب VerifyLookup کاوه‌نگار باید در تنظیمات محرمانه محیط باشند.
+
+        مسیرهای زیر برای حساب‌های ایمیلی موجود تا تعیین تکلیف مهاجرت آن‌ها باقی مانده‌اند.
+
         **شروع با حساب جدید:** `GET /api/auth/csrf` ← `POST /api/auth/register` ← `POST /api/auth/confirm-email` ← `POST /api/auth/login`.
 
         **حساب موجود:** `GET /api/auth/csrf` ← `POST /api/auth/login` ← توکن دریافتی را در **Authorize** وارد کنید ← `GET /api/auth/me`.
@@ -15,6 +19,8 @@ internal static class OpenApiText
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
         ("Auth", "Csrf") => "۱. دریافت توکن CSRF",
+        ("Auth", "RequestOtp") => "۲. ارسال کد ورود به موبایل",
+        ("Auth", "VerifyOtp") => "۳. تأیید کد و ورود یا ثبت‌نام",
         ("Auth", "Register") => "۲. ثبت‌نام سازمان و مالک",
         ("Auth", "Confirm") => "۳. تأیید ایمیل",
         ("Auth", "Resend") => "ارسال دوباره ایمیل تأیید",

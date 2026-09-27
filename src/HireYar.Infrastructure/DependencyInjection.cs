@@ -19,12 +19,20 @@ public static class DependencyInjection
         services.AddScoped<IApplicationDbContext>(s => s.GetRequiredService<AppDbContext>());
         services.AddIdentityCore<ApplicationUser>(o =>
         {
-            o.User.RequireUniqueEmail = true; o.Password.RequiredLength = 12; o.Password.RequireNonAlphanumeric = true;
+            o.User.RequireUniqueEmail = false; o.Password.RequiredLength = 12; o.Password.RequireNonAlphanumeric = true;
             o.Lockout.MaxFailedAccessAttempts = 5; o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             o.SignIn.RequireConfirmedEmail = true;
         }).AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(2));
         services.Configure<SecurityOptions>(config.GetSection("Security"));
+        services.AddOptions<KavenegarOptions>().Bind(config.GetSection("Kavenegar"))
+            .Validate(o => !o.UseFixedOtp || (o.FixedOtpCode.Length == 6 && o.FixedOtpCode.All(char.IsAsciiDigit)),
+                "Kavenegar:FixedOtpCode must be exactly six ASCII digits when UseFixedOtp is enabled.")
+            .ValidateOnStart();
+        // The API key is part of Kavenegar's URL; avoid HttpClientFactory request URI logging.
+        services.AddSingleton<IPhoneOtpSender>(s => new KavenegarOtpSender(
+            new HttpClient { BaseAddress = new Uri("https://api.kavenegar.com/"), Timeout = TimeSpan.FromSeconds(10) },
+            s.GetRequiredService<Microsoft.Extensions.Options.IOptions<KavenegarOptions>>()));
         services.AddOptions<SmtpOptions>().Bind(config.GetSection("Smtp")).Validate(s => !string.IsNullOrWhiteSpace(s.Host) && s.Port is > 0 and <= 65535 && System.Net.Mail.MailAddress.TryCreate(s.From, out _), "Smtp Host, Port and From are required.").ValidateOnStart();
         services.AddScoped<IEmailSender, SmtpEmailSender>(); services.AddScoped<IAccounts, Accounts>(); services.AddScoped<ITeamMembers, TeamMembers>();
         services.AddSingleton(TimeProvider.System); return services;

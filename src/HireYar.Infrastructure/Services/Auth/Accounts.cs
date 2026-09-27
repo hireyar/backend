@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Security.Cryptography;
 using HireYar.Application.Auth;
 using HireYar.Application.Common;
 using HireYar.Domain.Organizations;
@@ -13,10 +14,74 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 namespace HireYar.Infrastructure.Auth;
 
-public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IEmailSender email, IOptions<SecurityOptions> options, TimeProvider time, ILogger<Accounts> logger) : IAccounts
+public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IEmailSender email, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger) : IAccounts
 {
     private SecurityOptions Settings => options.Value;
     private DateTimeOffset Now => time.GetUtcNow();
+    private string OtpHash(string mobile, string code) => Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(Settings.SigningKey), Encoding.UTF8.GetBytes($"{mobile}:{code}")));
+    public async Task<OtpRequestResult> RequestOtpAsync(RequestOtpRequest r, CancellationToken ct)
+    {
+        var now = Now;
+        var fixedMode = otpOptions.Value.UseFixedOtp;
+        var code = fixedMode ? otpOptions.Value.FixedOtpCode : RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        OtpChallenge challenge;
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            challenge = await db.OtpChallenges.FromSqlInterpolated($"SELECT * FROM \"OtpChallenges\" WHERE \"Mobile\" = {r.Mobile} FOR UPDATE").SingleOrDefaultAsync(ct)
+                ?? new OtpChallenge { Mobile = r.Mobile };
+            if (challenge.CreatedAtUtc > now.AddSeconds(-60)) throw new AppException(429, "rate_limited", "Please wait before requesting another code.");
+            if (db.Entry(challenge).State == EntityState.Detached) db.OtpChallenges.Add(challenge);
+            challenge.CodeHash = OtpHash(r.Mobile, code);
+            challenge.CreatedAtUtc = now; challenge.ExpiresAtUtc = now.AddMinutes(5);
+            challenge.ConsumedAtUtc = null; challenge.Delivered = fixedMode; challenge.FailedAttempts = 0;
+            await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        }
+        if (fixedMode) return new(challenge.ExpiresAtUtc);
+        try
+        {
+            await sms.SendAsync(r.Mobile, code, ct);
+            challenge.Delivered = true;
+            await db.SaveChangesAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception)
+        {
+            logger.LogWarning("OTP delivery failed. EventCode={EventCode}", "otp_delivery_failed");
+            throw new AppException(503, "otp_delivery_failed", "Could not send the verification code.");
+        }
+        return new(challenge.ExpiresAtUtc);
+    }
+    public async Task<SessionResult> VerifyOtpAsync(VerifyOtpRequest r, CancellationToken ct)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var challenge = await db.OtpChallenges.FromSqlInterpolated($"SELECT * FROM \"OtpChallenges\" WHERE \"Mobile\" = {r.Mobile} FOR UPDATE").SingleOrDefaultAsync(ct);
+        if (challenge is null || !challenge.Delivered || challenge.ConsumedAtUtc.HasValue || challenge.ExpiresAtUtc <= Now || challenge.FailedAttempts >= 5)
+            throw AppException.Unauthorized();
+        var actual = Convert.FromHexString(challenge.CodeHash);
+        var supplied = Convert.FromHexString(OtpHash(r.Mobile, r.Code));
+        if (!CryptographicOperations.FixedTimeEquals(actual, supplied))
+        {
+            challenge.FailedAttempts++;
+            await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+            throw AppException.Unauthorized();
+        }
+        var u = await db.Users.SingleOrDefaultAsync(x => x.PhoneNumber == r.Mobile, ct);
+        if (u is null)
+        {
+            var org = new Organization { Name = "سازمان من", CreatedAtUtc = Now, UpdatedAtUtc = Now };
+            db.Organizations.Add(org); await db.SaveChangesAsync(ct);
+            u = new ApplicationUser { Id = Guid.NewGuid(), UserName = r.Mobile, PhoneNumber = r.Mobile,
+                PhoneNumberConfirmed = true, FullName = "کاربر", OrganizationId = org.Id, Role = OrganizationRole.Owner,
+                CreatedAtUtc = Now, UpdatedAtUtc = Now };
+            Check(await users.CreateAsync(u));
+        }
+        if (!u.IsActive || await users.IsLockedOutAsync(u)) throw AppException.Unauthorized();
+        u.PhoneNumberConfirmed = true;
+        challenge.ConsumedAtUtc = Now;
+        var session = Issue(u, Guid.NewGuid());
+        await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        return session;
+    }
     public async Task<RegistrationResult> RegisterAsync(RegisterRequest r, CancellationToken ct)
     {
             var normalized = users.NormalizeEmail(r.Email.Trim());
@@ -72,7 +137,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
         {
             await Revoke(u.Id, old.FamilyId, ct); await tx.CommitAsync(ct); throw AppException.Unauthorized();
         }
-        if (old.ExpiresAtUtc <= Now || !u.IsActive || !u.EmailConfirmed) throw AppException.Unauthorized();
+        if (old.ExpiresAtUtc <= Now || !u.IsActive || !(u.EmailConfirmed || u.PhoneNumberConfirmed)) throw AppException.Unauthorized();
         var result = Issue(u, old.FamilyId);
         var next = db.ChangeTracker.Entries<RefreshToken>().Single(x => x.State == EntityState.Added).Entity;
         old.RevokedAtUtc = Now; old.ReplacedById = next.Id;
@@ -115,7 +180,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
         (from u in db.Users.AsNoTracking()
          join o in db.Organizations.AsNoTracking() on u.OrganizationId equals o.Id
          where u.Id == userId
-         select new CurrentUserDto(u.Id, u.Email!, u.FullName, u.OrganizationId, o.Name, u.Role)).SingleOrDefaultAsync(ct) ?? throw AppException.Unauthorized();
+         select new CurrentUserDto(u.Id, u.Email, u.PhoneNumber, u.FullName, u.OrganizationId, o.Name, u.Role)).SingleOrDefaultAsync(ct) ?? throw AppException.Unauthorized();
     public async Task<CurrentUserDto> UpdateAsync(Guid userId, NameRequest r, CancellationToken ct)
     {
         var u = await users.FindByIdAsync(userId.ToString()) ?? throw AppException.Unauthorized();

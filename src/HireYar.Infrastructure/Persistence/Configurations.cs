@@ -16,12 +16,24 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<ApplicationUser
     public void Configure(EntityTypeBuilder<ApplicationUser> b)
     {
         b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
-        b.Property(x => x.Email).HasMaxLength(256).IsRequired(); b.Property(x => x.NormalizedEmail).HasMaxLength(256).IsRequired();
+        b.Property(x => x.Email).HasMaxLength(256); b.Property(x => x.NormalizedEmail).HasMaxLength(256);
+        b.Property(x => x.PhoneNumber).HasMaxLength(11);
+        b.HasIndex(x => x.PhoneNumber).IsUnique().HasFilter("\"PhoneNumber\" IS NOT NULL");
         b.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
         b.HasIndex(x => x.NormalizedEmail).IsUnique(); b.HasIndex(x => new { x.OrganizationId, x.IsActive });
         b.HasIndex(x => x.OrganizationId).IsUnique().HasFilter("\"Role\" = 'Owner'");
         b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
         b.ToTable(t => t.HasCheckConstraint("CK_User_Role", "\"Role\" IN ('Owner','Recruiter')"));
+    }
+}
+public sealed class OtpChallengeConfiguration : IEntityTypeConfiguration<OtpChallenge>
+{
+    public void Configure(EntityTypeBuilder<OtpChallenge> b)
+    {
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Mobile).HasMaxLength(11).IsRequired();
+        b.Property(x => x.CodeHash).HasMaxLength(64).IsRequired();
+        b.HasIndex(x => x.Mobile).IsUnique();
     }
 }
 public sealed class JobConfiguration : IEntityTypeConfiguration<JobPosition>

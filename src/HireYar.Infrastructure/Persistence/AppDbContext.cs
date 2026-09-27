@@ -16,6 +16,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
     public DbSet<InterviewTemplate> InterviewTemplates => Set<InterviewTemplate>();
     public DbSet<InterviewQuestion> InterviewQuestions => Set<InterviewQuestion>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<OtpChallenge> OtpChallenges => Set<OtpChallenge>();
     public DbSet<TeamInvitation> TeamInvitations => Set<TeamInvitation>();
     protected override void OnModelCreating(ModelBuilder b)
     {
