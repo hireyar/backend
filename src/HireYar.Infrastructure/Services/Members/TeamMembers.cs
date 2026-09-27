@@ -15,7 +15,7 @@ public sealed class TeamMembers(AppDbContext db, UserManager<ApplicationUser> us
     public async Task<Page<MemberDto>> ListAsync(Guid org, PageQuery p, CancellationToken ct)
     {
         var q = db.Users.AsNoTracking().Where(x => x.OrganizationId == org); var total = await q.CountAsync(ct);
-        var rows = await q.OrderBy(x => x.CreatedAtUtc).ThenBy(x => x.Id).Skip(p.Skip).Take(p.PageSize).Select(x => new MemberDto(x.Id, x.Email!, x.FullName, x.Role, x.IsActive)).ToListAsync(ct);
+        var rows = await q.OrderBy(x => x.CreatedAtUtc).ThenBy(x => x.Id).Skip(p.Skip).Take(p.PageSize).Select(x => new MemberDto(x.Id, x.Email, x.PhoneNumber, x.FullName, x.Role, x.IsActive)).ToListAsync(ct);
         return new(rows, total, p.Page, p.PageSize);
     }
     public async Task<Page<InvitationDto>> InvitationsAsync(Guid org, PageQuery p, CancellationToken ct)

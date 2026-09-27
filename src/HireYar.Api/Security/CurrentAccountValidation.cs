@@ -9,8 +9,8 @@ public sealed class CurrentAccountValidation(AppDbContext db) : JwtBearerEvents
     public override async Task TokenValidated(TokenValidatedContext context)
     {
         if (!Guid.TryParse(context.Principal?.FindFirstValue("sub"), out var id)) { context.Fail("Invalid account."); return; }
-        var u = await db.Users.AsNoTracking().Where(x => x.Id == id).Select(x => new { x.IsActive, x.EmailConfirmed, x.OrganizationId, x.Role }).SingleOrDefaultAsync(context.HttpContext.RequestAborted);
-        if (u is not { IsActive: true, EmailConfirmed: true }) { context.Fail("Invalid account."); return; }
+        var u = await db.Users.AsNoTracking().Where(x => x.Id == id).Select(x => new { x.IsActive, x.EmailConfirmed, x.PhoneNumberConfirmed, x.OrganizationId, x.Role }).SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+        if (u is not { IsActive: true } || !(u.EmailConfirmed || u.PhoneNumberConfirmed)) { context.Fail("Invalid account."); return; }
         var identity = (ClaimsIdentity)context.Principal!.Identity!;
         foreach (var claim in identity.FindAll("org").Concat(identity.FindAll("role")).ToArray()) identity.RemoveClaim(claim);
         identity.AddClaim(new("org", u.OrganizationId.ToString())); identity.AddClaim(new("role", u.Role.ToString()));

@@ -4,6 +4,8 @@ namespace HireYar.Application.Auth;
 
 public interface IAccounts
 {
+    Task<OtpRequestResult> RequestOtpAsync(RequestOtpRequest r, CancellationToken ct);
+    Task<SessionResult> VerifyOtpAsync(VerifyOtpRequest r, CancellationToken ct);
     Task<RegistrationResult> RegisterAsync(RegisterRequest r, CancellationToken ct);
     Task ConfirmAsync(TokenRequest r, CancellationToken ct);
     Task ResendAsync(EmailRequest r, CancellationToken ct);

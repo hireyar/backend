@@ -4,6 +4,8 @@ namespace HireYar.Application.Auth;
 
 public sealed class AuthService(IAccounts accounts, HireYar.Application.Common.ICurrentUser user)
 {
+    public Task<OtpRequestResult> RequestOtpAsync(RequestOtpRequest r, CancellationToken ct) => accounts.RequestOtpAsync(r, ct);
+    public Task<SessionResult> VerifyOtpAsync(VerifyOtpRequest r, CancellationToken ct) => accounts.VerifyOtpAsync(r, ct);
     public Task<RegistrationResult> RegisterAsync(RegisterRequest r, CancellationToken ct) => accounts.RegisterAsync(r, ct);
     public Task ConfirmAsync(TokenRequest r, CancellationToken ct) => accounts.ConfirmAsync(r, ct);
     public Task ResendAsync(EmailRequest r, CancellationToken ct) => accounts.ResendAsync(r, ct);
