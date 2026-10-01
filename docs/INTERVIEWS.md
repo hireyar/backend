@@ -1,5 +1,7 @@
 # Candidate AI Interview
 
+به‌روزرسانی Pricing در 2026-10-01 روی `codex/pricing`: invite/start اکنون اشتراک فعال با قابلیت HR/فنی و ai_interview می‌خواهند؛ start اعتبار حداکثر هزینه را reserve می‌کند و completion/revoke/expiry settlement مربوط دارند. `requiredCapabilityCode` در CreateInterviewRequest اختیاری و پیش‌فرض `technical_interview` است؛ HR از `hr_interview` استفاده کند. rate/feature/retention snapshot و rule مدت مالی در [BILLING](BILLING.md) مرجع‌اند. گزارش تاریخی حفظ می‌شود ولی audio download بعد از retention قرارداد 404 می‌دهد. درگاه runtime غیرفعال است و provisioning اولیه بدون fake success لازم دارد. قرارداد domain/lease/provider قبلی حفظ شده است.
+
 راهنمای مستقل قابل تحویل به تیم فرانت‌اند و پرامپت اجرای آن: [FRONTEND_INTERVIEWS_HANDOFF](FRONTEND_INTERVIEWS_HANDOFF.md).
 
 نتیجه جاری بررسی پیش از staging: [INTERVIEW_AUDIT](INTERVIEW_AUDIT.md)؛ ۱۱۸ تست موفق روی PostgreSQL واقعی، model بدون drift و smoke واقعی TTS/STT/LLM با داده مصنوعی موفق. دو نقص مسیر خطا و secret default اصلاح شدند؛ قرارداد API و schema تغییر نکردند. آمار ۹۴ و وضعیت «Live آزمایش نشده» در گزارش قبلی پایین تاریخی‌اند.

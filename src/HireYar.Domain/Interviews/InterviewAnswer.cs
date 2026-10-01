@@ -10,6 +10,8 @@ public sealed class InterviewAnswer
     public string AudioContentType { get; private set; } = "";
     public long AudioSizeBytes { get; private set; }
     public DateTimeOffset SubmittedAtUtc { get; private set; }
+    public int BillableSeconds { get; private set; }
+    internal void SetBillableSeconds(int seconds) => BillableSeconds = seconds;
     public DateTimeOffset? ProcessedAtUtc { get; private set; }
     public string? Transcript { get; private set; }
     public string? TranscriptProvider { get; private set; }

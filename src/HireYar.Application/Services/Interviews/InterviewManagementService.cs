@@ -1,9 +1,11 @@
 using HireYar.Application.Common;
+using HireYar.Application.Billing;
 using HireYar.Domain.Interviews;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
-public sealed class InterviewManagementService(IApplicationDbContext db, ICurrentUser user, TimeProvider time)
+public sealed class InterviewManagementService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
+    ISubscriptionEntitlementService entitlements, InterviewBillingService billing)
 {
     private async Task CheckJob(Guid id, CancellationToken ct)
     { if (!await db.JobPositions.AnyAsync(x => x.OrganizationId == user.OrganizationId && x.Id == id, ct)) throw AppException.NotFound(); }
@@ -62,6 +64,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         await CheckJob(jobId, ct);
         if (!await db.CandidateApplications.AnyAsync(x => x.Id == applicationId && x.OrganizationId == user.OrganizationId && x.JobPositionId == jobId, ct))
             throw AppException.NotFound();
+        await entitlements.RequireAsync(user.OrganizationId, [r.RequiredCapabilityCode, "ai_interview"], ct);
         var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == r.TemplateId
         && x.OrganizationId == user.OrganizationId && x.JobPositionId == jobId && !x.IsArchived, ct)
             ?? throw AppException.NotFound();
@@ -80,6 +83,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         var token = InterviewTokens.Create();
         var session = new InterviewSession(user.OrganizationId, jobId, applicationId, template.Id, questions, skills,
             r.MaxQuestionCount, template.DurationMinutes * 60, now, now.AddHours(r.ExpiresInHours));
+        session.SetRequiredCapability(r.RequiredCapabilityCode);
         session.SetAccessTokenHash(InterviewTokens.Hash(token)); db.InterviewSessions.Add(session);
         await db.SaveChangesAsync(ct);
         return new(session.Id, token, session.ExpiresAtUtc, $"/api/candidate/interviews/{session.Id}");
@@ -95,7 +99,17 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
             s.Evidence.Select(x => new HrEvidenceDto(x.InterviewAnswerId, x.QuestionId, x.SkillId, x.ScoreBefore, x.ScoreAfter, x.Delta, x.Confidence, x.Evidence, x.CreatedAtUtc)).ToArray(),
             s.CoveredTopics.Select(x => new HrTopicDto(x.SkillId, x.Topic, x.Coverage, x.EvidenceCount)).ToArray());
     }
-    public async Task RevokeAsync(Guid id, CancellationToken ct) { var s = await Scoped(id, ct); s.RevokeAccess(time.GetUtcNow()); await db.SaveChangesAsync(ct); }
+    public async Task RevokeAsync(Guid id, CancellationToken ct)
+    {
+        var s = await Scoped(id, ct);
+        await billing.FinishAsync(s, true, async () => {
+            await db.ReloadInterviewAsync(s, ct);
+            if (s.Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled)) s.Cancel(time.GetUtcNow());
+            s.RevokeAccess(time.GetUtcNow()); return true;
+        }, ct);
+    }
     public async Task<InterviewSession> Scoped(Guid id, CancellationToken ct) => await db.InterviewSessions.Include(x => x.Answers)
         .SingleOrDefaultAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId, ct) ?? throw AppException.NotFound();
+    public async Task<InterviewSession> MediaScopedAsync(Guid id, CancellationToken ct)
+    { var session = await Scoped(id, ct); await billing.RequireMediaRetentionAsync(session, ct); return session; }
 }

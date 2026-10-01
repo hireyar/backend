@@ -75,6 +75,7 @@ public sealed class InterviewFlowTests(ApiFixture f)
     private async Task<(Account Hr, InterviewInvitation Invite)> Invite()
     {
         f.InterviewAi.Reset(); var hr = await f.RegisterConfirmed();
+        await f.FundInterviewsAsync(hr);
         var job = await (await hr.Client.Send(HttpMethod.Post, "/api/job-positions", new { title = "Backend", description = "Synthetic description", seniority = "Senior", status = "Active" })).Content.ReadFromJsonAsync<JsonElement>();
         var id = job.GetProperty("id").GetGuid();
         var template = await (await hr.Client.Send(HttpMethod.Post, "/api/interview-templates", new { jobPositionId = id, title = "Interview", durationMinutes = 30, maxFollowUpQuestionsPerQuestion = 0, language = "fa-IR", isArchived = false,

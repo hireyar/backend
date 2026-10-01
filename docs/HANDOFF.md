@@ -1,5 +1,21 @@
 # ادامه کار
 
+برای دسترسی موقت همکاران، فایل کامل [Grant-ColleagueTestAccess.sql](../scripts/Grant-ColleagueTestAccess.sql) پس از migration Pricing اجرا شود: اعتبار قابل تغییر ۱۰۰ USD، Advanced یک‌ماهه، هر سازمان یک بار برای campaign. `InternalTestGrant` اعطای غیرنقدی با مبلغ اسمی است؛ پرداخت درگاه/درآمد نقدی محسوب نشود. اشتراک Advanced موجود استفاده می‌شود؛ اشتراک دیگر متداخل rollback می‌کند. روی مقصد اجرا نشده؛ تست PostgreSQL واقعی اولیه، تکرار و پس از مصرف موفق بود، DB مصنوعی حذف و cluster متوقف شد؛ build موفق.
+
+## تحویل Pricing — 2026-10-01
+
+برنچ فعال `codex/pricing` است؛ ابتدا از وضعیت پاک به `origin/dev` (`d9d4d72`, ادغام مصاحبه در dev) fast-forward شد. تغییرات این نوبت محلی و commitنشده‌اند؛ production و branch dev محلی تغییر نکردند؛ push/deploy انجام نشد. دستور قبلیِ اجرا روی dev بدون مصاحبه با درخواست تازهٔ کاربر superseded شد. قرارداد قابل استفاده و پنج نمونه JSON در [BILLING](BILLING.md)؛ تصمیم‌ها در ADR-018.
+
+کاتالوگ پویا، قرارداد immutable در checkout، اشتراک صف‌شده، wallet/ledger/maximum reservation، settlement/cancellation/lazy expiry، media retention access و feature enforcement به مصاحبهٔ موجود متصل‌اند. IPaymentGateway فقط Disabled runtime دارد؛ fake از fixture tests ثبت می‌شود. درگاه واقعی یا آمادگی production payment ادعا نمی‌شود. Owner خرید سازمان خود را انجام می‌دهد؛ read برای Owner/Recruiter؛ pricing mutation فقط SystemAdmin از flag دوباره‌خوانده‌شدهٔ DB.
+
+Verification نهایی: `dotnet test HireYar.slnx --no-restore` با HIREYAR_TEST_POSTGRES روی PostgreSQL 18 مستقل localhost:55447: **۱۵۱ موفق، صفر شکست/Skip**؛ TRX `TestResults/billing-complete.trx`. تست‌ها فقط synthetic data و fake provider دارند؛ هیچ درخواست واقعی AI/payment انجام نشد. tool restore و solution restore موفق‌اند. `dotnet build HireYar.slnx --no-restore` صفر warning/error و EF `has-pending-model-changes --no-build` بدون اختلاف بودند. migration `20261001080208_AddPricingBilling` واقعی است، script `artifacts/billing-migrations.sql` دوبار روی DB تصادفی بررسی شد و همان DB حذف شد. count نهایی fixture/script databaseها صفر و cluster آزمایشی این نوبت متوقف شد؛ `git diff --check` پاک است.
+
+قبل از استفادهٔ پرداخت واقعی: adapter درگاه را با قرارداد idempotent PaymentId و verification مستقیم مبلغ/ارز/transaction بنویسید؛ checkout recovery و reconciliation و خطای پرداخت دیررس را با sandbox همان provider آزمایش کنید. مدیر را فقط با عملیات مورد اعتماد در DB provision کنید، credit product با قیمت/credit صریح بسازید، سازمان‌ها را از جریان خرید یا adjustment مستند تأمین کنید. در runtime خودکار هیچ اشتراک یا اعتبار رایگان ساخته نمی‌شود. جلسات started قدیمی بدون billing snapshot باید تمام/لغو و در صورت نیاز دعوت تازه شوند؛ retroactive billing وجود ندارد.
+
+قانون مالی فعلی server response window محدود است و length واقعی صوت را اندازه نمی‌گیرد. نگهداری snapshot فقط download را محدود می‌کند؛ حذف فیزیکی cache/orphan/expired media و backup/volume با عملیات آماده شود. پایان اشتراک هنگام جلسه، نرخ را عوض نمی‌کند؛ expired reservation با wallet GET/start/adjustment settle می‌شود. مسیرهای mutation stateهای Cancelled/Suspended/Refund provider و proration آینده‌اند.
+
+اختلاف source و audit قدیمی دربارهٔ ApiKey بررسی و ثبت شد؛ مقدار default خالی شد، secret محلی حفظ و تست نیاز کلید موفق شد. چون مقدار در تاریخچه بوده، rotation توسط operator لازم است؛ حذف default تاریخچه را پاک نمی‌کند. Generic Repository/پروژه/worker/distributed infrastructure و frontend اضافه نشده‌اند. یادداشت‌های پایین مربوط به اجراهای قبلی‌اند.
+
 ## تحویل audit پیش از staging — 2026-10-01
 
 گزارش چهار بخش در [INTERVIEW_AUDIT](INTERVIEW_AUDIT.md) شامل نقص/فایل/اثر/fix/test، trace مراحل، migration و recovery است. تغییر کد فقط رفع IOException provider، graceful failure خواندن cache و default خالی ApiKey است؛ تست‌های race/recovery/scope/validation/logging تکمیل شدند. برنچ `codex/candidate-ai-interview` حفظ شد؛ تغییرهای مستندی تحویل فرانت نوبت قبل حفظ شدند. build صفر warning/error؛ ۱۱۸ موفق، صفر fail/Skip با PostgreSQL 18 مستقل localhost:55441؛ EF drift ندارد. اجرای نهایی دارای دسترسی loopback موفق است؛ شکست اتصال اجرای اولیه sandbox نتیجه کد محسوب نشد.

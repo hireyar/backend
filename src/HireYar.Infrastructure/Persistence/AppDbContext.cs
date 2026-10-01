@@ -1,3 +1,4 @@
+using HireYar.Domain.Billing;
 using HireYar.Application.Common;
 using HireYar.Domain.Organizations;
 using HireYar.Domain.JobPositions;
@@ -10,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using HireYar.Domain.Interviews;
 namespace HireYar.Infrastructure.Persistence;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options), IApplicationDbContext
+public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options), IApplicationDbContext
 {
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<JobPosition> JobPositions => Set<JobPosition>();
@@ -28,20 +29,35 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
     public DbSet<InterviewAnswer> InterviewAnswers => Set<InterviewAnswer>();
     public Task ReloadInterviewAsync(InterviewSession session, CancellationToken ct) => Entry(session).ReloadAsync(ct);
     public void DetachEntity(object entity) => Entry(entity).State = EntityState.Detached;
+    public DbSet<PricingPackage> PricingPackages => Set<PricingPackage>();
+    public IQueryable<PricingPackage> PricingCatalog => PricingPackages.AsSingleQuery();
+    public DbSet<PackagePeriod> PackagePeriods => Set<PackagePeriod>();
+    public DbSet<FeatureDefinition> FeatureDefinitions => Set<FeatureDefinition>();
+    public DbSet<PackageFeature> PackageFeatures => Set<PackageFeature>();
+    public DbSet<AiCreditPackage> AiCreditPackages => Set<AiCreditPackage>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<SubscriptionPurchase> SubscriptionPurchases => Set<SubscriptionPurchase>();
+    public DbSet<OrganizationSubscription> OrganizationSubscriptions => Set<OrganizationSubscription>();
+    public DbSet<OrganizationAiWallet> OrganizationAiWallets => Set<OrganizationAiWallet>();
+    public DbSet<AiCreditTransaction> AiCreditTransactions => Set<AiCreditTransaction>();
+    public DbSet<AiCreditReservation> AiCreditReservations => Set<AiCreditReservation>();
+    public DbSet<InterviewBilling> InterviewBillings => Set<InterviewBilling>();
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+        BillingConfigurations.Configure(b);
         b.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         foreach (var relation in b.Model.GetEntityTypes().SelectMany(x => x.GetForeignKeys())) relation.DeleteBehavior = DeleteBehavior.Restrict;
     }
     public override Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
         ChangeTracker.DetectChanges();
+        ValidateBillingHistory();
         // PostgreSQL has no SQL Server rowversion. Keep the opaque Base64 API token
         // and rotate a 128-bit application-managed concurrency token on every write.
         foreach (var entry in ChangeTracker.Entries().Where(e =>
             e.State is EntityState.Added or EntityState.Modified &&
-            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is BankQuestion)))
+            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is BankQuestion || e.Entity is PricingPackage || e.Entity is AiCreditPackage)))
             entry.Property("RowVersion").CurrentValue = Guid.NewGuid().ToByteArray();
         return base.SaveChangesAsync(ct);
     }

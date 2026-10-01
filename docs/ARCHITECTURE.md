@@ -1,5 +1,19 @@
 # معماری و تصمیم‌ها
 
+## ADR-018 — Pricing، اشتراک و اعتبار مستقل AI (2026-10-01)
+
+درخواست مستقل Pricing روی `codex/pricing` پس از fast-forward به `origin/dev` (`d9d4d72`) اجرا شد؛ مصاحبهٔ موجود همان پایه حفظ شد. پکیج/دوره/feature/محصول اعتبار entity پویا در PostgreSQL هستند، نه enum پکیج یا شرط Basic/Advanced. seed فقط migration یک‌باره است. مسیر Service → IApplicationDbContext و لایه‌ها حفظ شد؛ SQL/locking/query splitting در Infrastructure می‌ماند. `PricingCatalog` فقط سیاست خواندن تک‌statement قرارداد را تأمین می‌کند؛ Repository جدید نیست.
+
+SubscriptionPurchase و entitlements در checkout immutable snapshot می‌شوند؛ تغییر قیمت/قابلیت آینده قرارداد پرداخت قدیمی یا pending را تغییر نمی‌دهد. fulfillment پس از verification مستقیم درگاه، اشتراک را اکنون یا انتهای صف اشتراک فعلی زمان‌بندی می‌کند. بازه‌ها با UTC و AddMonths هستند؛ وضعیت مؤثر از زمان خوانده می‌شود. snapshot نرخ/retention و reference اشتراک در start مصاحبه تثبیت می‌شود و پایان اشتراک مانع پایان مصاحبهٔ شروع‌شده نیست. capabilityهایی چون analysis/adaptive/difficulty در پردازش از همین قرارداد خوانده می‌شوند.
+
+IRT تومان مستقیم، USD واحد accounting کیف پول است. محصولات اعتبار مبلغ فروش و مقدار USD صریح دارند و نسبت مؤثر قرارداد snapshot می‌شود؛ forex زنده یا نرخ مشترک اضافه نشد. ledger immutable با compensating entry و Balance cache، reservation کامل حداکثر هزینه و unique reference مالی دارد. تمام mutationهای مالی و read مرکب wallet زیر قفل FOR UPDATE سازمان و transaction هستند؛ DB triggerهای deferred تطابق ledger/balance/reservations و trigger عدم هم‌پوشانی اشتراک را enforce می‌کنند. FK مرکب tenant و Restrict تاریخچه را حفظ می‌کنند.
+
+مدت مالی نسخه اول window پاسخ‌گویی سرور بین آماده‌شدن سؤال پس از TTS و رسیدن پاسخ است، با floor ثانیه و سقف ۱۲۰ ثانیهٔ هر پاسخ و سقف کل جلسه. پاسخ بی‌پاسخ و processing/retry زمان مالی ندارند؛ DurationSeconds کلاینت حقیقت مالی نیست. هزینهٔ نهایی decimal با شش رقم و ToEven گرد می‌شود. این قاعده زمان دقیق صوت را ادعا نمی‌کند؛ جزئیات محدودیت و توسعهٔ decoder/capture در [BILLING](BILLING.md) است.
+
+IPaymentGateway فقط abstraction Application و Disabled implementation runtime دارد؛ fake فقط تست. callback صرفاً محرک verify است و success/price از client نمی‌گیرد. DB unique Provider/TransactionId، PaymentId fulfillment و reference ledger به همراه قفل سازمان، تکرار callback را بی‌اثر می‌کنند. حداقل مرز مدیریت پلتفرم IsSystemAdmin از DB است؛ JWT claim آن در هر درخواست بازسازی و ثبت‌نام/profile هرگز آن را نمی‌پذیرند. Owner/Recruiter مدیر پلتفرم نیستند.
+
+retention دسترسی دانلود رسانه را از snapshot کنترل می‌کند؛ حذف فیزیکی و shared-cache cleanup عملیاتی‌اند. expiry رزرو به صورت lazy در wallet/start/adjustment تسویه می‌شود؛ worker/زیرساخت آینده ساخته نشد. proration، refund درگاه و payment adapter واقعی کار مستقل‌اند. مستندات audit پایه دربارهٔ خالی‌بودن ApiKey با source دریافتی اختلاف داشت؛ default در این تغییر خالی و الزام کلید دوباره تست شد، secret محلی تغییر نکرد. تصمیم‌های قدیمی دربارهٔ موکول‌بودن پرداخت اکنون برای این درخواست مستقل superseded هستند.
+
 ## ADR-017 — اجرای مصاحبه با persistence و provider (2026-10-01)
 
 Domain اولیه با constructor خصوصی و backing field به EF متصل شد؛ QuestionSnapshot/SkillSnapshot/SkillState/SkillEvidence/CoveredTopic entity رابطه‌ای مستقل‌اند، نه JSON و نه owned navigation. این انتخاب drift مشاهده‌شدهٔ snapshot حذف ownedها را رفع کرد و FK بین answer/question/skill را صریح کرد. tenant-owned CandidateApplication/Skill/PositionSkill/BankQuestion/Session با کلیدهای مرکب به موقعیت/قالب/مهارت همان سازمان وصل‌اند؛ همهٔ delete behaviorها Restrict است.

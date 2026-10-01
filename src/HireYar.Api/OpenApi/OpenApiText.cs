@@ -68,6 +68,10 @@ internal static class OpenApiText
         ("CandidateInterviews", "Retry") => "پردازش دوباره همان پاسخ",
         ("CandidateInterviews", "Complete") => "پایان مصاحبه به درخواست داوطلب",
         ("CandidateInterviews", "Audio") => "دریافت خصوصی صوت سؤال",
+        ("Pricing", _) => "مشاهده قیمت‌ها و پکیج‌های عمومی",
+        ("Billing", _) => "اشتراک، اعتبار و پرداخت سازمان جاری",
+        ("AdminPricing", _) => "مدیریت قیمت‌گذاری؛ فقط مدیر پلتفرم",
+        ("PaymentCallbacks", _) => "تأیید پرداخت از درگاه؛ بدون پذیرش قیمت یا موفقیت از درخواست",
         _ => null
     };
 }

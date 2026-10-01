@@ -12,7 +12,8 @@ public sealed record BankQuestionRequest(Guid SkillId, [Required, StringLength(2
     [Required, StringLength(200, MinimumLength = 1)] string Topic, [Range(1, 5)] int Difficulty, bool IsActive);
 public sealed record UpdateBankQuestionRequest(BankQuestionRequest Question, [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
 public sealed record BankQuestionDto(Guid Id, Guid SkillId, string Text, string Topic, int Difficulty, bool IsActive, byte[] RowVersion);
-public sealed record CreateInterviewRequest(Guid TemplateId, [Range(1, 30)] int MaxQuestionCount = 12, [Range(1, 168)] int ExpiresInHours = 72);
+public sealed record CreateInterviewRequest(Guid TemplateId, [Range(1, 30)] int MaxQuestionCount = 12, [Range(1, 168)] int ExpiresInHours = 72,
+    [RegularExpression("^(hr_interview|technical_interview)$")] string RequiredCapabilityCode = "technical_interview");
 public sealed record InterviewInvitation(Guid InterviewId, string Token, DateTimeOffset ExpiresAtUtc, string CandidateRoute);
 public sealed record InterviewProgress(int AnsweredQuestions, int MaxQuestions, int RemainingSeconds);
 public sealed record CandidateQuestionDto(Guid Id, string Text, string? AudioUrl, bool AudioAvailable);

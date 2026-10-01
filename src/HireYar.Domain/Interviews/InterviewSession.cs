@@ -20,6 +20,18 @@ public sealed class InterviewSession
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
     public Guid? CurrentQuestionId { get; private set; }
+    public string RequiredCapabilityCode { get; private set; } = "technical_interview";
+    public DateTimeOffset? QuestionReadyAtUtc { get; private set; }
+    public void SetRequiredCapability(string code)
+    {
+        InterviewRules.Require(Status == InterviewStatus.Created && code is "hr_interview" or "technical_interview", "invalid_interview_capability");
+        RequiredCapabilityCode = code;
+    }
+    public void MarkQuestionReady(DateTimeOffset now)
+    {
+        CheckTime(now);
+        if (Status == InterviewStatus.WaitingForAnswer && QuestionReadyAtUtc is null) QuestionReadyAtUtc = now;
+    }
     public InterviewCompletionReason? CompletionReason { get; private set; }
     public int MaxQuestionCount { get; private set; }
     public int MaxDurationSeconds { get; private set; }
@@ -109,6 +121,10 @@ public sealed class InterviewSession
         InterviewRules.Require(CurrentQuestionId == questionId, "wrong_question");
         InterviewRules.Require(answers.All(x => x.QuestionId != questionId), "duplicate_answer");
         var answer = new InterviewAnswer(Id, questionId, storageKey, contentType, size, now);
+        // Bounded server response window. Time beyond the first 120 seconds is idle and excluded.
+        // This is server-observed engagement, not decoded audio length or browser page-open duration.
+        var elapsed = QuestionReadyAtUtc is { } ready ? (int)Math.Max(0, Math.Floor((now - ready).TotalSeconds)) : 0;
+        answer.SetBillableSeconds(Math.Min(120, Math.Min(elapsed, RemainingSeconds(QuestionReadyAtUtc ?? now))));
         answers.Add(answer); Status = InterviewStatus.ProcessingAnswer; return answer;
     }
 
@@ -156,7 +172,7 @@ public sealed class InterviewSession
     {
         CheckTime(now); RequireProcessed();
         InterviewRules.Require(AnsweredQuestionCount < MaxQuestionCount && RemainingSeconds(now) > 0, "interview_limit");
-        CheckQuestion(questionId); CurrentQuestionId = questionId; Status = InterviewStatus.WaitingForAnswer;
+        CheckQuestion(questionId); CurrentQuestionId = questionId; QuestionReadyAtUtc = null; Status = InterviewStatus.WaitingForAnswer;
     }
 
     public void Complete(InterviewCompletionReason reason, DateTimeOffset now)
