@@ -14,8 +14,10 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problems, ILogger
         var (status, code, message) = exception switch
         {
             AppException e => (e.Status, e.Code, e.Message),
+            HireYar.Domain.Interviews.InterviewRuleException e => (409, e.Code, "The interview operation is not allowed in its current state."),
             DbUpdateConcurrencyException => (409, "concurrency_conflict", "The record has changed. Reload before editing."),
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } => (409, "conflict", "The record already exists."),
+            DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation } } => (409, "related_record_conflict", "The operation conflicts with a related record."),
             PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.SerializationFailure } => (409, "concurrency_conflict", "Concurrent operation; retry the request."),
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.SerializationFailure } } => (409, "concurrency_conflict", "Concurrent operation; retry the request."),
             _ => (500, "unexpected_error", "An unexpected error occurred.")

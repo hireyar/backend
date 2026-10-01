@@ -10,3 +10,4 @@ TestResults/
 artifacts/
 keys/
 *.user
+storage/

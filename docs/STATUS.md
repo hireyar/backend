@@ -1,5 +1,23 @@
 # وضعیت جاری
 
+## جریان قابل اجرای مصاحبه — ادامه 2026-10-01
+
+این بخش جایگزین محدودیت‌های «شروع ماژول» پایین است. مسیر کامل HR invitation → candidate token → start/current → private audio → STT → exact shortlist/LLM → evidence/fallback → next question/complete پیاده و روی PostgreSQL واقعی با provider جعلی آزمایش شد. retry همان پاسخ، lease/recovery، schema tenant FK، unique answer و optimistic concurrency، download خصوصی و TTS cache برقرارند. مدل‌ها دیگر صرفاً حافظه‌ای نیستند؛ تمام stateها entity رابطه‌ای مستقل با explicit mapping و Restrict هستند. جزئیات قرارداد و تنظیمات در [INTERVIEWS](INTERVIEWS.md).
+
+Migration جدید `20261001061608_AddCandidateInterviewFlow` تولید و روی DB تصادفی fixture PostgreSQL 18 اعمال شد؛ migration قبلی یا جدول‌های قبلی recreate نشدند. EF has-pending-model-changes بدون اختلاف. build صفر warning/error؛ کل تست‌ها **۹۴ موفق، صفر شکست، صفر Skip** با HIREYAR_TEST_POSTGRES روی cluster آزمایشی مستقل localhost:55441. HTTPهای واقعی AI در suite فراخوانی نشده‌اند؛ NetArz با mocked handler بررسی شده و پیاده‌سازی واقعی HttpClientFactory آمادهٔ تنظیم است. کلید واقعی و smoke-test حساب NetArz، volume/retention خصوصی فایل‌ها و اعمال migration در محیط مقصد هنوز لازم‌اند. push/deploy/commit انجام نشده است.
+
+## شروع ماژول مصاحبه داوطلب — 2026-10-01
+
+طبق درخواست مستقل کاربر، پرامپت Candidate AI Interview روی برنچ `codex/candidate-ai-interview` از `dev` شروع شد؛ Git در شروع پاک بود. فقط هستهٔ Domain/Application این نوبت پیاده شده و ماژول کامل یا production-ready نیست.
+
+- مدل جلسه با وضعیت Created/WaitingForAnswer/ProcessingAnswer/Completed/Cancelled؛ پاسخ مستقل با Uploaded/Transcribing/Transcribed/Evaluating/Processed/Failed، retry همان پاسخ و حفظ صوت و transcript.
+- snapshot مستقل سؤال و مهارت، state مهارت، evidence با delta واقعی پس از clamp و coverage موضوع به تفکیک مهارت؛ امتیاز و confidence در بازه ۰..۱.
+- سیاست shortlist بین ۵ تا ۲۰، حذف سؤال پرسیده‌شده/غیرفعال/موضوع پوشش‌یافته، اولویت کمبود evidence، required/priority و difficulty؛ fallback قطعی.
+- DTO سخت‌گیر خروجی AI، validation و fallback بدون تغییر assessment نامعتبر؛ prompt نسخه v1. پیشنهاد تکمیل AI شرط پایان را تغییر نمی‌دهد.
+- restore موفق (دسترسی NuGet.Config با escalation)، build صفر warning/error؛ `dotnet test HireYar.slnx --no-restore`: ۲۶ موفق، صفر شکست، ۲۷ Skip بدون HIREYAR_TEST_POSTGRES. ۲۴ مورد تست جدید Domain/Application موفق‌اند؛ این شواهد اثبات رفتار PostgreSQL نیستند.
+
+مدل‌ها هنوز به EF متصل نیستند؛ جدول یا migration جدید، API، candidate access token، storage، NetArz HttpClient، observability و تست provider/دیتابیس اضافه نشده‌اند. فراخوانی واقعی AI یا تغییر دیتابیس صورت نگرفت. push/deploy/commit انجام نشد.
+
 به‌روزرسانی 2026-09-27: `Kavenegar` در appsettings تعریف شد؛ `ApiKey`/`Template` خالی، `UseFixedOtp=false` در تنظیمات مشترک و کد ثابت `123456` با فلگ true فقط در Development. حالت ثابت SMS را کامل رد می‌کند و از همان challenge و محدودیت‌های OTP استفاده می‌کند. تست جدید آن روی PostgreSQL 18 اجرا شد؛ نتیجهٔ کل مجموعه ۲۹/۲۹ موفق، build صفر warning/error. ارسال واقعی کاوه‌نگار همچنان بدون کلید و قالب بررسی نشده است.
 
 تغییر 2026-09-27: ورود یکپارچه با موبایل و OTP در `otp/request` و `otp/verify` پیاده شد؛ نبود کاربر باعث ساخت Owner و سازمان اولیه می‌شود. اطلاعات شرکت با `PUT /api/organization` تکمیل می‌شود. VerifyLookup کاوه‌نگار با تنظیمات محیطی و بدون ثبت کلید/کد در لاگ اضافه شد. migration `AddMobileOtp` و تست جدید روی PostgreSQL 18 محلی اجرا شد؛ مجموعهٔ کامل ۲۸/۲۸ موفق، build بدون warning/error، و EF `has-pending-model-changes` بدون اختلاف بود. ارسال واقعی کاوه‌نگار به علت نبود کلید و قالب آزمایش نشده است. مسیرهای ایمیل/رمز و دعوت Recruiter هنوز فعال‌اند تا تصمیم مهاجرت حساب‌های فعلی گرفته شود؛ بنابراین جایگزینی کامل هنوز انجام نشده است. به دیتابیس استقرار migration اعمال نشده و push/deploy انجام نشده است.
@@ -56,3 +74,5 @@ Swagger اکنون راهنمای فارسی کوتاه برای مسیر `csrf 
 rowVersion اکنون Base64 از ۱۶ بایت است؛ توکن قبلی SQL Server قابل استفاده نیست. جزئیات در ARCHITECTURE و README است. setup production/TLS و frontend همچنان خارج دامنه‌اند.
 
 برنچ فعال dev و در شروع این نوبت با origin/dev همگام بود. تغییرات راهنمای فارسی Swagger هنوز commit/push نشده‌اند؛ production تغییر نکرد.
+
+یادداشت اجرای نهایی مصاحبه: یک run با خطای transport اتصال PostgreSQL شکست خورد؛ اجرای مجدد با SSL Mode=Disable و GSS Encryption Mode=Disable صرفاً روی cluster محلی آزمایشی، ۹۴/۹۴ موفق بود. build نهایی صفر warning/error؛ DB تصادفی تست باقی نماند و cluster آزمایشی متوقف شد. اسکریپت idempotent در artifacts/candidate-interview-migrations.sql تولید شد ولی این اسکریپت جداگانه اجرا نشد؛ اعمال migration از fixture واقعی PostgreSQL بررسی شد.

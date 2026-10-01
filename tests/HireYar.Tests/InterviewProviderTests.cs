@@ -1,0 +1,115 @@
+using System.Net;
+using System.Text;
+using HireYar.Application.Interviews;
+using HireYar.Domain.Interviews;
+using HireYar.Infrastructure.Interviews;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+namespace HireYar.Tests;
+
+public sealed class InterviewProviderTests
+{
+    private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => send(request, ct);
+    }
+    private static InterviewDecisionContext Context()
+    {
+        var skill = Guid.NewGuid(); var q = new InterviewQuestionSnapshot(Guid.NewGuid(), skill, "سؤال", "indexes", 3, true);
+        return new("Backend", q.QuestionId, "ProcessingAnswer", 0, 12, 1200, q, "پاسخ", [new(skill, "SQL", true, 100)], [], [], [q]);
+    }
+    private static NetArzClient Client(Handler handler, int seconds = 1) => new(new HttpClient(handler), Options.Create(new NetArzOptions {
+        ApiKey = "synthetic-test-key", SttTimeoutSeconds = seconds, LlmTimeoutSeconds = seconds, TtsTimeoutSeconds = seconds
+    }), NullLogger<NetArzClient>.Instance);
+    private static Task Invoke(NetArzClient client, string operation) => operation switch {
+        "stt" => client.TranscribeAsync(new MemoryStream(new byte[16]), "answer.wav", "audio/wav", default),
+        "llm" => client.EvaluateAsync(Context(), default), _ => client.GenerateAsync("سؤال", default)
+    };
+    [Theory]
+    [InlineData("stt", 401)] [InlineData("stt", 429)] [InlineData("stt", 500)]
+    [InlineData("llm", 401)] [InlineData("llm", 429)] [InlineData("llm", 500)]
+    [InlineData("tts", 401)] [InlineData("tts", 429)] [InlineData("tts", 500)]
+    public async Task Provider_status_is_safe_and_typed(string operation, int status)
+    {
+        var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent("sensitive upstream details") }));
+        var exception = await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(Client(handler), operation));
+        Assert.Equal($"{operation}_http_{status}", exception.Code); Assert.DoesNotContain("sensitive", exception.Message);
+    }
+    [Theory] [InlineData("stt")] [InlineData("llm")] [InlineData("tts")]
+    public async Task Provider_timeouts_are_typed(string operation)
+    {
+        var handler = new Handler(async (_, ct) => { await Task.Delay(Timeout.InfiniteTimeSpan, ct); return new(HttpStatusCode.OK); });
+        var error = await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(Client(handler), operation));
+        Assert.Equal(operation + "_timeout", error.Code);
+    }
+    [Theory] [InlineData("stt")] [InlineData("llm")] [InlineData("tts")]
+    public async Task Caller_cancellation_is_preserved(string operation)
+    {
+        var handler = new Handler(async (_, ct) => { await Task.Delay(Timeout.InfiniteTimeSpan, ct); return new(HttpStatusCode.OK); });
+        using var ct = new CancellationTokenSource(); ct.Cancel(); var client = Client(handler);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => {
+            if (operation == "stt") await client.TranscribeAsync(new MemoryStream(new byte[16]), "a.wav", "audio/wav", ct.Token);
+            else if (operation == "llm") await client.EvaluateAsync(Context(), ct.Token);
+            else await client.GenerateAsync("Question", ct.Token);
+        });
+    }
+    [Fact]
+    public async Task Stt_uses_farsi_multipart_and_parses_text()
+    {
+        var handler = new Handler(async (request, ct) => {
+            Assert.EndsWith("/audio/transcriptions", request.RequestUri!.AbsolutePath);
+            Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
+            var body = await request.Content!.ReadAsStringAsync(ct); Assert.Contains("gpt-transcribe", body); Assert.Contains("fa", body);
+            return new(HttpStatusCode.OK) { Content = new StringContent("{\"text\":\"پاسخ آزمایشی\"}", Encoding.UTF8, "application/json") };
+        });
+        var result = await Client(handler).TranscribeAsync(new MemoryStream(new byte[16]), "a.wav", "audio/wav", default);
+        Assert.Equal("پاسخ آزمایشی", result.Text);
+    }
+    [Theory] [InlineData("{}")] [InlineData("{\"text\":null}")] [InlineData("invalid")]
+    public async Task Stt_invalid_response_is_rejected(string json)
+    {
+        var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) }));
+        Assert.Equal("stt_invalid_response", (await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(Client(handler), "stt"))).Code);
+    }
+    [Fact]
+    public async Task Llm_extracts_message_content_and_sends_versioned_prompt()
+    {
+        var handler = new Handler(async (request, ct) => {
+            Assert.EndsWith("/chat/completions", request.RequestUri!.AbsolutePath);
+            var text = await request.Content!.ReadAsStringAsync(ct); Assert.Contains("availableQuestions", text); Assert.Contains("Never generate", text);
+            return new(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"{}\"}}]}") };
+        });
+        Assert.Equal("{}", (await Client(handler).EvaluateAsync(Context(), default)).Json);
+    }
+    [Theory] [InlineData("{}")] [InlineData("{\"choices\":[]}")] [InlineData("not-json")]
+    public async Task Llm_invalid_envelope_is_rejected(string json)
+    {
+        var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) }));
+        Assert.Equal("llm_invalid_response", (await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(Client(handler), "llm"))).Code);
+    }
+    [Fact]
+    public async Task Tts_returns_audio_and_rejects_json_disguised_as_success()
+    {
+        var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent("ID3-test-audio"u8.ToArray()) }));
+        Assert.Equal("audio/mpeg", (await Client(handler).GenerateAsync("Question", default)).ContentType);
+        var bad = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"error\":\"bad\"}") }));
+        await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(Client(bad), "tts"));
+    }
+    [Fact]
+    public void Token_hashes_and_audio_cache_hashes_are_stable_and_change_with_inputs()
+    {
+        var token = InterviewTokens.Create(); Assert.True(InterviewTokens.Matches(token, InterviewTokens.Hash(token)));
+        Assert.False(InterviewTokens.Matches(InterviewTokens.Create(), InterviewTokens.Hash(token)));
+        var profile = new SpeechProfile("test-tts", "voice", 1m);
+        Assert.Equal(QuestionAudioService.Hash(" text ", profile), QuestionAudioService.Hash("text", profile));
+        Assert.NotEqual(QuestionAudioService.Hash("text", profile), QuestionAudioService.Hash("changed", profile));
+        Assert.NotEqual(QuestionAudioService.Hash("text", profile), QuestionAudioService.Hash("text", profile with { Speed = 1.1m }));
+    }
+    [Fact]
+    public async Task Disabled_provider_never_calls_http_even_with_a_configured_key()
+    {
+        var handler = new Handler((_, _) => throw new InvalidOperationException("Disabled provider must not make HTTP requests."));
+        var client = new NetArzClient(new HttpClient(handler), Options.Create(new NetArzOptions { Enabled = false, ApiKey = "synthetic-test-key" }), NullLogger<NetArzClient>.Instance);
+        Assert.Equal("provider_not_configured", (await Assert.ThrowsAsync<InterviewProviderException>(() => client.GenerateAsync("Question", default))).Code);
+    }
+}
