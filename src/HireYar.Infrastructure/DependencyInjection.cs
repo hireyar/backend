@@ -1,3 +1,4 @@
+using HireYar.Infrastructure.Interviews;
 using HireYar.Application.Auth;
 using HireYar.Application.Common;
 using HireYar.Application.Members;
@@ -15,7 +16,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(config.GetConnectionString("Default")));
+        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(config.GetConnectionString("Default"), n => n.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
         services.AddScoped<IApplicationDbContext>(s => s.GetRequiredService<AppDbContext>());
         services.AddIdentityCore<ApplicationUser>(o =>
         {
@@ -35,6 +36,6 @@ public static class DependencyInjection
             s.GetRequiredService<Microsoft.Extensions.Options.IOptions<KavenegarOptions>>()));
         services.AddOptions<SmtpOptions>().Bind(config.GetSection("Smtp")).Validate(s => !string.IsNullOrWhiteSpace(s.Host) && s.Port is > 0 and <= 65535 && System.Net.Mail.MailAddress.TryCreate(s.From, out _), "Smtp Host, Port and From are required.").ValidateOnStart();
         services.AddScoped<IEmailSender, SmtpEmailSender>(); services.AddScoped<IAccounts, Accounts>(); services.AddScoped<ITeamMembers, TeamMembers>();
-        services.AddSingleton(TimeProvider.System); return services;
+        services.AddSingleton(TimeProvider.System); services.AddInterviews(config); return services;
     }
 }

@@ -13,6 +13,8 @@ using HireYar.Application.Members;
 using HireYar.Application.Organizations;
 using HireYar.Infrastructure;
 using HireYar.Infrastructure.Auth;
+using HireYar.Application.Interviews;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
@@ -36,6 +38,7 @@ if (string.IsNullOrWhiteSpace(security.DataProtectionPath)) throw new InvalidOpe
 builder.Services.AddDataProtection().SetApplicationName("HireYar").PersistKeysToFileSystem(new DirectoryInfo(security.DataProtectionPath));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor(); builder.Services.AddScoped<ICurrentUser, CurrentUser>(); builder.Services.AddScoped<CurrentAccountValidation>();
+builder.Services.AddScoped<ICurrentInterviewAccess, CurrentInterviewAccess>();
 builder.Services.AddScoped<AuthService>(); builder.Services.AddScoped<MemberService>(); builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
 builder.Services.AddControllers().AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
 builder.Services.Configure<ApiBehaviorOptions>(o => o.InvalidModelStateResponseFactory = c =>
@@ -70,12 +73,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         RoleClaimType = "role"
     };
 });
-builder.Services.AddAuthorization(o => o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, InterviewAuthenticationHandler>(InterviewAuthenticationHandler.SchemeName, _ => { });
+builder.Services.AddAuthorization(o => o.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme).RequireAuthenticatedUser().Build());
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(security.AllowedOrigins).AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
 builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "hireyar.csrf"; o.Cookie.HttpOnly = true; o.Cookie.Path = "/api/auth"; o.Cookie.SameSite = SameSiteMode.Strict; o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; });
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
+    o.AddPolicy("candidate", context => RateLimitPartition.GetFixedWindowLimiter(context.User.FindFirst("interview")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("AuthRateLimit:PermitLimit") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
@@ -83,6 +88,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
     doc.Info.Title = "HireYar API"; doc.Info.Version = "v1"; doc.Info.Description = OpenApiText.Introduction;
     doc.Components ??= new(); doc.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
     doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
+    doc.Components.SecuritySchemes["InterviewToken"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", Description = "Opaque token scoped to one candidate interview; cannot access HR endpoints." };
     return Task.CompletedTask;
 }).AddOperationTransformer(async (operation, context, ct) =>
 {
@@ -91,7 +97,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
     routeValues.TryGetValue("action", out var action);
     operation.Summary = OpenApiText.Summary(controller, action);
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
-        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = [] }];
+        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : "Bearer", context.Document)] = [] }];
     if (context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true && context.Description.HttpMethod != "GET")
     {
         operation.Parameters ??= [];

@@ -51,6 +51,23 @@ internal static class OpenApiText
         ("InterviewTemplates", "Create") => "ساخت قالب برای موقعیت شغلی",
         ("InterviewTemplates", "Update") => "ویرایش قالب و سؤال‌ها",
         ("Dashboard", "Get") => "آمار سازمان جاری",
+        ("Interviews", "CreateApplication") => "ثبت داوطلب برای موقعیت",
+        ("Interviews", "CreateSkill") => "تعریف مهارت سازمان",
+        ("Interviews", "SetSkill") => "تنظیم مهارت موقعیت",
+        ("Interviews", "Questions") => "بانک سؤال موقعیت",
+        ("Interviews", "CreateQuestion") => "افزودن سؤال به بانک",
+        ("Interviews", "UpdateQuestion") => "ویرایش سؤال بانک",
+        ("Interviews", "Invite") => "ساخت جلسه و توکن دعوت داوطلب",
+        ("Interviews", "Get") => "مشاهده شواهد و نتیجه مصاحبه",
+        ("Interviews", "Revoke") => "ابطال دسترسی داوطلب",
+        ("Interviews", "AnswerAudio") => "دریافت خصوصی صوت پاسخ داوطلب",
+        ("Interviews", "QuestionAudio") => "دریافت خصوصی صوت سؤال مصاحبه",
+        ("CandidateInterviews", "Start") => "شروع مصاحبه با توکن داوطلب",
+        ("CandidateInterviews", "Current") => "وضعیت جاری مصاحبه داوطلب",
+        ("CandidateInterviews", "Answer") => "ثبت و پردازش پاسخ صوتی",
+        ("CandidateInterviews", "Retry") => "پردازش دوباره همان پاسخ",
+        ("CandidateInterviews", "Complete") => "پایان مصاحبه به درخواست داوطلب",
+        ("CandidateInterviews", "Audio") => "دریافت خصوصی صوت سؤال",
         _ => null
     };
 }
