@@ -5,7 +5,7 @@ namespace HireYar.Application.Interviews;
 public sealed class InterviewPolicy
 {
     public IReadOnlyList<InterviewQuestionSnapshot> GetAllowedQuestions(InterviewSession session, DateTimeOffset now,
-        int shortlistLimit = 10, decimal coverageThreshold = 0.8m)
+        int shortlistLimit = 10, decimal coverageThreshold = 0.8m, bool adaptDifficulty = true)
     {
         Validate(shortlistLimit, coverageThreshold);
         if (session.Status is InterviewStatus.Completed or InterviewStatus.Cancelled ||
@@ -20,7 +20,7 @@ public sealed class InterviewPolicy
             .OrderBy(q => session.SkillStates.Single(s => s.SkillId == q.SkillId).EvidenceCount)
             .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).IsRequired)
             .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).Priority)
-            .ThenBy(q => Math.Abs(q.Difficulty - TargetDifficulty(session, q.SkillId)))
+            .ThenBy(q => Math.Abs(q.Difficulty - (adaptDifficulty ? TargetDifficulty(session, q.SkillId) : session.Skills.Single(s => s.SkillId == q.SkillId).TargetDifficulty)))
             .ThenBy(q => q.QuestionId).Take(shortlistLimit).ToArray();
     }
 

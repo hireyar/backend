@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using HireYar.Application.Common;
+using HireYar.Application.Billing;
 using HireYar.Domain.Interviews;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -7,7 +8,8 @@ namespace HireYar.Application.Interviews;
 
 public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrentInterviewAccess access, TimeProvider time,
     InterviewOptions options, InterviewPolicy policy, InterviewDecisionValidator validator, IInterviewAudioStorage storage,
-    ISpeechToTextService stt, IInterviewDecisionService decisions, QuestionAudioService audio, ILogger<CandidateInterviewService> logger)
+    ISpeechToTextService stt, IInterviewDecisionService decisions, QuestionAudioService audio, ILogger<CandidateInterviewService> logger,
+    InterviewBillingService billing)
 {
     private async Task<InterviewSession> Load(Guid id, CancellationToken ct)
     {
@@ -23,15 +25,19 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
     public async Task<CandidateInterviewDto> StartAsync(Guid id, CancellationToken ct)
     {
         var s = await Load(id, ct);
-        if (s.Status is InterviewStatus.Completed or InterviewStatus.Cancelled) throw AppException.Conflict();
-        if (s.Status == InterviewStatus.Created)
+        await billing.StartAsync(s, async () =>
         {
+          if (s.Status is InterviewStatus.Completed or InterviewStatus.Cancelled) throw AppException.Conflict();
+          if (s.Status == InterviewStatus.Created)
+          {
             var first = policy.SelectFallback(s, time.GetUtcNow(), options.ShortlistLimit) ?? throw AppException.Invalid("interview_plan_incomplete");
             s.Start(first.QuestionId, time.GetUtcNow());
             var application = await db.CandidateApplications.SingleAsync(x => x.Id == s.CandidateApplicationId && x.OrganizationId == s.OrganizationId, ct);
             application.Status = CandidateApplicationStatus.Interviewing; application.UpdatedAtUtc = time.GetUtcNow();
             await db.SaveChangesAsync(ct); InterviewMetrics.Started.Add(1);
-        }
+          }
+          return true;
+        }, ct);
         return await Map(s, true, ct);
     }
     public async Task<CandidateInterviewDto> CurrentAsync(Guid id, CancellationToken ct) => await Map(await Load(id, ct), false, ct);
@@ -39,16 +45,18 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         string contentType, long length, int? durationSeconds, CancellationToken ct)
     {
         var s = await Load(id, ct);
+        await billing.EnsureProcessingAllowedAsync(s, ct);
         if (s.Status != InterviewStatus.WaitingForAnswer) throw AppException.Conflict();
         if (s.CurrentQuestionId != questionId) throw AppException.Invalid("wrong_question");
         if (s.Answers.Any(x => x.QuestionId == questionId)) throw AppException.Conflict();
         if (s.RemainingSeconds(time.GetUtcNow()) == 0) throw new AppException(409, "interview_expired", "The interview time limit was reached.");
+        var receivedAt = time.GetUtcNow();
         await AudioUploadValidator.ValidateAsync(stream, fileName, contentType, length, durationSeconds, options, ct);
         var saved = await storage.SaveAsync(stream, "answers", s.Id, options.MaxUploadBytes, ct);
         InterviewAnswer answer; Guid lease;
         try
         {
-            answer = s.SubmitAnswer(questionId, saved.Key, contentType.Split(';')[0].Trim().ToLowerInvariant(), saved.SizeBytes, time.GetUtcNow());
+            answer = s.SubmitAnswer(questionId, saved.Key, contentType.Split(';')[0].Trim().ToLowerInvariant(), saved.SizeBytes, receivedAt);
             lease = s.AcquireLease(answer.Id, time.GetUtcNow(), options.LeaseSeconds);
             await db.SaveChangesAsync(ct);
         }
@@ -60,6 +68,7 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
     {
         var s = await Load(id, ct); var answer = s.Answers.SingleOrDefault(x => x.Id == answerId) ?? throw AppException.NotFound();
         if (answer.Status == AnswerStatus.Processed) return await Map(s, false, ct);
+        await billing.EnsureProcessingAllowedAsync(s, ct);
         var lease = s.AcquireLease(answer.Id, time.GetUtcNow(), options.LeaseSeconds);
         answer.SetDiagnostics(null, null, null); await db.SaveChangesAsync(ct);
         return await Process(s, answer, lease, ct);
@@ -69,6 +78,7 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         var watch = Stopwatch.StartNew();
         try
         {
+            var capabilities = await billing.CapabilitiesAsync(s, ct);
             if (answer.Transcript is null)
             {
                 s.CheckLease(lease, time.GetUtcNow()); s.BeginTranscription(answer.Id); await db.SaveChangesAsync(ct);
@@ -91,19 +101,21 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
                 s.SetTranscript(answer.Id, transcript.Text, transcript.Provider, transcript.Model); await db.SaveChangesAsync(ct);
             }
             s.CheckLease(lease, time.GetUtcNow()); s.BeginEvaluation(answer.Id); await db.SaveChangesAsync(ct);
-            var shortlist = policy.GetAllowedQuestions(s, time.GetUtcNow(), options.ShortlistLimit);
+            var shortlist = policy.GetAllowedQuestions(s, time.GetUtcNow(), options.ShortlistLimit, adaptDifficulty: capabilities.Contains("adaptive_difficulty"));
             var position = await db.JobPositions.AsNoTracking().SingleAsync(x => x.Id == s.JobPositionId && x.OrganizationId == s.OrganizationId, ct);
             var question = s.Questions.Single(x => x.QuestionId == answer.QuestionId);
             InterviewDecisionResult? decision = null; string? failureCode = null;
             try
             {
-                decision = await decisions.EvaluateAsync(new(position.Title, question.QuestionId, s.Status.ToString(), s.AnsweredQuestionCount,
+                if (capabilities.Contains("answer_analysis") || capabilities.Contains("adaptive_questions"))
+                  decision = await decisions.EvaluateAsync(new(position.Title, question.QuestionId, s.Status.ToString(), s.AnsweredQuestionCount,
                     s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow()), question, answer.Transcript!, s.Skills, s.SkillStates, s.CoveredTopics, shortlist), ct);
             }
             catch (InterviewProviderException e) { failureCode = e.Code; }
             await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
             var result = validator.ValidateOrFallback(decision?.Json, s, shortlist.Select(x => x.QuestionId).ToArray(), time.GetUtcNow());
-            s.FinishAnswer(answer.Id, result.SkillUpdates, result.CoveredTopics, decision?.Model ?? "backend-fallback", InterviewDecisionPrompt.Version, time.GetUtcNow());
+            s.FinishAnswer(answer.Id, capabilities.Contains("answer_analysis") ? result.SkillUpdates : [],
+                capabilities.Contains("avoid_repeated_topics") ? result.CoveredTopics : [], decision?.Model ?? "backend-fallback", InterviewDecisionPrompt.Version, time.GetUtcNow());
             var sourceName = result.UsedFallback ? "Fallback" : "AI";
             answer.SetDiagnostics(result.UsedFallback ? "Evaluating" : null, result.UsedFallback ? failureCode ?? "decision_invalid" : null, sourceName);
             var completion = policy.GetCompletionReason(s, time.GetUtcNow());
@@ -116,8 +128,8 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
             else
             {
                 // Evidence may have covered a topic; enforce policy again before advancement.
-                var finalAllowed = policy.GetAllowedQuestions(s, time.GetUtcNow(), options.ShortlistLimit);
-                var proposed = finalAllowed.FirstOrDefault(x => x.QuestionId == result.NextQuestionId);
+                var finalAllowed = policy.GetAllowedQuestions(s, time.GetUtcNow(), options.ShortlistLimit, adaptDifficulty: capabilities.Contains("adaptive_difficulty"));
+                var proposed = capabilities.Contains("adaptive_questions") ? finalAllowed.FirstOrDefault(x => x.QuestionId == result.NextQuestionId) : null;
                 var next = proposed ?? finalAllowed.First();
                 if (proposed is null && !result.UsedFallback)
                 {
@@ -126,7 +138,9 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
                 }
                 s.AskNext(next.QuestionId, time.GetUtcNow());
             }
-            s.ReleaseLease(lease, time.GetUtcNow()); await db.SaveChangesAsync(ct);
+            s.ReleaseLease(lease, time.GetUtcNow());
+            if (s.Status == InterviewStatus.Completed) await billing.FinishAsync(s, false, ct);
+            else await db.SaveChangesAsync(ct);
             if (s.Status == InterviewStatus.Completed) InterviewMetrics.Completed.Add(1);
             InterviewMetrics.Selection.Add(1, new KeyValuePair<string, object?>("source", sourceName));
             logger.LogInformation("Interview question selection interviewId={InterviewId} answerId={AnswerId} selectionSource={SelectionSource} failureCode={FailureCode}", s.Id, answer.Id, sourceName, answer.FailureCode);
@@ -137,15 +151,20 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
     public async Task<CandidateInterviewDto> CompleteAsync(Guid id, CancellationToken ct)
     {
         var s = await Load(id, ct);
-        if (s.Status != InterviewStatus.WaitingForAnswer) throw AppException.Conflict();
-        s.Complete(InterviewCompletionReason.Manual, time.GetUtcNow());
-        var application = await db.CandidateApplications.SingleAsync(x => x.Id == s.CandidateApplicationId && x.OrganizationId == s.OrganizationId, ct);
-        application.Status = CandidateApplicationStatus.InterviewCompleted; application.UpdatedAtUtc = time.GetUtcNow();
-        await db.SaveChangesAsync(ct); InterviewMetrics.Completed.Add(1); return await Map(s, false, ct);
+        await billing.FinishAsync(s, false, async () => {
+            await db.ReloadInterviewAsync(s, ct);
+            if (s.Status == InterviewStatus.Completed) return true;
+            if (s.Status != InterviewStatus.WaitingForAnswer) throw AppException.Conflict();
+            s.Complete(InterviewCompletionReason.Manual, time.GetUtcNow());
+            var application = await db.CandidateApplications.SingleAsync(x => x.Id == s.CandidateApplicationId && x.OrganizationId == s.OrganizationId, ct);
+            application.Status = CandidateApplicationStatus.InterviewCompleted; application.UpdatedAtUtc = time.GetUtcNow(); return true;
+        }, ct);
+        InterviewMetrics.Completed.Add(1); return await Map(s, false, ct);
     }
     public async Task<Stream> OpenQuestionAudioAsync(Guid id, Guid questionId, CancellationToken ct)
     {
         var s = await Load(id, ct);
+        await billing.RequireMediaRetentionAsync(s, ct);
         if (s.CurrentQuestionId != questionId && !s.Answers.Any(x => x.QuestionId == questionId)) throw AppException.NotFound();
         var q = s.Questions.SingleOrDefault(x => x.QuestionId == questionId) ?? throw AppException.NotFound();
         var cached = await audio.ResolveAsync(s.OrganizationId, q.Text, false, ct) ?? throw AppException.NotFound();
@@ -158,6 +177,8 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         {
             var snapshot = s.Questions.Single(x => x.QuestionId == id);
             var sound = await audio.ResolveAsync(s.OrganizationId, snapshot.Text, generateAudio, ct);
+            if (generateAudio && s.Status == InterviewStatus.WaitingForAnswer && s.QuestionReadyAtUtc is null)
+            { s.MarkQuestionReady(time.GetUtcNow()); await db.SaveChangesAsync(ct); }
             q = new(id, snapshot.Text, sound is null ? null : $"/api/candidate/interviews/{s.Id}/questions/{id}/audio", sound is not null);
         }
         var a = s.Answers.SingleOrDefault(x => x.QuestionId == s.CurrentQuestionId)
