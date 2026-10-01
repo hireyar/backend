@@ -4,11 +4,25 @@ using HireYar.Application.Interviews;
 using HireYar.Domain.Interviews;
 using HireYar.Infrastructure.Interviews;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 namespace HireYar.Tests;
 
 public sealed class InterviewProviderTests
 {
+    private sealed class CaptureLogger : ILogger<NetArzClient>
+    {
+        public List<string> Lines { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel level) => true;
+        public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> formatter) =>
+            Lines.Add(formatter(state, error) + (error?.Message ?? ""));
+    }
+    private sealed class BrokenResponseStream : MemoryStream
+    {
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default) =>
+            ValueTask.FromException<int>(new IOException("Synthetic sensitive response stream failure"));
+    }
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => send(request, ct);
@@ -34,6 +48,29 @@ public sealed class InterviewProviderTests
         var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent("sensitive upstream details") }));
         var exception = await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(Client(handler), operation));
         Assert.Equal($"{operation}_http_{status}", exception.Code); Assert.DoesNotContain("sensitive", exception.Message);
+    }
+    [Theory] [InlineData("stt")] [InlineData("llm")] [InlineData("tts")]
+    public async Task Broken_response_stream_is_safe_and_typed(string operation)
+    {
+        var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StreamContent(new BrokenResponseStream())
+        }));
+        var error = await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(Client(handler), operation));
+        Assert.Equal(operation + "_unavailable", error.Code);
+        Assert.DoesNotContain("sensitive", error.Message);
+    }
+    [Theory] [InlineData("stt")] [InlineData("llm")] [InlineData("tts")]
+    public async Task Provider_network_failures_are_typed_and_logs_exclude_sensitive_content(string operation)
+    {
+        var handler = new Handler((_, _) => throw new HttpRequestException("sensitive-provider-body"));
+        var logger = new CaptureLogger();
+        var client = new NetArzClient(new HttpClient(handler), Options.Create(new NetArzOptions { ApiKey = "synthetic-secret-key" }), logger);
+        var error = await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(client, operation));
+        Assert.Equal(operation + "_unavailable", error.Code);
+        var log = Assert.Single(logger.Lines);
+        foreach (var sensitive in new[] { "synthetic-secret-key", "sensitive-provider-body", "Authorization", "پاسخ", InterviewDecisionPrompt.System })
+            Assert.DoesNotContain(sensitive, log);
+        Assert.Contains("network_failure", log);
     }
     [Theory] [InlineData("stt")] [InlineData("llm")] [InlineData("tts")]
     public async Task Provider_timeouts_are_typed(string operation)

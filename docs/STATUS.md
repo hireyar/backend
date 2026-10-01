@@ -1,5 +1,13 @@
 # وضعیت جاری
 
+## audit پیش از staging — 2026-10-01
+
+نتیجه فعلی در [INTERVIEW_AUDIT](INTERVIEW_AUDIT.md): دو نقص مسیر خطا (قطع response stream provider و خواندن cache صوت) اصلاح شدند؛ ApiKey از default فایل تحت Git به تنظیمات محلی ignored منتقل شد و تست الزام کلید موفق است. NetArz فقط در Development local فعال شد؛ endpoint/قرارداد/schema تغییر نکرد. build صفر warning/error؛ **۱۱۸ تست موفق، صفر شکست/Skip** با PostgreSQL 18 واقعی مستقل. EF بدون pending model changes. smoke واقعی TTS → STT → LLM با داده مصنوعی و decision معتبر موفق شد؛ گزارش‌های «NetArz آزمایش نشده» و «تست کلید شکست دارد» پایین تاریخی‌اند. rotation کلید قبلاً ثبت‌شده در Git پیش از staging هنوز تأیید نشده؛ volume/retention/backup عملیاتی باقی‌اند. migration مقصد طبق گفته کاربر قبلاً اجرا شده و در این audit تغییر نکرد.
+
+## تحویل قرارداد فرانت‌اند — 2026-10-01
+
+راهنمای مستقل [FRONTEND_INTERVIEWS_HANDOFF](FRONTEND_INTERVIEWS_HANDOFF.md) بر اساس DTOها و Controllerهای فعلی اضافه شد: جریان داوطلب، فرم حداقلی HR، گزارش، صوت خصوصی، retry، محدودیت APIها و پرامپت آماده Codex. این مرحله فقط مستندات است؛ فرانت‌اند، API یا دیتابیس تغییر نکرد. اعتبارسنجی این مرحله در HANDOFF ثبت می‌شود؛ نتیجه ۹۴ تست بخش قبلی مربوط به پیاده‌سازی بک‌اند است.
+
 ## جریان قابل اجرای مصاحبه — ادامه 2026-10-01
 
 این بخش جایگزین محدودیت‌های «شروع ماژول» پایین است. مسیر کامل HR invitation → candidate token → start/current → private audio → STT → exact shortlist/LLM → evidence/fallback → next question/complete پیاده و روی PostgreSQL واقعی با provider جعلی آزمایش شد. retry همان پاسخ، lease/recovery، schema tenant FK، unique answer و optimistic concurrency، download خصوصی و TTS cache برقرارند. مدل‌ها دیگر صرفاً حافظه‌ای نیستند؛ تمام stateها entity رابطه‌ای مستقل با explicit mapping و Restrict هستند. جزئیات قرارداد و تنظیمات در [INTERVIEWS](INTERVIEWS.md).

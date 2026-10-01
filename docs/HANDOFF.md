@@ -1,5 +1,19 @@
 # ادامه کار
 
+## تحویل audit پیش از staging — 2026-10-01
+
+گزارش چهار بخش در [INTERVIEW_AUDIT](INTERVIEW_AUDIT.md) شامل نقص/فایل/اثر/fix/test، trace مراحل، migration و recovery است. تغییر کد فقط رفع IOException provider، graceful failure خواندن cache و default خالی ApiKey است؛ تست‌های race/recovery/scope/validation/logging تکمیل شدند. برنچ `codex/candidate-ai-interview` حفظ شد؛ تغییرهای مستندی تحویل فرانت نوبت قبل حفظ شدند. build صفر warning/error؛ ۱۱۸ موفق، صفر fail/Skip با PostgreSQL 18 مستقل localhost:55441؛ EF drift ندارد. اجرای نهایی دارای دسترسی loopback موفق است؛ شکست اتصال اجرای اولیه sandbox نتیجه کد محسوب نشد.
+
+کلید تنظیم‌شده بدون چاپ مقدار به `src/HireYar.Api/appsettings.Development.local.json` منتقل و AI:Provider=NetArz همان‌جا فعال شد؛ فایل ignored است. آدرس/modelهای فعلی حفظ شدند. smoke واقعی با client موجود: TTS صوت مصنوعی ساخت، STT متن داد و LLM decision معتبر داد. هیچ داده واقعی candidate یا request body لاگ نشد. این smoke جای آزمون بار/کیفیت استقرار نیست. default provider مشترک Disabled می‌ماند؛ staging secret و فعال‌سازی خودش را لازم دارد. کلید قبلاً در Git بوده و rotation آن پیش از staging هنوز لازم است؛ حذف default تاریخچه را پاک نکرد.
+
+schema و قرارداد API تغییر نکرد؛ migration مقصد طبق گفته کاربر قبلاً انجام شده و DB مقصد در audit دست‌نخورده است. fixture DBهای تصادفی حذف شدند و cluster مستقل تست پس از بررسی متوقف شد. commit/push/deploy انجام نشد. راهنمای [فرانت‌اند](FRONTEND_INTERVIEWS_HANDOFF.md) همچنان قرارداد معتبر است.
+
+## تحویل به تیم فرانت‌اند — 2026-10-01
+
+فایل مستقل [FRONTEND_INTERVIEWS_HANDOFF](FRONTEND_INTERVIEWS_HANDOFF.md) را به تیم فرانت بدهید؛ قرارداد ورودی/خروجی، stateهای UI، ضبط و دانلود خصوصی، retry، خطاها، APIهای موجودنبودن و پرامپت آماده برای Codex داخل همان فایل است. محدود به صفحات داوطلب، گزارش HR و فرم ایجاد ساده؛ معماری/وابستگی جدید لازم نیست. کد بک‌اند و migration تغییر نکردند. شروع این نوبت Git پاک روی `codex/candidate-ai-interview` و همگام با origin بود؛ یادداشت‌های commitنشده پایین مربوط به نوبت‌های قبلی هستند.
+
+اعتبارسنجی این نوبت: قرارداد با Controllerها/DTOهای موجود تطبیق داده شد؛ build صفر warning/error و diff --check بدون خطای whitespace. تست‌های InterviewRulesTests/InterviewProviderTests/InterviewAudioTests: ۵۸ موفق، یک شکست، صفر Skip. تست Enabled_provider_requires_key_and_valid_timeouts انتظار خطا برای کلید تنظیم‌نشده دارد، ولی مقدار پیش‌فرض ApiKey در NetArzOptions فعلی خالی نیست؛ مقدار آن چاپ یا به این مستند منتقل نشد. این وضعیت از کد موجود است و در تغییر مستندی اصلاح نشده. تست اتصال واقعی NetArz یا PostgreSQL جدید جزو این نوبت نیست.
+
 ## تحویل vertical slice — 2026-10-01
 
 برنچ همچنان `codex/candidate-ai-interview`؛ تمام تغییرات اولیه و این نوبت uncommitted حفظ شده‌اند. migration `20261001061608_AddCandidateInterviewFlow` و APIهای HR/candidate، token hash، بانک PositionSkill، صوت خصوصی و NetArz typed client اضافه شدند. [INTERVIEWS](INTERVIEWS.md) قراردادها، تنظیمات و مثال درخواست/JSON را دارد؛ یادداشت تحویل شروع پایین دیگر وضعیت فعلی نیست.
