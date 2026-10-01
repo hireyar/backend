@@ -1,6 +1,10 @@
 # Candidate AI Interview
 
-این ماژول روی branch `codex/candidate-ai-interview` مسیر HR → دعوت → start → صوت → STT → ارزیابی → سؤال بعدی را از API اجرا می‌کند. تصمیم استخدام/رد خودکار ندارد. اجرای واقعی NetArz با کلید و مدل‌های حساب مقصد هنوز smoke-test نشده است؛ تست عادی از HTTP handler و provider آزمایشی استفاده می‌کند.
+راهنمای مستقل قابل تحویل به تیم فرانت‌اند و پرامپت اجرای آن: [FRONTEND_INTERVIEWS_HANDOFF](FRONTEND_INTERVIEWS_HANDOFF.md).
+
+نتیجه جاری بررسی پیش از staging: [INTERVIEW_AUDIT](INTERVIEW_AUDIT.md)؛ ۱۱۸ تست موفق روی PostgreSQL واقعی، model بدون drift و smoke واقعی TTS/STT/LLM با داده مصنوعی موفق. دو نقص مسیر خطا و secret default اصلاح شدند؛ قرارداد API و schema تغییر نکردند. آمار ۹۴ و وضعیت «Live آزمایش نشده» در گزارش قبلی پایین تاریخی‌اند.
+
+این ماژول روی branch `codex/candidate-ai-interview` مسیر HR → دعوت → start → صوت → STT → ارزیابی → سؤال بعدی را از API اجرا می‌کند. تصمیم استخدام/رد خودکار ندارد. smoke واقعی NetArz با تنظیم موجود موفق شد؛ تست عادی همچنان از HTTP handler و provider آزمایشی استفاده می‌کند. کلید را خارج Git تنظیم کنید و کلید قبلاً ثبت‌شده در source را پیش از staging تعویض کنید.
 
 ## تنظیمات
 

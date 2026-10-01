@@ -79,6 +79,7 @@ public sealed class NetArzClient(HttpClient http, IOptions<NetArzOptions> option
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { outcome = "timeout"; throw new InterviewProviderException($"{operation}_timeout"); }
         catch (OperationCanceledException) { outcome = "cancelled"; throw; }
         catch (HttpRequestException) { outcome = "network_failure"; throw new InterviewProviderException($"{operation}_unavailable"); }
+        catch (IOException) { outcome = "network_failure"; throw new InterviewProviderException($"{operation}_unavailable"); }
         catch (InterviewProviderException) { outcome = "failure"; throw; }
         finally
         {

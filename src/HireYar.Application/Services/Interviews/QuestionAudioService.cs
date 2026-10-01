@@ -21,6 +21,11 @@ public sealed class QuestionAudioService(IApplicationDbContext db, IInterviewAud
             try { await using var existing = await storage.OpenReadAsync(cached.AudioStorageKey, ct); return cached; }
             catch (FileNotFoundException) { }
             catch (DirectoryNotFoundException) { }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning("Question audio unavailable operation=cache_read failureCode=storage_unavailable");
+                return null;
+            }
         }
         if (!generate) return null;
         try

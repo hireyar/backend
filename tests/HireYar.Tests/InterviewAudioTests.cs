@@ -30,6 +30,16 @@ public sealed class InterviewAudioTests
         Assert.Equal("audio_too_large", (await Assert.ThrowsAsync<AppException>(() => AudioUploadValidator.ValidateAsync(stream, "a.mp3", "audio/mpeg", 100, null, new() { MaxUploadBytes = 16 }, default))).Code);
         Assert.Equal("answer_duration_invalid", (await Assert.ThrowsAsync<AppException>(() => AudioUploadValidator.ValidateAsync(stream, "a.mp3", "audio/mpeg", 16, 1000, new(), default))).Code);
     }
+    [Theory]
+    [InlineData("a.exe", "audio/webm")]
+    [InlineData("a.webm", "audio/mpeg")]
+    [InlineData("a.mp3", "audio/mpeg")]
+    public async Task Extension_mime_and_signature_must_agree(string name, string mime)
+    {
+        using var audio = new MemoryStream(new byte[] { 0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+        Assert.Equal("audio_invalid", (await Assert.ThrowsAsync<AppException>(() =>
+            AudioUploadValidator.ValidateAsync(audio, name, mime, audio.Length, 1, new(), default))).Code);
+    }
     [Fact]
     public async Task Local_storage_round_trip_rejects_traversal_and_oversized_stream()
     {
