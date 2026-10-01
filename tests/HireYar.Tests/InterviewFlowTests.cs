@@ -7,11 +7,15 @@ using HireYar.Domain.Interviews;
 using Microsoft.EntityFrameworkCore;
 using HireYar.Infrastructure.Persistence;
 using Npgsql;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Concurrent;
 namespace HireYar.Tests;
 
 public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService
 {
     public int SttCalls; public int TtsCalls; public bool FailStt; public bool FailLlm; public bool InvalidLlm; public bool FailTts;
+    public int LlmCalls;
     public TaskCompletionSource? Entered; public TaskCompletionSource? Release;
     public SpeechProfile Profile => new("fake-tts", "fake-voice", 1m);
     public Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct)
@@ -22,7 +26,9 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
     }
     public async Task<InterviewDecisionResult> EvaluateAsync(InterviewDecisionContext context, CancellationToken ct)
     {
-        Entered?.TrySetResult(); if (Release is not null) await Release.Task.WaitAsync(ct);
+        Interlocked.Increment(ref LlmCalls);
+        var release = Release;
+        Entered?.TrySetResult(); if (release is not null) await release.Task.WaitAsync(ct);
         if (FailLlm) throw new InterviewProviderException("llm_timeout");
         if (InvalidLlm) return new("not-json", "Test", "fake-llm");
         var result = new InterviewDecision { AnswerAssessment = new() { Relevance = 0.8m, Clarity = 0.8m, EvidenceQuality = 0.8m },
@@ -41,6 +47,31 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
 [Collection("Postgres")]
 public sealed class InterviewFlowTests(ApiFixture f)
 {
+    private sealed class TestAccess(Guid id) : ICurrentInterviewAccess { public Guid InterviewId => id; }
+    private sealed class SimultaneousStorage(IInterviewAudioStorage inner) : IInterviewAudioStorage
+    {
+        private int arrivals;
+        private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ConcurrentBag<string> Saved { get; } = [];
+        public ConcurrentBag<string> Deleted { get; } = [];
+        public async Task<StoredAudio> SaveAsync(Stream source, string category, Guid owner, long maximum, CancellationToken ct)
+        {
+            var saved = await inner.SaveAsync(source, category, owner, maximum, ct);
+            Saved.Add(saved.Key);
+            if (Interlocked.Increment(ref arrivals) == 2) ready.TrySetResult();
+            await ready.Task.WaitAsync(ct); return saved;
+        }
+        public Task<Stream> OpenReadAsync(string key, CancellationToken ct) => inner.OpenReadAsync(key, ct);
+        public async Task DeleteAsync(string key, CancellationToken ct) { await inner.DeleteAsync(key, ct); Deleted.Add(key); }
+    }
+    private sealed class UnreadableStorage(bool denied) : IInterviewAudioStorage
+    {
+        public Task<Stream> OpenReadAsync(string key, CancellationToken ct) => Task.FromException<Stream>(
+            denied ? new UnauthorizedAccessException("Synthetic denied cache") : new IOException("Synthetic unavailable cache"));
+        public Task<StoredAudio> SaveAsync(Stream stream, string category, Guid owner, long max, CancellationToken ct) =>
+            Task.FromException<StoredAudio>(new IOException("Synthetic unavailable storage"));
+        public Task DeleteAsync(string key, CancellationToken ct) => Task.CompletedTask;
+    }
     private async Task<(Account Hr, InterviewInvitation Invite)> Invite()
     {
         f.InterviewAi.Reset(); var hr = await f.RegisterConfirmed();
@@ -146,6 +177,24 @@ public sealed class InterviewFlowTests(ApiFixture f)
     }
 
     [PostgresFact]
+    public async Task Unreadable_cached_question_audio_does_not_stop_the_text_flow()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite);
+        var started = await Start(c, invite.InterviewId);
+        await f.Db(async db => {
+            foreach (var denied in new[] { false, true })
+            {
+                var service = new QuestionAudioService(db, new UnreadableStorage(denied), f.InterviewAi,
+                    f.Clock, NullLogger<QuestionAudioService>.Instance);
+                Assert.Null(await service.ResolveAsync((await db.InterviewSessions.SingleAsync(x => x.Id == invite.InterviewId)).OrganizationId,
+                    started.Question!.Text, false, default));
+                Assert.Null(await service.ResolveAsync((await db.InterviewSessions.SingleAsync(x => x.Id == invite.InterviewId)).OrganizationId,
+                    started.Question.Text, true, default));
+            }
+        });
+    }
+
+    [PostgresFact]
     public async Task Expired_token_and_hr_token_cannot_authenticate_candidate()
     {
         var (hr, invite) = await Invite(); using var c = Candidate(invite);
@@ -153,6 +202,149 @@ public sealed class InterviewFlowTests(ApiFixture f)
         f.Clock.Offset = TimeSpan.FromDays(4);
         try { Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/candidate/interviews/{invite.InterviewId}/current")).StatusCode); }
         finally { f.Clock.Offset = TimeSpan.Zero; }
+    }
+
+    [PostgresFact]
+    public async Task Candidate_and_hr_audio_access_are_scoped_to_the_actual_session_and_tenant()
+    {
+        var (hr, invite) = await Invite(); using var c = Candidate(invite);
+        var (_, second) = await Invite(); using var otherCandidate = Candidate(second);
+        var started = await Start(c, invite.InterviewId);
+        var otherStarted = await Start(otherCandidate, second.InterviewId);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/candidate/interviews/{second.InterviewId}/current")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.PostAsync($"/api/candidate/interviews/{second.InterviewId}/start", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync(otherStarted.Question!.AudioUrl)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/interviews/{invite.InterviewId}")).StatusCode);
+        Guid futureQuestion = Guid.Empty;
+        await f.Db(async db => {
+            var s = await db.InterviewSessions.SingleAsync(x => x.Id == invite.InterviewId);
+            futureQuestion = s.Questions.First(x => x.QuestionId != started.Question!.Id).QuestionId;
+        });
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/candidate/interviews/{invite.InterviewId}/questions/{futureQuestion}/audio")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Submit(c, invite.InterviewId, started.Question!.Id)).StatusCode);
+        var report = (await (await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).Content.ReadFromJsonAsync<HrInterviewDto>())!;
+        var answerUrl = Assert.Single(report.Answers).AudioUrl;
+        Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Get, answerUrl)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(answerUrl)).StatusCode);
+        var otherHr = await f.RegisterConfirmed();
+        Assert.Equal(HttpStatusCode.NotFound, (await otherHr.Client.Send(HttpMethod.Get, answerUrl)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherHr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}/questions/{started.Question.Id}/audio")).StatusCode);
+        var spoof = await hr.Client.Send(HttpMethod.Post, $"/api/job-positions/{report.JobPositionId}/applications",
+            new { firstName = "Test", lastName = "Candidate", email = "candidate@example.test", organizationId = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.BadRequest, spoof.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.GetAsync(started.Question.AudioUrl)).StatusCode);
+    }
+
+    private async Task VerifyRecovery(AnswerStatus stage)
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);
+        Guid answerId = Guid.Empty; string audioKey = "";
+        // Persist exactly the state left by a stopped request, using private storage and PostgreSQL.
+        await using (var scope = f.Services.CreateAsyncScope())
+        {
+            var storage = scope.ServiceProvider.GetRequiredService<IInterviewAudioStorage>();
+            using var source = new MemoryStream("ID3-synthetic-recovery"u8.ToArray());
+            audioKey = (await storage.SaveAsync(source, "answers", invite.InterviewId, 1024, default)).Key;
+        }
+        await f.Db(async db => {
+            var s = await db.InterviewSessions.Include(x => x.Answers).SingleAsync(x => x.Id == invite.InterviewId);
+            var now = f.Clock.GetUtcNow();
+            var answer = s.SubmitAnswer(start.Question!.Id, audioKey, "audio/mpeg", 22, now);
+            answerId = answer.Id; s.AcquireLease(answer.Id, now, 300);
+            if (stage != AnswerStatus.Uploaded)
+            {
+                s.BeginTranscription(answer.Id); s.SetTranscript(answer.Id, "Synthetic persisted transcript", "Test", "fake-stt");
+                if (stage == AnswerStatus.Evaluating) s.BeginEvaluation(answer.Id);
+            }
+            await db.SaveChangesAsync();
+        });
+        var sttCalls = f.InterviewAi.SttCalls; var llmCalls = f.InterviewAi.LlmCalls;
+        f.Clock.Offset = TimeSpan.FromMinutes(6);
+        try
+        {
+            var current = (await c.GetFromJsonAsync<CandidateInterviewDto>($"/api/candidate/interviews/{invite.InterviewId}/current"))!;
+            Assert.True(current.Answer!.CanRetry); Assert.False(current.IsProcessing);
+            Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/answers/{answerId}/retry", null)).StatusCode);
+            Assert.Equal(sttCalls + (stage == AnswerStatus.Uploaded ? 1 : 0), f.InterviewAi.SttCalls);
+            Assert.Equal(llmCalls + 1, f.InterviewAi.LlmCalls);
+            // A repeat of the successful retry must not evaluate or apply anything again.
+            Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/answers/{answerId}/retry", null)).StatusCode);
+            Assert.Equal(llmCalls + 1, f.InterviewAi.LlmCalls);
+            await f.Db(async db => {
+                var s = await db.InterviewSessions.Include(x => x.Answers).SingleAsync(x => x.Id == invite.InterviewId);
+                Assert.Equal(audioKey, Assert.Single(s.Answers).AudioStorageKey);
+                Assert.Equal(answerId, s.Answers[0].Id); Assert.Equal(AnswerStatus.Processed, s.Answers[0].Status);
+                Assert.Single(s.Evidence); Assert.Equal(1, s.SkillStates.Single().EvidenceCount);
+                Assert.Equal(1, s.AnsweredQuestionCount); Assert.NotEqual(start.Question!.Id, s.CurrentQuestionId);
+                Assert.Null(s.ProcessingLeaseId);
+            });
+        }
+        finally { f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
+    }
+    [PostgresFact] public Task Saved_audio_before_stt_recovers_after_lease_expiry() => VerifyRecovery(AnswerStatus.Uploaded);
+    [PostgresFact] public Task Persisted_transcript_recovers_without_repeating_stt() => VerifyRecovery(AnswerStatus.Transcribed);
+    [PostgresFact] public Task Uncommitted_evaluation_can_repeat_without_duplicate_evidence() => VerifyRecovery(AnswerStatus.Evaluating);
+
+    [PostgresFact]
+    public async Task New_lease_worker_commits_once_and_old_worker_cannot_overwrite_it()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.InterviewAi.Entered = entered; f.InterviewAi.Release = release;
+        var oldWorker = Submit(c, invite.InterviewId, start.Question!.Id);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            var current = (await c.GetFromJsonAsync<CandidateInterviewDto>($"/api/candidate/interviews/{invite.InterviewId}/current"))!;
+            f.Clock.Offset = TimeSpan.FromMinutes(6); f.InterviewAi.Entered = f.InterviewAi.Release = null;
+            var sttCalls = f.InterviewAi.SttCalls;
+            var resumed = await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/answers/{current.Answer!.Id}/retry", null);
+            Assert.Equal(HttpStatusCode.OK, resumed.StatusCode);
+            var final = (await resumed.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+            release.TrySetResult(); Assert.Equal(HttpStatusCode.Conflict, (await oldWorker).StatusCode);
+            Assert.Equal(sttCalls, f.InterviewAi.SttCalls);
+            await f.Db(async db => {
+                var s = await db.InterviewSessions.Include(x => x.Answers).SingleAsync(x => x.Id == invite.InterviewId);
+                Assert.Single(s.Answers); Assert.Single(s.Evidence); Assert.Equal(1, s.AnsweredQuestionCount);
+                Assert.Equal(final.Question!.Id, s.CurrentQuestionId); Assert.Equal(1, s.SkillStates.Single().EvidenceCount);
+            });
+        }
+        finally { release.TrySetResult(); f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
+    }
+
+    [PostgresFact]
+    public async Task Simultaneous_submissions_from_waiting_state_commit_one_answer_and_clean_the_losing_file()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite); var started = await Start(c, invite.InterviewId);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var ownerScope = f.Services.CreateAsyncScope();
+        var storage = new SimultaneousStorage(ownerScope.ServiceProvider.GetRequiredService<IInterviewAudioStorage>());
+        var sttCalls = f.InterviewAi.SttCalls;
+        async Task<Exception?> SubmitInScope()
+        {
+            await using var scope = f.Services.CreateAsyncScope();
+            var service = ActivatorUtilities.CreateInstance<CandidateInterviewService>(scope.ServiceProvider,
+                new TestAccess(invite.InterviewId), storage);
+            using var source = new MemoryStream(new byte[] { 0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+            try
+            {
+                var state = await service.SubmitAsync(invite.InterviewId, started.Question!.Id, source, "a.webm", "audio/webm", source.Length, 1, timeout.Token);
+                Assert.Equal(1, state.Progress.AnsweredQuestions); return null;
+            }
+            catch (DbUpdateException e) { return e; }
+        }
+        var outcomes = await Task.WhenAll(SubmitInScope(), SubmitInScope());
+        Assert.Single(outcomes, x => x is null); Assert.Single(outcomes, x => x is DbUpdateException);
+        Assert.Equal(2, storage.Saved.Count); Assert.Single(storage.Deleted);
+        Assert.Equal(sttCalls + 1, f.InterviewAi.SttCalls);
+        await Assert.ThrowsAsync<FileNotFoundException>(() => storage.OpenReadAsync(storage.Deleted.Single(), default));
+        await f.Db(async db => {
+            var s = await db.InterviewSessions.Include(x => x.Answers).SingleAsync(x => x.Id == invite.InterviewId);
+            var answer = Assert.Single(s.Answers); Assert.Single(s.Evidence); Assert.Equal(1, s.AnsweredQuestionCount);
+            Assert.Equal(1, s.SkillStates.Single().EvidenceCount); Assert.NotEqual(started.Question!.Id, s.CurrentQuestionId);
+            Assert.DoesNotContain(answer.AudioStorageKey, storage.Deleted);
+        });
     }
 
     [PostgresFact]

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using HireYar.Application.Interviews;
 using HireYar.Domain.Interviews;
 
@@ -172,6 +173,28 @@ public sealed class InterviewRulesTests
             var result = validator.ValidateOrFallback(Decision(s, next), s, [Q(2).QuestionId], Now.AddSeconds(20));
             Assert.True(result.UsedFallback); Assert.Equal(Q(2).QuestionId, result.NextQuestionId); Assert.Empty(result.SkillUpdates);
         }
+    }
+
+    [Theory]
+    [InlineData("skill")] [InlineData("topic")] [InlineData("confidence")]
+    [InlineData("relevance")] [InlineData("clarity")] [InlineData("evidenceQuality")]
+    [InlineData("nullSkill")] [InlineData("nullTopic")]
+    public void Invalid_assessment_falls_back_without_any_partial_evidence(string invalid)
+    {
+        var s = Session(); Answer(s); var json = JsonNode.Parse(Decision(s, Q(2).QuestionId))!;
+        switch (invalid)
+        {
+            case "skill": json["skillUpdates"]![0]!["skillId"] = Guid.NewGuid().ToString(); break;
+            case "topic": json["coveredTopics"]![0]!["topic"] = "invented-topic"; break;
+            case "confidence": json["skillUpdates"]![0]!["confidence"] = 1.1m; break;
+            case "nullSkill": json["skillUpdates"]![0] = null; break;
+            case "nullTopic": json["coveredTopics"]![0] = null; break;
+            default: json["answerAssessment"]![invalid] = -0.1m; break;
+        }
+        var result = new InterviewDecisionValidator(new InterviewPolicy()).ValidateOrFallback(json.ToJsonString(), s,
+            [Q(2).QuestionId], Now.AddSeconds(20));
+        Assert.True(result.UsedFallback); Assert.Empty(result.SkillUpdates); Assert.Empty(result.CoveredTopics);
+        Assert.Empty(s.Evidence); Assert.Equal(Q(2).QuestionId, result.NextQuestionId);
     }
 
     [Fact]
