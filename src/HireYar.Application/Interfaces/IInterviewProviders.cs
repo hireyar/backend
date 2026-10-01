@@ -1,0 +1,43 @@
+using HireYar.Domain.Interviews;
+namespace HireYar.Application.Interviews;
+
+public sealed record SpeechTranscriptionResult(string Text, string Provider, string Model);
+public sealed record SpeechProfile(string Model, string Voice, decimal Speed);
+public sealed record TextToSpeechResult(byte[] Audio, string ContentType);
+public sealed record InterviewDecisionResult(string Json, string Provider, string Model);
+public sealed record InterviewDecisionContext(string PositionTitle, Guid CurrentQuestionId, string Status,
+    int AnsweredQuestionCount, int MaxQuestionCount, int RemainingSeconds,
+    InterviewQuestionSnapshot Question, string CandidateTranscript,
+    IReadOnlyList<InterviewSkill> Skills, IReadOnlyList<CandidateSkillState> SkillStates,
+    IReadOnlyList<InterviewCoveredTopic> CoveredTopics, IReadOnlyList<InterviewQuestionSnapshot> AvailableQuestions);
+public interface ISpeechToTextService
+{
+    Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct);
+}
+public interface IInterviewDecisionService
+{
+    Task<InterviewDecisionResult> EvaluateAsync(InterviewDecisionContext context, CancellationToken ct);
+}
+public interface ITextToSpeechService
+{
+    SpeechProfile Profile { get; }
+    Task<TextToSpeechResult> GenerateAsync(string text, CancellationToken ct);
+}
+public sealed class InterviewProviderException(string code) : Exception("Interview provider unavailable.")
+{
+    public string Code { get; } = code;
+}
+public sealed record StoredAudio(string Key, long SizeBytes);
+public interface IInterviewAudioStorage
+{
+    Task<StoredAudio> SaveAsync(Stream audio, string category, Guid ownerId, long maxBytes, CancellationToken ct);
+    Task<Stream> OpenReadAsync(string key, CancellationToken ct);
+    Task DeleteAsync(string key, CancellationToken ct);
+}
+public sealed class InterviewOptions
+{
+    public int ShortlistLimit { get; set; } = 10;
+    public int LeaseSeconds { get; set; } = 300;
+    public int MaxAnswerSeconds { get; set; } = 600;
+    public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
+}

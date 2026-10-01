@@ -1,5 +1,29 @@
 # ادامه کار
 
+## تحویل vertical slice — 2026-10-01
+
+برنچ همچنان `codex/candidate-ai-interview`؛ تمام تغییرات اولیه و این نوبت uncommitted حفظ شده‌اند. migration `20261001061608_AddCandidateInterviewFlow` و APIهای HR/candidate، token hash، بانک PositionSkill، صوت خصوصی و NetArz typed client اضافه شدند. [INTERVIEWS](INTERVIEWS.md) قراردادها، تنظیمات و مثال درخواست/JSON را دارد؛ یادداشت تحویل شروع پایین دیگر وضعیت فعلی نیست.
+
+بررسی: restore/build موفق، build صفر warning/error؛ ۹۴/۹۴ تست موفق روی PostgreSQL 18 مستقل loopback:55441، صفر Skip. Fixture DB تصادفی می‌سازد و حذف می‌کند. provider جعلی فقط تست و HttpClient mocked است؛ هیچ هزینه/درخواست واقعی NetArz انجام نشده. EF model بدون drift است. cluster آزمایشی در artifacts/candidate-interview-pg است و پس از بررسی متوقف شد؛ دیتابیس موجود پروژه/production تغییر نکرده. آدرس یا کلید واقعی پروژه چاپ/به فایل جدید منتقل نشد.
+
+نکات پیاده‌سازی: AutoInclude مجموعه‌های relational جلسه + split query در Infrastructure؛ Application همچنان فقط EF abstraction دارد. Answer/Evidence Guid از Domain می‌آیند و ValueGeneratedNever لازم است تا EF child تازه را UPDATE فرض نکند. به علت snapshot generation نامناسب owned/restrict، stateها entity مستقل‌اند. migration دستی قبلی AddMobileOtp target model ندارد؛ اگر migration تازهٔ اعمال‌نشده را با EF remove کردید، snapshot قبلی را از نسخهٔ درست ریپو حفظ کنید، وگرنه ابزار snapshot خالی می‌سازد. تاریخچه migration موجود تغییر نکرده است.
+
+lease روی Session و نسخه ۱۶بایتی در هر stage کنترل می‌شود؛ worker قدیمی بعد از تماس خارجی session را reload و lease را بررسی می‌کند. transcript persistشده STT را در retry حذف می‌کند. SaveChanges کوتاه است و external call در transaction نیست. snapshot plan هنگام دعوت ثابت می‌شود؛ بانک موقعیت منبع سؤال است و قالب قدیمی فقط تنظیم مدت را می‌دهد. کد current سؤال بعدی انتخاب نمی‌کند و فقط cache موجود را می‌خواند.
+
+برای استفاده واقعی، تنظیمات خارج Git طبق example با AI:Provider=NetArz و کلید واقعی لازم است؛ Disabled هیچ HTTP خارجی نمی‌زند. اجرا با کلید واقعی، volume پایدار، retention و cleanup فایل‌های orphan هنوز عملیاتی بررسی نشده‌اند. هیچ push/deploy/commit انجام نشده.
+
+## تحویل شروع مصاحبه — 2026-10-01
+
+برنچ فعلی `codex/candidate-ai-interview` از dev، با تغییرات commitنشده است. کاربر ساخت برنچ و شروع پرامپت کامل Candidate AI Interview را خواست. Domain در `src/HireYar.Domain/Interviews` و policy/validator/prompt در `Application/Services/Interviews`، DTO در `Application/DTOs/Interviews` و تست‌ها در `tests/HireYar.Tests/InterviewRulesTests.cs` اضافه شدند. API/Infrastructure موجود تغییر نکردند؛ این یک هستهٔ اولیه است و اجرای مصاحبه هنوز ممکن نیست.
+
+restore و build موفق؛ build صفر warning/error. تست کل ۲۶ pass، صفر fail، ۲۷ skip بدون HIREYAR_TEST_POSTGRES؛ ۲۴ تست جدید همه pass. migration یا بررسی SQL انجام نشده؛ از موفقیت تست Domain نتیجهٔ concurrency دیتابیس نگیرید.
+
+تحلیل ریپو: Candidate/Application/Skill/storage وجود ندارند؛ InterviewQuestion زیر InterviewTemplate است و Competency متن دارد؛ Template FK مرکب OrganizationId/JobPositionId دارد. TemplateService سؤال‌ها را delete/insert می‌کند و شناسه باقی‌مانده را نگه می‌دارد، پس snapshot جلسه باید تاریخچه را مستقل از این تغییر نگه دارد. HR JWT با CurrentAccountValidation از DB بررسی می‌شود؛ برای داوطلب باید token scoped جدا ساخته شود. سرویس‌ها مستقیم از IApplicationDbContext استفاده می‌کنند؛ Repository/MediatR اضافه نشود. Provider فعلی Npgsql و خطاها AppException/ProblemDetails هستند.
+
+گام بعد: قبل از اتصال به EF، constructor/private collection مدل‌ها را برای materialization بررسی و backing-field mapping یا constructor خصوصی مناسب اضافه کن؛ enumها با check constraint، FK مرکب سازمان در مدل CandidateApplication/Session و unique session/question برای پاسخ. Domain اکنون فقط invariantهای حافظه‌ای را enforce می‌کند؛ optimistic concurrency باید در persistence اضافه شود. mapped stateها و evidence هنوز جدول نیستند. policy برندهٔ backend است؛ علت sufficient evidence/no questions باید فقط پس از بررسی policy برای Complete استفاده شود. تمام AI خارج transaction، هر stage ذخیره شود و processing رهاشده پس از قطع فرایند lease/recovery داشته باشد. validator باید در زمان integration حد shortlist تنظیم‌شده را هم رعایت کند؛ اکنون policy پیش‌فرض ۱۰ را بازسازی می‌کند. سپس باقی موارد فهرست‌شده در BACKLOG را اجرا کن.
+
+کلید/داده واقعی در کد اضافه نشده؛ NetArz واقعی فراخوانی نشده و push/deploy انجام نشده است.
+
 به‌روزرسانی همین نوبت: بخش `Kavenegar` به `appsettings.json` اضافه شد. `ApiKey` و `Template` فعلاً خالی‌اند؛ مقدار واقعی را فقط در تنظیمات خارج Git یا override محیطی وارد کنید. `UseFixedOtp=false` در تنظیمات مشترک است. در Development مقدار `UseFixedOtp=true` و `FixedOtpCode=123456` تنظیم شده؛ درخواست OTP پیامک ارسال نمی‌کند و تأیید با این کد، با همان انقضا و محدودیت تلاش، انجام می‌شود. تست PostgreSQL 18: ۲۹ موفق، صفر شکست/Skip؛ build صفر warning/error. PostgreSQL موقت پس از تست متوقف شد. push/deploy انجام نشده است.
 
 در 2026-09-27 مسیر موبایل/OTP اضافه شد: `GET /api/auth/csrf`، سپس `POST /api/auth/otp/request` با `{ "mobile": "09..." }`، سپس `POST /api/auth/otp/verify` با `{ "mobile": "09...", "code": "......" }`. پاسخ verify همان access token و refresh cookie جاری است. حساب جدید Owner با سازمان اولیه ساخته می‌شود؛ نام شرکت از `PUT /api/organization` ویرایش می‌شود. برای ارسال واقعی `Kavenegar__ApiKey` و `Kavenegar__Template` را فقط در محیط تنظیم کنید؛ ارسال واقعی هنوز آزمایش نشده است. migration `20260927090000_AddMobileOtp` باید پیش از استفاده در محیط مقصد اعمال شود. اجرای محلی روی PostgreSQL 18: ۲۸/۲۸ تست موفق؛ build صفر warning/error؛ `has-pending-model-changes` بدون اختلاف. PostgreSQL موقت تست متوقف شد. مسیرهای ایمیلی و دعوت Recruiter عمداً تا پاسخ درباره مهاجرت کاربران فعلی باقی مانده‌اند. پس از تصمیم، مستندات قدیمی ایمیل/SMTP و تست‌ها نیز باید با قرارداد نهایی هماهنگ شوند. push/deploy انجام نشده است.
@@ -27,3 +51,5 @@
 کاربر برای توسعه روزمره Docker PostgreSQL روی localhost:5433 را انتخاب کرد. قدم بعد HY-006: پس از دسترسی Docker daemon، `pwsh -File scripts/Start-DevelopmentContainers.ps1` و سپس `pwsh -File scripts/Update-DevelopmentDatabase.ps1` را اجرا کن. اسکریپت‌ها secret چاپ نمی‌کنند. اجرای واقعی compose/SMTP هنوز تأیید نشده است.
 
 برنچ dev است؛ تغییرات اخیر commit/push/deploy نشده‌اند. `dotnet tool restore` در این محیط به NuGet.Config دسترسی نداشت؛ بررسی EF اجرا نشد. Docker daemon هم Access denied داد. HY-006 و HY-007 باز هستند؛ HY-010 با تصمیم دسترسی عمومی مستندات و تست مستقل بسته شد.
+
+یادداشت اجرای نهایی مصاحبه: یک run با خطای transport اتصال PostgreSQL شکست خورد؛ اجرای مجدد با SSL Mode=Disable و GSS Encryption Mode=Disable صرفاً روی cluster محلی آزمایشی، ۹۴/۹۴ موفق بود. build نهایی صفر warning/error؛ DB تصادفی تست باقی نماند و cluster آزمایشی متوقف شد. اسکریپت idempotent در artifacts/candidate-interview-migrations.sql تولید شد ولی این اسکریپت جداگانه اجرا نشد؛ اعمال migration از fixture واقعی PostgreSQL بررسی شد.

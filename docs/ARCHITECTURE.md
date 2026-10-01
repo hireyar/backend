@@ -1,5 +1,29 @@
 # معماری و تصمیم‌ها
 
+## ADR-017 — اجرای مصاحبه با persistence و provider (2026-10-01)
+
+Domain اولیه با constructor خصوصی و backing field به EF متصل شد؛ QuestionSnapshot/SkillSnapshot/SkillState/SkillEvidence/CoveredTopic entity رابطه‌ای مستقل‌اند، نه JSON و نه owned navigation. این انتخاب drift مشاهده‌شدهٔ snapshot حذف ownedها را رفع کرد و FK بین answer/question/skill را صریح کرد. tenant-owned CandidateApplication/Skill/PositionSkill/BankQuestion/Session با کلیدهای مرکب به موقعیت/قالب/مهارت همان سازمان وصل‌اند؛ همهٔ delete behaviorها Restrict است.
+
+بانک موقعیت مستقل از editable questionهای قالب است؛ template feature و delete/insert آن تغییر نمی‌کنند. متن/موضوع/مهارت/difficulty و plan در زمان **صدور دعوت** snapshot می‌شوند، سپس start همان plan را فعال می‌کند. این تثبیت زودتر از start مانع تغییر بی‌صدای دعوت پس از ویرایش HR می‌شود. بانک می‌تواند تغییر کند اما session فقط snapshot خودش را ارزیابی می‌کند.
+
+Candidate token تصادفی ۲۵۶بیتی با SHA-256 ذخیره، expiry و revoke است. scheme اختصاصی Interview در Api فقط یک claim شناسه جلسه صادر می‌کند و CurrentAccountValidation HR را استفاده نمی‌کند. HR policy همچنان JWT معتبر و نقش server-side دارد؛ توکن candidate دسترسی HR ندارد. توکن از Authorization header می‌آید و در URL/log قرار نمی‌گیرد. invite token فقط یک بار در پاسخ HR عرضه می‌شود؛ ارسال پیام دعوت اضافه نشده.
+
+صدای پاسخ و سؤال در storage خصوصی خارج wwwroot ذخیره می‌شود؛ key و signature و حجم enforce می‌شوند و دانلود از endpoint scoped است. cache سازمانی صوت با hash متن normalize/model/voice/speed میان جلسه‌ها reuse می‌شود. TTS ناموفق integrity جلسه را خراب نمی‌کند و متن برمی‌گردد. concurrent cache miss می‌تواند درخواست تکراری ایجاد کند ولی unique cache key یک winner نگه می‌دارد. Local storage برای استقرار تک instance نیازمند volume خصوصی پایدار است.
+
+پاسخ مستقل unique session/question است. processing state و transcript و diagnostics persist می‌شوند. Session lease با expiry و optimistic RowVersion ۱۶بایتی در هر stage نوشته می‌شود؛ stale lease با retry همان پاسخ قابل بازیابی است. worker قبلی پیش از commit بعد از network، lease معتبر را دوباره بررسی می‌کند. transaction طولانی، worker پس‌زمینه یا distributed lock اضافه نشده است. قطع درخواست می‌تواند تا انقضای lease processing بماند؛ current امکان retry را مشخص می‌کند.
+
+AI abstraction در Application، NetArz typed HttpClientFactory و options/timeouts در Infrastructure است؛ key خالی با NetArz در startup رد می‌شود و Disabled فراخوانی خارجی ندارد. LLM advisory است؛ shortlist دقیق همان attempt اعتبارسنجی می‌شود، policy پس از evidence دوباره hard limits/coverage را اعمال می‌کند. invalid JSON/401/429/5xx/timeout → deterministic fallback بدون evidence نامعتبر. خطای STT → retryable همان صوت. score evidence و justification کوتاه قابل مشاهده‌اند؛ hidden reasoning و hiring/rejection خودکار وجود ندارند. هیچ transaction هنگام AI باز نیست و retry خودکار POST خارجی انجام نمی‌شود.
+
+metricها فقط provider/source کم‌تنوع دارند؛ شناسه‌ها فقط در structured log مجاز، بدون transcript/audio/token/key. مدت واقعی صوت بدون decoder تأیید نمی‌شود؛ سقف حجم و مدت کلی server-side هستند و duration client صرفاً محدودیت کمکی است. این محدودیت و سیاست عملیاتی retention/orphan cleanup در INTERVIEWS ثبت شده‌اند.
+
+## ADR-016 — شروع هستهٔ مصاحبه (2026-10-01)
+
+در پاسخ به درخواست مستقل Candidate AI Interview، Domain/Interviews و سرویس policy/validator در Application اضافه شدند؛ تصمیم پیشین درباره موکول‌بودن AI به تسک مستقل اکنون برای این درخواست فعال شده است. معماری Service → IApplicationDbContext و پوشه‌بندی مسئولیتی حفظ می‌شود. مدل جلسه snapshot سؤال/مهارت را مستقل نگه می‌دارد تا جایگزینی سؤال‌های قالب، تاریخچه جواب و evidence را تغییر ندهد. core score/confidence/coverage برابر ۰..۱ و delta برابر -۱..۱ است؛ delta ذخیره‌شده اثر واقعی پس از clamp است. topic با SkillId شناسایی می‌شود.
+
+LLM فقط decision support است؛ shortlist و completion از policy می‌آیند. validation همه assessment را قبل از mutation بررسی می‌کند؛ پاسخ نامعتبر evidence نمی‌سازد و fallback قطعی دارد. evidence فعلاً به مهارت و موضوع همان سؤال محدود می‌شود. prompt نسخه v1 صرفاً شواهد شغلی می‌خواهد و تصمیم استخدام یا hidden reasoning نمی‌خواهد.
+
+این تصمیم فعلاً فقط در Domain/Application پیاده شده است. persistence، schema، candidate auth و token scope، audio storage، NetArz و HTTP endpoints هنوز آماده نیستند. constructorهای مدل‌ها باید هنگام EF integration با materialization سازگار شوند. تمام tenant ownership از Application و identity/token معتبر سرور resolve خواهد شد؛ Guidهای constructor ورودی HTTP قابل اعتماد محسوب نمی‌شوند.
+
 ## تغییر احراز هویت موبایلی (در حال انتقال، 2026-09-27)
 
 تنظیمات ارسال در بخش `Kavenegar` فایل `appsettings.json` تعریف شده‌اند: `ApiKey` و `Template` خالی هستند تا کلید واقعی در Git قرار نگیرد. `UseFixedOtp` در تنظیمات مشترک false است؛ در `appsettings.Development.json` مقدار true و `FixedOtpCode` برابر `123456` است. وقتی فلگ فعال باشد، همان کد شش‌رقمی برای challenge ذخیره می‌شود و هیچ درخواست SMS انجام نمی‌شود. اعتبار پنج دقیقه، محدودیت ۶۰ ثانیه، پنج تلاش و مصرف یک‌باره در هر دو حالت برقرارند. هنگام فعال‌سازی، کد باید دقیقاً شش رقم ASCII باشد و در startup بررسی می‌شود. مقدارهای محیطی همچنان می‌توانند appsettings را override کنند.

@@ -7,6 +7,7 @@ using HireYar.Infrastructure.Members;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using HireYar.Domain.Interviews;
 namespace HireYar.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options), IApplicationDbContext
@@ -18,6 +19,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<OtpChallenge> OtpChallenges => Set<OtpChallenge>();
     public DbSet<TeamInvitation> TeamInvitations => Set<TeamInvitation>();
+    public DbSet<CandidateApplication> CandidateApplications => Set<CandidateApplication>();
+    public DbSet<Skill> Skills => Set<Skill>();
+    public DbSet<PositionSkill> PositionSkills => Set<PositionSkill>();
+    public DbSet<BankQuestion> BankQuestions => Set<BankQuestion>();
+    public DbSet<QuestionAudio> QuestionAudios => Set<QuestionAudio>();
+    public DbSet<InterviewSession> InterviewSessions => Set<InterviewSession>();
+    public DbSet<InterviewAnswer> InterviewAnswers => Set<InterviewAnswer>();
+    public Task ReloadInterviewAsync(InterviewSession session, CancellationToken ct) => Entry(session).ReloadAsync(ct);
+    public void DetachEntity(object entity) => Entry(entity).State = EntityState.Detached;
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -31,7 +41,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
         // and rotate a 128-bit application-managed concurrency token on every write.
         foreach (var entry in ChangeTracker.Entries().Where(e =>
             e.State is EntityState.Added or EntityState.Modified &&
-            (e.Entity is JobPosition || e.Entity is InterviewTemplate)))
+            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is BankQuestion)))
             entry.Property("RowVersion").CurrentValue = Guid.NewGuid().ToByteArray();
         return base.SaveChangesAsync(ct);
     }
