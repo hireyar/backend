@@ -1,5 +1,26 @@
 # وضعیت جاری
 
+اسکریپت دسترسی همکاران برای تست: [Grant-ColleagueTestAccess.sql](../scripts/Grant-ColleagueTestAccess.sql) به سازمان‌های دارای کاربر فعال، پیش‌فرض ۱۰۰ USD اعتبار PromotionalCredit و Advanced یک‌ماهه می‌دهد. اجرای مجدد campaign تکراری شارژ نمی‌کند؛ Advanced فعال موجود حفظ می‌شود، اشتراک متداخل دیگر باعث rollback کامل است. سند پرداخت `InternalTestGrant` صرفاً اعطای غیرنقدی با مبلغ اسمی کاتالوگ است و باید از گزارش درآمد نقدی کنار گذاشته شود. روی DB کاربران اجرا نشده؛ PostgreSQL 18 با سه کاربر مصنوعی/دو سازمان، اجرای تکراری و حفظ موجودی پس از مصرف موفق؛ build صفر warning/error.
+
+## Pricing و Billing — 2026-10-01
+
+برنچ `codex/pricing` از وضعیت پاک با fast-forward به `origin/dev` در `d9d4d72` به‌روز شد؛ مصاحبهٔ موجود نیز در همین برنچ است. پکیج/دوره/feature پویا، snapshot قرارداد خرید، اشتراک صف‌شده بدون از دست‌رفتن زمان، AI wallet/ledger، رزرو حداکثر هزینه، settlement یک‌باره، API عمومی/admin/organization، مرز SystemAdmin و IPaymentGateway پیاده شدند. currency IRT/USD و مدت مالی window محدود سرور مستقل‌اند؛ راهنمای معتبر [BILLING](BILLING.md).
+
+وضعیت: رفتار داخلی مالی با PostgreSQL **Verified**؛ درگاه واقعی و آمادگی پرداخت production **NotImplemented**. runtime provider غیرفعال است؛ pending quote ساخته می‌شود ولی verification برابر 503 و fulfillment مالی انجام نمی‌شود. محصولات اعتبار باید با مقدار و قیمت صریح توسط مدیر ایجاد شوند. فایل‌ها بر اساس retention snapshot از download خارج می‌شوند؛ حذف فیزیکی/backup/volume آماده‌سازی عملیاتی‌اند.
+
+نتیجهٔ واقعی این نوبت:
+
+- `dotnet tool restore` و `dotnet restore HireYar.slnx`: موفق پس از دسترسی به NuGet.Config؛ هیچ package/framework جدید اضافه نشد.
+- `dotnet build HireYar.slnx --no-restore`: موفق، صفر warning/error؛ EF `has-pending-model-changes --no-build`: بدون اختلاف مدل.
+- `dotnet test HireYar.slnx --no-restore` با PostgreSQL 18 واقعی مستقل loopback:55447: **۱۵۱ Passed، صفر Failed، صفر Skipped**؛ TRX: `TestResults/billing-complete.trx`.
+- ۳۳ تست جدید: ۱۰ math case و ۲۳ تست PostgreSQL، شامل callback هم‌زمان، provider transaction تکراری، رزرو race، ledger/tenant constraint، snapshot، expiry، basic capabilities، rounding، retention و provider غیرفعال. تست‌های مصاحبهٔ موجود با خرید/اعتبار آزمایشی صریح ادامه یافتند؛ auto-funding runtime اضافه نشد.
+- migration `20261001080208_AddPricingBilling` تولید شد؛ precision، unique، FK مرکب، Restrict و backfill بررسی شدند. script idempotent در `artifacts/billing-migrations.sql` دو بار روی DB تصادفی مستقل اعمال شد؛ هر دو موفق، کاتالوگ دو پکیج و هشت دوره داشت؛ DB بررسی حذف شد.
+- constraint triggerهای deferred، wallet بدون ledger و رزرو بیش از موجودی را در commit رد می‌کنند. ثبت دورهٔ جدید، ساخت lazy wallet و limiter partition در جریان تست اصلاح شدند. snapshot پکیج در یک statement خوانده می‌شود تا split query قرارداد ترکیبی نسازد.
+
+دیتابیس تصادفی script و تمام دیتابیس‌های fixture حذف شدند؛ count نهایی صفر بود. cluster آزمایشی مستقل همین نوبت متوقف شد. `git diff --check` بدون ایراد whitespace است.
+
+اختلاف با یادداشت audit قبلی بررسی شد: source دریافتی NetArzOptions هنوز ApiKey غیرخالی داشت؛ default این نوبت خالی شد و تست الزام کلید موفق است. هیچ AI یا درگاه واقعی فراخوانی نشد؛ کلید محلی دست‌نخورده است. rotation کلید قبلاً ثبت‌شده در Git همچنان عملیاتی لازم است. push/deploy و تغییر production انجام نشده؛ تغییرات این نوبت commit نشده‌اند. بخش‌های تاریخی پایین مرجع وضعیت Pricing نیستند.
+
 ## audit پیش از staging — 2026-10-01
 
 نتیجه فعلی در [INTERVIEW_AUDIT](INTERVIEW_AUDIT.md): دو نقص مسیر خطا (قطع response stream provider و خواندن cache صوت) اصلاح شدند؛ ApiKey از default فایل تحت Git به تنظیمات محلی ignored منتقل شد و تست الزام کلید موفق است. NetArz فقط در Development local فعال شد؛ endpoint/قرارداد/schema تغییر نکرد. build صفر warning/error؛ **۱۱۸ تست موفق، صفر شکست/Skip** با PostgreSQL 18 واقعی مستقل. EF بدون pending model changes. smoke واقعی TTS → STT → LLM با داده مصنوعی و decision معتبر موفق شد؛ گزارش‌های «NetArz آزمایش نشده» و «تست کلید شکست دارد» پایین تاریخی‌اند. rotation کلید قبلاً ثبت‌شده در Git پیش از staging هنوز تأیید نشده؛ volume/retention/backup عملیاتی باقی‌اند. migration مقصد طبق گفته کاربر قبلاً اجرا شده و در این audit تغییر نکرد.

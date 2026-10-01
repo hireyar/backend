@@ -29,13 +29,13 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
     [HttpGet("api/interviews/{id:guid}/answers/{answerId:guid}/audio")]
     public async Task<IActionResult> AnswerAudio(Guid id, Guid answerId, CancellationToken ct)
     {
-        var s = await service.Scoped(id, ct); var answer = s.Answers.SingleOrDefault(x => x.Id == answerId) ?? throw AppException.NotFound();
+        var s = await service.MediaScopedAsync(id, ct); var answer = s.Answers.SingleOrDefault(x => x.Id == answerId) ?? throw AppException.NotFound();
         return File(await storage.OpenReadAsync(answer.AudioStorageKey, ct), answer.AudioContentType, enableRangeProcessing: true);
     }
     [HttpGet("api/interviews/{id:guid}/questions/{questionId:guid}/audio")]
     public async Task<IActionResult> QuestionAudio(Guid id, Guid questionId, CancellationToken ct)
     {
-        var s = await service.Scoped(id, ct); var q = s.Questions.SingleOrDefault(x => x.QuestionId == questionId) ?? throw AppException.NotFound();
+        var s = await service.MediaScopedAsync(id, ct); var q = s.Questions.SingleOrDefault(x => x.QuestionId == questionId) ?? throw AppException.NotFound();
         var cached = await audio.ResolveAsync(s.OrganizationId, q.Text, false, ct) ?? throw AppException.NotFound();
         return File(await storage.OpenReadAsync(cached.AudioStorageKey, ct), "audio/mpeg", enableRangeProcessing: true);
     }

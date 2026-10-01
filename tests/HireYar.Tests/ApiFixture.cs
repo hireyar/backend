@@ -47,6 +47,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public bool Production { get; init; }
     public bool AutoConfirmEmailOnRegistration { get; init; }
     public bool UseFixedOtp { get; init; }
+    public bool DisabledPayments { get; init; }
+    public FakePaymentGateway PaymentGateway { get; } = new();
     public TestEmail Email { get; } = new(); public TestClock Clock { get; } = new();
     public TestPhoneOtp PhoneOtp { get; } = new();
     public FakeInterviewProvider InterviewAi { get; } = new();
@@ -72,6 +74,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
+            if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }
             s.RemoveAll<IEmailSender>();
             s.AddSingleton<IEmailSender>(Email); s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
             s.RemoveAll<IPhoneOtpSender>(); s.AddSingleton<IPhoneOtpSender>(PhoneOtp);
@@ -98,14 +101,25 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     {
         var browser = Browser(); var address = $"{Guid.NewGuid():N}@example.test"; var password = "Test-" + Guid.NewGuid().ToString("N") + "!aA7";
         var response = await browser.Send(HttpMethod.Post, "/api/auth/register", new RegisterRequest("Test Person", "Test Organization", address, password));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode); var registration = (await response.Content.ReadFromJsonAsync<RegistrationResult>())!;
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode); var registration = (await response.Content.ReadFromJsonAsync<RegistrationResult>(BillingJson.Options))!;
         var confirmation = await browser.Send(HttpMethod.Post, "/api/auth/confirm-email", new TokenRequest(registration.UserId, Email.Token(address))); Assert.Equal(HttpStatusCode.NoContent, confirmation.StatusCode);
         var login = await browser.Send(HttpMethod.Post, "/api/auth/login", new LoginRequest(address, password)); Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        var session = (await login.Content.ReadFromJsonAsync<AccessResponse>())!; browser.AccessToken = session.AccessToken;
+        var session = (await login.Content.ReadFromJsonAsync<AccessResponse>(BillingJson.Options))!; browser.AccessToken = session.AccessToken;
         return new(browser, address, password, registration.UserId);
     }
     public async Task Db(Func<AppDbContext, Task> action) { await using var scope = Services.CreateAsyncScope(); await action(scope.ServiceProvider.GetRequiredService<AppDbContext>()); }
+    public async Task FundInterviewsAsync(Account account)
+    {
+        var pricing = await (await account.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options);
+        var package = pricing!.Packages.Single(x => x.Code == "advanced");
+        var pending = await (await account.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(package.Periods.Single(x => x.Months == 1).Id))).Content.ReadFromJsonAsync<HireYar.Application.Billing.PurchaseResult>(BillingJson.Options);
+        Assert.Equal(HttpStatusCode.OK, (await account.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending!.Payment.Id}/verify")).StatusCode);
+        await using var scope = Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var org = await db.Users.Where(x => x.Id == account.Id).Select(x => x.OrganizationId).SingleAsync();
+        await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 100m, "Synthetic interview test credit"), default);
+    }
 }
+public sealed record PricingResponse(IReadOnlyList<HireYar.Application.Billing.PackageDto> Packages);
 public sealed record Account(Browser Client, string Email, string Password, Guid Id);
 public sealed class Browser(HttpClient client)
 {
@@ -117,7 +131,7 @@ public sealed class Browser(HttpClient client)
     { if (response.Headers.TryGetValues("Set-Cookie", out var values)) foreach (var value in values) { var pair = value.Split(';')[0].Split('=', 2); cookies[pair[0]] = pair[1]; } }
     private HttpRequestMessage Request(HttpMethod method, string url, object? body = null)
     {
-        var request = new HttpRequestMessage(method, url); if (body is not null) request.Content = JsonContent.Create(body);
+        var request = new HttpRequestMessage(method, url); if (body is not null) request.Content = JsonContent.Create(body, options: BillingJson.Options);
         if (AccessToken is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
         request.Headers.TryAddWithoutValidation("Cookie", string.Join("; ", cookies.Select(x => $"{x.Key}={x.Value}"))); return request;
     }
@@ -127,7 +141,7 @@ public sealed class Browser(HttpClient client)
         if (csrf && method != HttpMethod.Get && url.StartsWith("/api/auth", StringComparison.Ordinal))
         {
             using var csrfRequest = Request(HttpMethod.Get, "/api/auth/csrf"); using var response = await client.SendAsync(csrfRequest); Capture(response);
-            var doc = await response.Content.ReadFromJsonAsync<JsonElement>(); token = doc.GetProperty("token").GetString();
+            var doc = await response.Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options); token = doc.GetProperty("token").GetString();
         }
         using var request = Request(method, url, body); if (token is not null) request.Headers.Add("X-CSRF-TOKEN", token); if (origin is not null) request.Headers.Add("Origin", origin);
         var result = await client.SendAsync(request); Capture(result); return result;

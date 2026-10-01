@@ -68,6 +68,7 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.HasKey(x => x.Id); b.HasAlternateKey(x => new { x.OrganizationId, x.Id });
         b.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
         b.Property(x => x.AccessTokenHash).HasMaxLength(64).IsRequired(); b.HasIndex(x => x.AccessTokenHash).IsUnique();
+        b.Property(x => x.RequiredCapabilityCode).HasMaxLength(64);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         b.Property(x => x.CompletionReason).HasConversion<string>().HasMaxLength(30);
         b.Ignore(x => x.AnsweredQuestionCount);
@@ -80,6 +81,7 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.ToTable(t => {
             t.HasCheckConstraint("CK_Interview_Status", "\"Status\" IN ('Created','WaitingForAnswer','ProcessingAnswer','Completed','Cancelled')");
             t.HasCheckConstraint("CK_Interview_Limits", "\"MaxQuestionCount\" BETWEEN 1 AND 30 AND \"MaxDurationSeconds\" BETWEEN 300 AND 3600");
+            t.HasCheckConstraint("CK_Interview_Capability", "\"RequiredCapabilityCode\" IN ('hr_interview','technical_interview')");
         });
         b.HasMany(x => x.Answers).WithOne().HasForeignKey(x => x.InterviewSessionId);
         b.Navigation(x => x.Answers).HasField("answers").UsePropertyAccessMode(PropertyAccessMode.Field);
@@ -112,6 +114,7 @@ public sealed class InterviewAnswerConfiguration : IEntityTypeConfiguration<Inte
         b.ToTable(t => {
             t.HasCheckConstraint("CK_Answer_Status", "\"Status\" IN ('Uploaded','Transcribing','Transcribed','Evaluating','Processed','Failed')");
             t.HasCheckConstraint("CK_Answer_Size", "\"AudioSizeBytes\" > 0");
+            t.HasCheckConstraint("CK_Answer_BillableSeconds", "\"BillableSeconds\" BETWEEN 0 AND 120");
         });
     }
 }

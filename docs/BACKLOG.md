@@ -1,5 +1,18 @@
 # Backlog
 
+پیشرفت HY-404: اسکریپت دستی اعطای Advanced و اعتبار تست همکاران در `scripts/Grant-ColleagueTestAccess.sql` با ledger و idempotency روی PostgreSQL واقعی بررسی شد. اجرای مقصد و provisioning عملیاتی همچنان انجام نشده‌اند؛ این اعطای غیرنقدی با provider داخلی باید از درآمد نقدی مستثنا شود.
+
+## Pricing — نتیجه 2026-10-01
+
+| شناسه | عنوان | وضعیت | شواهد/باقی‌مانده |
+|---|---|---|---|
+| HY-401 | کاتالوگ پویا، snapshot، اشتراک و API billing/admin | Verified | PostgreSQL واقعی، tenant scope، کاتالوگ و snapshot، queued purchase و حداقل مرز SystemAdmin |
+| HY-402 | کیف پول، ledger، رزرو و billing مصاحبه | Verified | race/idempotency/constraint، نرخ و capability snapshot، زمان سرور، cancellation/expiry، retention؛ جزء مجموعهٔ ۱۵۱ تست موفق |
+| HY-403 | adapter پرداخت واقعی | NotImplemented | IPaymentGateway + pending record آماده؛ Disabled runtime. adapter، verification/recovery/reconciliation واقعی و تست sandbox provider لازم‌اند |
+| HY-404 | آماده‌سازی عملیاتی Billing | NotStarted | provisioning مدیر، محصولات اعتبار، اشتراک/اعتبار اولیه، migration مقصد، پایان جلسات legacy، backup/cleanup رسانه و rotation کلید قدیمی |
+
+قواعد و محدودیت‌های پذیرفته‌شده در [BILLING](BILLING.md): اندازه‌گیری window سرور با سقف ۱۲۰ ثانیه هر پاسخ، lazy expiry reservation، وضعیت اشتراک time-derived، قیمت IRT و accounting USD. precision decoder/capture و automation cleanup نیازمند تسک جدا هستند. proration، refund provider، forex، invoice/tax و Angular جزو این درخواست اجرا نشدند. این backlog مجوز push/deploy یا شروع خودکار کار آینده نیست.
+
 audit پیش از staging 2026-10-01: [INTERVIEW_AUDIT](INTERVIEW_AUDIT.md) مرجع نتیجه فعلی است. IOException provider و خطای خواندن cache اصلاح شدند؛ secret default حذف و local settings حفظ شد؛ شکست تست الزام کلید رفع شد. تست کامل ۱۱۸/۱۱۸ با PostgreSQL واقعی و smoke زنده TTS/STT/LLM موفق‌اند. نیاز به smoke اولیه NetArz که در یادداشت قبلی باز بود، اکنون انجام شد؛ آزمون ظرفیت/کیفیت طولانی‌مدت همچنان انجام نشده است. schema/API بدون تغییر و migration تازه لازم نیست. کار باقی‌مانده واقعی: rotation کلید قبلی پیش از staging، secret استقرار خارج Git، volume/retention/orphan cleanup/backup و تنظیم timeout proxy. قابلیت آینده‌ای خودکار فعال یا اضافه نشد.
 
 تحویل فرانت‌اند 2026-10-01: قرارداد و پرامپت اجرای حداقلی در [FRONTEND_INTERVIEWS_HANDOFF](FRONTEND_INTERVIEWS_HANDOFF.md) آماده است. پیاده‌سازی فرانت همچنان در ریپوی خودش انجام می‌شود؛ این مستند تکمیل HY-301 یا مجوز توسعه endpointهای فهرست جدید نیست. کمبود APIهای فهرست در راهنما صریح ثبت شده است.

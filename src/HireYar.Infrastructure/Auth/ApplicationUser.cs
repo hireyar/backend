@@ -8,6 +8,8 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public Guid OrganizationId { get; set; }
     public OrganizationRole Role { get; set; }
     public bool IsActive { get; set; } = true;
+    // Only provisioned by an operator; never accepted from account/profile DTOs.
+    public bool IsSystemAdmin { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
