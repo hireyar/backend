@@ -83,3 +83,9 @@ restore و build موفق؛ build صفر warning/error. تست کل ۲۶ pass، 
 برنچ dev است؛ تغییرات اخیر commit/push/deploy نشده‌اند. `dotnet tool restore` در این محیط به NuGet.Config دسترسی نداشت؛ بررسی EF اجرا نشد. Docker daemon هم Access denied داد. HY-006 و HY-007 باز هستند؛ HY-010 با تصمیم دسترسی عمومی مستندات و تست مستقل بسته شد.
 
 یادداشت اجرای نهایی مصاحبه: یک run با خطای transport اتصال PostgreSQL شکست خورد؛ اجرای مجدد با SSL Mode=Disable و GSS Encryption Mode=Disable صرفاً روی cluster محلی آزمایشی، ۹۴/۹۴ موفق بود. build نهایی صفر warning/error؛ DB تصادفی تست باقی نماند و cluster آزمایشی متوقف شد. اسکریپت idempotent در artifacts/candidate-interview-migrations.sql تولید شد ولی این اسکریپت جداگانه اجرا نشد؛ اعمال migration از fixture واقعی PostgreSQL بررسی شد.
+
+## تنظیمات AI در appsettings — 2026-10-02
+
+روی برنچ `codex/ai-appsettings` از `dev`، بخش `AI` در `src/HireYar.Api/appsettings.json` اضافه شد: Provider=NetArz، BaseUrl، مدل‌های STT/LLM/TTS، voice، speed و سه timeout. binding موجود `AI:NetArz` و انتخاب `AI:Provider` همین تنظیمات را مصرف می‌کنند؛ override محیطی/local همچنان اولویت دارد. ApiKey در محل فعلی و تمام فایل‌های کلید دست‌نخورده ماند؛ کلید تازه در appsettings اضافه یا کپی نشد. یادداشت‌های تاریخی Disabled برای پیش‌فرض مشترک دیگر وضعیت جاری این برنچ نیستند.
+
+Build موفق با صفر warning/error؛ تست‌های InterviewProviderTests و InterviewAudioTests: ۴۳ موفق، صفر شکست/Skip. تست کلید خالی اکنون مقدار خالی را صریحاً فقط در fixture خود می‌دهد تا وابسته به default فعلی نباشد. تماس واقعی AI، تست PostgreSQL، migration، commit، push و deploy انجام نشدند.

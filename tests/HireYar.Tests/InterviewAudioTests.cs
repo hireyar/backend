@@ -61,7 +61,9 @@ public sealed class InterviewAudioTests
     [Fact]
     public void Enabled_provider_requires_key_and_valid_timeouts()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["AI:Provider"] = "NetArz" }).Build();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+            ["AI:Provider"] = "NetArz", ["AI:NetArz:ApiKey"] = ""
+        }).Build();
         var services = new ServiceCollection(); services.AddLogging(); services.AddInterviews(configuration);
         using var provider = services.BuildServiceProvider();
         Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<NetArzOptions>>().Value);
