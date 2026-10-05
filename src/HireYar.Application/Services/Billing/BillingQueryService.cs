@@ -9,7 +9,7 @@ public sealed class BillingQueryService(IApplicationDbContext db, ISubscriptionE
     {
         if (!await db.Organizations.AnyAsync(x => x.Id == org, ct)) throw AppException.NotFound();
         var current = await entitlements.CurrentAsync(org, ct); var now = time.GetUtcNow();
-        var scheduled = await db.OrganizationSubscriptions.AsNoTracking().Where(x => x.OrganizationId == org && x.StartedAtUtc > now && x.Status == SubscriptionStatus.Scheduled)
+        var scheduled = await db.OrganizationSubscriptions.AsNoTracking().Where(x => x.OrganizationId == org && x.StartedAtUtc > now && x.Status == SubscriptionStatus.Scheduled && !db.SubscriptionReplacements.Any(r => r.OrganizationId == org && r.SubscriptionId == x.Id))
             .OrderBy(x => x.StartedAtUtc).Take(100).ToListAsync(ct);
         var paymentIds = scheduled.Select(x => x.PaymentId).ToArray();
         var purchases = await db.SubscriptionPurchases.AsNoTracking().Include(x => x.Entitlements).Where(x => x.OrganizationId == org && paymentIds.Contains(x.PaymentId)).ToDictionaryAsync(x => x.PaymentId, ct);

@@ -72,8 +72,8 @@ public sealed class BillingTests(ApiFixture f)
     public async Task Catalog_seed_prices_and_features_are_exact()
     {
         var basic = await SeedPackage("basic"); var advanced = await SeedPackage("advanced");
-        Assert.Equal(new decimal[] { 3000000, 8100000, 15300000, 28800000 }, basic.Periods.Select(x => x.Price));
-        Assert.Equal(new decimal[] { 4500000, 12150000, 22950000, 43200000 }, advanced.Periods.Select(x => x.Price));
+        Assert.Equal(new decimal[] { 3000000, 8550000, 16200000, 28800000 }, basic.Periods.Select(x => x.Price));
+        Assert.Equal(new decimal[] { 4500000, 12825000, 24300000, 43200000 }, advanced.Periods.Select(x => x.Price));
         Assert.Equal(0.03m, basic.AiPricePerMinuteUsd); Assert.Equal(0.05m, advanced.AiPricePerMinuteUsd);
         Assert.Equal(30, basic.RetentionDays); Assert.Equal(60, advanced.RetentionDays);
         Assert.DoesNotContain(basic.Features, x => x.Code == "technical_interview"); Assert.Contains(advanced.Features, x => x.Code == "technical_interview");

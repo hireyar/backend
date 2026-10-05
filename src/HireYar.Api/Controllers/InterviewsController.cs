@@ -5,8 +5,20 @@ using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Authorize(Roles = "Owner,Recruiter")]
-public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio) : ControllerBase
+public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel) : ControllerBase
 {
+    [HttpGet("api/interviews")]
+    public Task<Page<PanelInterviewDto>> List([FromQuery] InterviewListQuery query, CancellationToken ct) => panel.ListAsync(query, ct);
+    [HttpPost("api/interviews/{id:guid}/resend")]
+    public Task<PanelInvitationResult> Resend(Guid id, ResendInterviewRequest r, CancellationToken ct) => panel.ResendAsync(id, r, ct);
+    [HttpPost("api/interviews/{id:guid}/cancel")]
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken ct) { await service.RevokeAsync(id, ct); return NoContent(); }
+    [HttpGet("api/interviews/{id:guid}/resume")]
+    public async Task<IActionResult> Resume(Guid id, CancellationToken ct)
+    {
+        var result = await panel.ResumeAsync(id, ct);
+        return File(result.Content, result.ContentType, "resume" + result.Extension);
+    }
     [HttpPost("api/job-positions/{positionId:guid}/applications")]
     public async Task<IActionResult> CreateApplication(Guid positionId, CandidateApplicationRequest r, CancellationToken ct) => Ok(new { id = await service.CreateApplicationAsync(positionId, r, ct) });
     [HttpPost("api/skills")]

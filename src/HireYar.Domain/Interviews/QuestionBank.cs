@@ -10,6 +10,9 @@ public sealed class CandidateApplication
     public string LastName { get; set; } = "";
     public string Email { get; set; } = "";
     public string? Phone { get; set; }
+    public string? ResumeStorageKey { get; set; }
+    public string? ResumeContentType { get; set; }
+    public string? ResumeExtension { get; set; }
     public CandidateApplicationStatus Status { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }

@@ -7,6 +7,9 @@ public sealed class InterviewTemplate
     public Guid JobPositionId { get; set; }
     public string Title { get; set; } = "";
     public string Language { get; set; } = "fa-IR";
+    public string InterviewType { get; set; } = "general";
+    public string WelcomeMessage { get; set; } = "به مصاحبه خوش آمدید.";
+    public string GoodbyeMessage { get; set; } = "از وقتی که گذاشتید متشکریم.";
     public int DurationMinutes { get; set; }
     public int MaxFollowUpQuestionsPerQuestion { get; set; }
     public bool IsArchived { get; set; }

@@ -1,4 +1,5 @@
 using HireYar.Application.Billing;
+using HireYar.Domain.Billing;
 using HireYar.Infrastructure.Billing;
 using HireYar.Infrastructure.Interviews;
 using HireYar.Application.Auth;
@@ -39,6 +40,9 @@ public static class DependencyInjection
         services.AddOptions<SmtpOptions>().Bind(config.GetSection("Smtp")).Validate(s => !string.IsNullOrWhiteSpace(s.Host) && s.Port is > 0 and <= 65535 && System.Net.Mail.MailAddress.TryCreate(s.From, out _), "Smtp Host, Port and From are required.").ValidateOnStart();
         services.AddScoped<IEmailSender, SmtpEmailSender>(); services.AddScoped<IAccounts, Accounts>(); services.AddScoped<ITeamMembers, TeamMembers>();
         services.AddScoped<PricingService>(); services.AddScoped<WalletService>(); services.AddScoped<PaymentService>();
+        services.AddOptions<BillingPanelOptions>().Bind(config.GetSection("BillingPanel"))
+            .Validate(x => x.SubscriptionTaxPercent is >= 0 and <= 100 && BillingMath.HasPrecision(x.SubscriptionTaxPercent, 2), "BillingPanel tax percent must be between 0 and 100 with at most two decimals.").ValidateOnStart();
+        services.AddScoped<BillingPanelService>();
         services.AddScoped<ISubscriptionEntitlementService, SubscriptionEntitlementService>(); services.AddScoped<InterviewBillingService>(); services.AddScoped<BillingQueryService>();
         services.AddSingleton<IPaymentGateway, DisabledPaymentGateway>();
         services.AddSingleton(TimeProvider.System); services.AddInterviews(config); return services;

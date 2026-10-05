@@ -19,7 +19,8 @@ public sealed record InterviewProgress(int AnsweredQuestions, int MaxQuestions, 
 public sealed record CandidateQuestionDto(Guid Id, string Text, string? AudioUrl, bool AudioAvailable);
 public sealed record CandidateAnswerDto(Guid Id, Guid QuestionId, string Status, bool CanRetry, string? ErrorCode);
 public sealed record CandidateInterviewDto(Guid InterviewId, string Status, bool CanRecord, bool IsProcessing,
-    CandidateQuestionDto? Question, InterviewProgress Progress, CandidateAnswerDto? Answer, string? CompletionReason);
+    CandidateQuestionDto? Question, InterviewProgress Progress, CandidateAnswerDto? Answer, string? CompletionReason,
+    string? WelcomeMessage = null, string? GoodbyeMessage = null);
 public sealed record HrAnswerDto(Guid Id, Guid QuestionId, string Status, string? Transcript, string? SelectionSource,
     string? FailureStage, string? FailureCode, string AudioUrl);
 public sealed record HrQuestionDto(Guid Id, Guid SkillId, string Text, string Topic, int Difficulty);

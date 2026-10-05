@@ -6,8 +6,14 @@ using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Route("api/billing"), Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Owner,Recruiter")]
-public sealed class BillingController(ICurrentUser user, BillingQueryService query, WalletService wallet, PaymentService payments) : ControllerBase
+public sealed class BillingController(ICurrentUser user, BillingQueryService query, WalletService wallet, PaymentService payments, BillingPanelService panel) : ControllerBase
 {
+    [HttpGet("panel")] public Task<BillingPanelDto> Panel(CancellationToken ct) => panel.OverviewAsync(user.OrganizationId, User.IsInRole("Owner"), ct);
+    [HttpPost("subscription/quote")] public Task<CheckoutSummaryDto> Quote(SubscriptionQuoteRequest r, CancellationToken ct) => panel.QuoteAsync(user.OrganizationId, r, ct);
+    [HttpPost("subscription/checkout"), Authorize(Roles = "Owner")]
+    public Task<PanelCheckoutResult> Checkout(SubscriptionQuoteRequest r, CancellationToken ct) => payments.PurchasePanelSubscriptionAsync(user.OrganizationId, r, ct);
+    [HttpGet("financial-history")] public Task<FinancialHistoryDto> FinancialHistory([FromQuery] FinancialHistoryQuery r, CancellationToken ct) => panel.HistoryAsync(user.OrganizationId, r, ct);
+    [HttpGet("payments/{id:guid}/invoice")] public Task<InvoiceDto> Invoice(Guid id, CancellationToken ct) => panel.InvoiceAsync(user.OrganizationId, id, ct);
     [HttpGet("subscription")] public Task<SubscriptionOverviewDto> Subscription(CancellationToken ct) => query.SubscriptionsAsync(user.OrganizationId, ct);
     [HttpGet("ai-credit")] public Task<WalletDto> Credit(CancellationToken ct) => wallet.GetAsync(user.OrganizationId, ct);
     [HttpGet("ai-credit/transactions")] public Task<Page<TransactionDto>> Transactions([FromQuery] PageQuery page, CancellationToken ct) => query.TransactionsAsync(user.OrganizationId, page, ct);

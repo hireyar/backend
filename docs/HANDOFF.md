@@ -1,3 +1,23 @@
+# تحویل اشتراک و اعتبار — 2026-10-05
+
+برنچ `codex/subscription-credit-panel` از `panel-wizard` طبق درخواست کاربر و Git پاک ساخته شد؛ تغییرات این نوبت commit نشده‌اند. [SUBSCRIPTION_CREDIT_API](SUBSCRIPTION_CREDIT_API.md) را به فرانت بدهید؛ overview یکپارچه تب وضعیت/اعتبار، کاتالوگ موجود، preview quote و سپس checkout با quoteFingerprint، financial-history با totals تمام بازه و invoice JSON پوشش داده می‌شوند. Role/tenant scope و عنوان فارسی Swagger حفظ‌اند. اشتراک پنل قبلی درخواست مستقل تازه دارد؛ متن تاریخی پایین درباره دست‌نخوردن Billing دیگر محدوده نوبت جاری نیست.
+
+ارتقا با فرض کاری شروع دوره جدید و کسر ارزش روزهای کامل باقی‌مانده، با snapshot اعتبار/tax و رکورد SubscriptionReplacement مستقل انجام می‌شود. old subscription/purchase immutable و billing جلسه قبلاً شروع‌شده وابسته به قرارداد خودش باقی است. قفل سازمان، unique source/payment، FK مرکب و trigger effective overlap و fulfillment در commit برقرارند. صف آینده/پرداخت Pending مانع upgrade و pending upgrade مانع خرید اشتراک دیگری از مسیر قدیمی هم می‌شود؛ recovery پرداخت نامعلوم لازم است، expiry نمایشی آن را خودکار آزاد نمی‌کند.
+
+Migration `20261005133142_AddSubscriptionCreditPanel` در مقصد لازم است؛ فقط DBهای تصادفی این نوبت تغییر کردند. old quote/payment تغییر مبلغ یا tax ندارد؛ قیمت seed ویرایش‌شده مدیر محفوظ و seedهای دست‌نخورده با discount ۵/۱۰٪ تطبیق یافته‌اند. tax پنل `BillingPanel__SubscriptionTaxPercent` پیش‌فرض ۱۰٪، قابل تنظیم است؛ tax جدید فقط checkout پنل اعمال می‌شود. سوابق PaidAtUtc و ledger مصرف دارند، credit purchase دوباره شمرده نمی‌شود، grant غیرنقدی درآمد/فاکتور نقدی نیست و ارزها جمع نمی‌شوند.
+
+بررسی: restore/tool restore موفق، build صفر warning/error؛ ۱۶۱/۱۶۱ تست موفق PostgreSQL 18 مستقل localhost:55453، صفر Skip، شش تست تازه پنل؛ `TestResults/subscription-credit-final.trx`. EF بدون drift؛ script idempotent دو بار روی baseline قبلی با خرید/اشتراک مصنوعی و قیمت سفارشی مدیر موفق بود. DBهای تصادفی حذف و cluster پس از بررسی متوقف شد. مقدار duration همان window مالی server است، نه audio decoded. runtime gateway Disabled است، quote/read فعال و checkout جدید 503؛ adapter/PDF فاکتور/Angular اضافه نشده‌اند. هیچ پرداخت/AI واقعی، commit، push، deploy یا تغییر production انجام نشده است.
+
+# تحویل پنل ویزاردی — 2026-10-05
+
+برنچ `dev`، Git شروع پاک؛ تغییرات این نوبت commit نشده‌اند. [PANEL_WIZARD_API](PANEL_WIZARD_API.md) را به فرانت بدهید؛ ورودی مرحله ۱ فقط عنوان/شرح، مرحله ۲ فقط قالب متنی با ۵..۳۰ سؤال/نوع/پیام‌ها، مرحله ۳ multipart اطلاعات کارجو/رزومه/نوع واقعی دعوت است. برگشت مراحل با state فرانت و شناسه‌های ثبت‌شده؛ draft سروری اضافه نشده. سرویس جدید PanelWizardService از EF abstraction استفاده می‌کند و سؤال/مهارت snapshot محلی موتور موجود را می‌سازد؛ APIهای قدیمی حفظ‌اند و Repository جدید نیست.
+
+Migration `20261005130515_AddPanelWizard` قبل از استفاده در مقصد لازم است؛ در این نوبت فقط DBهای تصادفی تست تغییر کردند. volume خصوصی storage موجود باید resumes را هم نگه دارد. download فقط HR سازمان جاری است و نام اصلی کاربر حفظ نمی‌شود. انتخاب قالب سازمان برای موقعیت دیگر کپی می‌سازد، دعوت/کارجو/کپی در یک SaveChanges اتمیک‌اند. نوع عمومی/تخصصی از فرم دعوت با قابلیت قرارداد فعلی کنترل می‌شود؛ billing تغییر ندارد. resend فقط دعوت شروع‌نشده و غیرلغوشده است و token قبلی را با optimistic concurrency باطل می‌کند.
+
+نتیجه نهایی: build صفر warning/error؛ ۱۵۵/۱۵۵ تست موفق، صفر Skip روی PostgreSQL 18 مستقل localhost:55451، provider جعلی و داده مصنوعی؛ `TestResults/panel-wizard-final.trx`. EF بدون drift؛ script idempotent روی baseline Pricing با قالب مصنوعی قدیمی دو بار موفق و backfill صحیح بود. تست DBهای تصادفی حذف و cluster پس از بررسی متوقف شد. tool restore ابتدا دسترسی NuGet.Config و سپس feed 401 داشت؛ restore پروژه موفق و EF با config موقت منبع عمومی بازیابی شد، وابستگی/نسخه جدید اضافه نشد.
+
+delivery ایمیل/SMS=NotConfigured و videoAvailable=false؛ UI فقط ساخت دعوت را موفق نمایش دهد، ارسال پیام/ویدیو را ادعا نکند. score بدون evidence=null؛ گزارش تصمیم انسانی است. subscription/wallet/pricing و settings حساب/مدت سازمانی دست‌نخورده‌اند. Angular در این ریپو نیست. هیچ پیام واقعی/AI واقعی/commit/push/deploy یا تغییر production انجام نشده. یادداشت‌های تاریخی بعدی مرجع محدودیت API جدید ویزارد نیستند.
+
 # ادامه کار
 
 برای دسترسی موقت همکاران، فایل کامل [Grant-ColleagueTestAccess.sql](../scripts/Grant-ColleagueTestAccess.sql) پس از migration Pricing اجرا شود: اعتبار قابل تغییر ۱۰۰ USD، Advanced یک‌ماهه، هر سازمان یک بار برای campaign. `InternalTestGrant` اعطای غیرنقدی با مبلغ اسمی است؛ پرداخت درگاه/درآمد نقدی محسوب نشود. اشتراک Advanced موجود استفاده می‌شود؛ اشتراک دیگر متداخل rollback می‌کند. روی مقصد اجرا نشده؛ تست PostgreSQL واقعی اولیه، تکرار و پس از مصرف موفق بود، DB مصنوعی حذف و cluster متوقف شد؛ build موفق.

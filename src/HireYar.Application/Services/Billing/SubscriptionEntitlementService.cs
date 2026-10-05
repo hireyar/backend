@@ -9,7 +9,8 @@ public sealed class SubscriptionEntitlementService(IApplicationDbContext db, Tim
     {
         var now = time.GetUtcNow();
         var s = await db.OrganizationSubscriptions.AsNoTracking().Where(x => x.OrganizationId == organizationId &&
-            (x.Status == SubscriptionStatus.Active || x.Status == SubscriptionStatus.Scheduled) && x.StartedAtUtc <= now && x.ExpiresAtUtc > now)
+            (x.Status == SubscriptionStatus.Active || x.Status == SubscriptionStatus.Scheduled) && x.StartedAtUtc <= now && x.ExpiresAtUtc > now &&
+            !db.SubscriptionReplacements.Any(r => r.OrganizationId == organizationId && r.SubscriptionId == x.Id && r.EndedAtUtc <= now))
             .OrderBy(x => x.StartedAtUtc).FirstOrDefaultAsync(ct);
         return s is null ? null : await MapAsync(s, "Active", ct);
     }

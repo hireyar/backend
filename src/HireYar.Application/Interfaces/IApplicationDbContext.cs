@@ -17,6 +17,7 @@ public interface IApplicationDbContext
     DbSet<HireYar.Domain.Billing.Payment> Payments { get; }
     DbSet<HireYar.Domain.Billing.SubscriptionPurchase> SubscriptionPurchases { get; }
     DbSet<HireYar.Domain.Billing.OrganizationSubscription> OrganizationSubscriptions { get; }
+    DbSet<HireYar.Domain.Billing.SubscriptionReplacement> SubscriptionReplacements { get; }
     DbSet<HireYar.Domain.Billing.OrganizationAiWallet> OrganizationAiWallets { get; }
     DbSet<HireYar.Domain.Billing.AiCreditTransaction> AiCreditTransactions { get; }
     DbSet<HireYar.Domain.Billing.AiCreditReservation> AiCreditReservations { get; }

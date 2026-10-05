@@ -29,5 +29,7 @@ public sealed record TemplateRequest(Guid JobPositionId,
 public sealed record UpdateTemplateRequest([Required] TemplateRequest Template,
     [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
 public sealed record QuestionDto(Guid Id, string Text, int Order, string Competency, string EvaluationGuidance);
-public sealed record TemplateDto(Guid Id, Guid JobPositionId, string Title, string Language, int DurationMinutes, int MaxFollowUpQuestionsPerQuestion, bool IsArchived, byte[] RowVersion, IReadOnlyList<QuestionDto> Questions);
-public sealed record TemplateListDto(Guid Id, Guid JobPositionId, string Title, string Language, int DurationMinutes, bool IsArchived, byte[] RowVersion);
+public sealed record TemplateDto(Guid Id, Guid JobPositionId, string Title, string Language, int DurationMinutes, int MaxFollowUpQuestionsPerQuestion, bool IsArchived, byte[] RowVersion, IReadOnlyList<QuestionDto> Questions,
+    string InterviewType = "general", string WelcomeMessage = "", string GoodbyeMessage = "");
+public sealed record TemplateListDto(Guid Id, Guid JobPositionId, string Title, string Language, int DurationMinutes, bool IsArchived, byte[] RowVersion,
+    string InterviewType = "general", int QuestionCount = 0);

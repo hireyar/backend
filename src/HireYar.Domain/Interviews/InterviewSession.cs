@@ -21,6 +21,26 @@ public sealed class InterviewSession
     public DateTimeOffset? CompletedAtUtc { get; private set; }
     public Guid? CurrentQuestionId { get; private set; }
     public string RequiredCapabilityCode { get; private set; } = "technical_interview";
+    public string? PositionTitleSnapshot { get; private set; }
+    public string? PositionDescriptionSnapshot { get; private set; }
+    public string? TemplateTitleSnapshot { get; private set; }
+    public string? WelcomeMessage { get; private set; }
+    public string? GoodbyeMessage { get; private set; }
+    public void SetPanelSnapshot(string title, string description, string templateTitle, string welcome, string goodbye)
+    {
+        InterviewRules.Require(Status == InterviewStatus.Created, "interview_already_started");
+        PositionTitleSnapshot = InterviewRules.Text(title, 200);
+        PositionDescriptionSnapshot = InterviewRules.Text(description, 10000);
+        TemplateTitleSnapshot = InterviewRules.Text(templateTitle, 200);
+        WelcomeMessage = InterviewRules.Text(welcome, 2000);
+        GoodbyeMessage = InterviewRules.Text(goodbye, 2000);
+    }
+    public void RenewInvitation(string hash, DateTimeOffset now, DateTimeOffset expires)
+    {
+        CheckTime(now); InterviewRules.Utc(expires);
+        InterviewRules.Require(Status == InterviewStatus.Created && AccessRevokedAtUtc is null && expires > now, "invitation_not_resendable");
+        SetAccessTokenHash(hash); CreatedAtUtc = now; ExpiresAtUtc = expires;
+    }
     public DateTimeOffset? QuestionReadyAtUtc { get; private set; }
     public void SetRequiredCapability(string code)
     {
