@@ -1,5 +1,15 @@
 # معماری و تصمیم‌ها
 
+## ADR-020 — اشتراک و اعتبار پنل و ارتقای روزشمار (2026-10-05)
+
+درخواست مستقل `subscription_credit.html` روی برنچ مشتق از panel-wizard اجرا شد. APIهای panel، quote/checkout، financial-history و invoice داده چهار تب را می‌دهند؛ Controller → Application Service → EF abstraction و SQL فقط Infrastructure باقی‌اند. کاتالوگ پویا و feature-based است؛ ارتقا با حفظ تمام قابلیت‌ها و افزایش امکانات/محدودیت/retention تشخیص داده می‌شود، نام پکیج شرط runtime نیست. قیمت دوره قبلی final بعد از discount است؛ tax تنظیمی پیش‌فرض ۱۰٪ فقط checkout جدید و بر خالص پس از credit اعمال می‌شود. fingerprint محاسبه سرور تغییر قیمت/صف/اعتبار/tax بین preview و checkout را 409 می‌کند؛ داده مالی از client authoritative نیست.
+
+فرض کاری ارتقا: شروع دوره کامل جدید در verification و کسر ارزش روزهای کامل باقی‌مانده snapshot خالص قرارداد قبلی، floor تومان و بدون بازپرداخت نقدی. اعتبار غیرنقدی InternalTestGrant به اعتبار روزشمار تبدیل نمی‌شود. صف اشتراک/پرداخت Pending پیش از ارتقا باید تعیین تکلیف شود؛ pending upgrade مانع checkout اشتراک دیگر از هر دو مسیر جدید و قدیمی است. انقضای نمایشی به معنی تأیید عدم پرداخت نیست. callback/verify معتبر همان quote ثابت را fulfill می‌کند؛ pendingهای نامعلوم recovery درگاه می‌خواهند.
+
+OrganizationSubscription و SubscriptionPurchase قبلی همچنان immutable‌اند. SubscriptionReplacement رکورد append-only با FK مرکب سازمان، unique source/payment و زمان قطع دسترسی مؤثر است؛ trigger، payment Paid و quote جایگزین را بررسی و وجود اشتراک جدید را در commit enforce می‌کند. trigger هم‌پوشانی از effective end (کمینه expiry و replacement) استفاده می‌کند. Current entitlement رکورد پایان‌یافته را حذف می‌کند؛ billing جلسات شروع‌شده همچنان purchase اصلی را می‌خواند. قفل سازمان، transaction کوتاه و عدم network داخل transaction حفظ‌اند.
+
+گزارش مالی یک projection SQL از پرداخت Paid نقدی و ledger بدون duplicate CreditPurchase است؛ زمان payment=PaidAtUtc، مصرف=تسویه ledger، مجموع‌ها پیش از page و ارزها مستقل‌اند. InternalTestGrant درآمد نقدی نیست؛ adjustment/هدیه در category مستقل تراکنش می‌ماند. کارت اعتبار زمان را از AvailableCredit و rate قرارداد جاری تخمین می‌زند؛ بدون قرارداد rate/time=null. BillableSeconds محدود سرور ثابت ماند و decoded audio ادعا نمی‌شود. Invoice داده JSON از snapshot است؛ PDF یا adapter پرداخت واقعی اضافه نشده. مسیرهای قبلی compatible و Swagger فارسی باقی‌اند.
+
 ## ADR-019 — قرارداد ساده ویزارد پنل (2026-10-05)
 
 براساس HTML ارسالی و درخواست مستقل کاربر، مسیرهای `api/panel-wizard` ورودی ساده موقعیت، قالب متنی و دعوت multipart دارند؛ مسیرهای قدیمی سازگار باقی‌اند. Service → IApplicationDbContext حفظ شده، Repository/MediatR یا persistence draft اضافه نشده. فرانت شناسه و داده مراحل را نگه می‌دارد. بانک UI همان مجموعه سؤال‌های قالب است؛ HR نیازی به تعریف مهارت یا بانک موقعیت ندارد. موتور موجود با یک مهارت snapshot محلی «ارزیابی شغلی» کار می‌کند؛ سؤال/ترتیب/شرح شغل/پیام‌های قالب در صدور دعوت ثابت‌اند. نوع دعوت مستقل از نوع پیشنهادی قالب، با entitlement موجود بررسی می‌شود؛ Billing تغییری ندارد.

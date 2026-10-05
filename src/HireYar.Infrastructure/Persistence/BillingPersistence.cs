@@ -23,7 +23,7 @@ public sealed partial class AppDbContext
         foreach (var entry in ChangeTracker.Entries())
         {
             if (entry.State is not (EntityState.Modified or EntityState.Deleted)) continue;
-            if (entry.Entity is AiCreditTransaction or SubscriptionPurchase or SubscriptionEntitlement or OrganizationSubscription)
+            if (entry.Entity is AiCreditTransaction or SubscriptionPurchase or SubscriptionEntitlement or OrganizationSubscription or SubscriptionReplacement)
                 throw new InvalidOperationException("Financial history is immutable.");
             if (entry.Entity is Payment)
             {

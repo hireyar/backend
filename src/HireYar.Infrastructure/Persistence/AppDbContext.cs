@@ -38,6 +38,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<SubscriptionPurchase> SubscriptionPurchases => Set<SubscriptionPurchase>();
     public DbSet<OrganizationSubscription> OrganizationSubscriptions => Set<OrganizationSubscription>();
+    public DbSet<SubscriptionReplacement> SubscriptionReplacements => Set<SubscriptionReplacement>();
     public DbSet<OrganizationAiWallet> OrganizationAiWallets => Set<OrganizationAiWallet>();
     public DbSet<AiCreditTransaction> AiCreditTransactions => Set<AiCreditTransaction>();
     public DbSet<AiCreditReservation> AiCreditReservations => Set<AiCreditReservation>();

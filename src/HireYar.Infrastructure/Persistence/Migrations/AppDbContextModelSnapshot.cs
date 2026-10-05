@@ -505,6 +505,18 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<decimal?>("SubtotalAmountSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<decimal?>("TaxAmountSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<decimal?>("TaxPercentSnapshot")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -526,6 +538,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Payments", t =>
                         {
+                            t.HasCheckConstraint("CK_Payment_Tax", "(\"SubtotalAmountSnapshot\" IS NULL AND \"TaxAmountSnapshot\" IS NULL AND \"TaxPercentSnapshot\" IS NULL) OR (\"SubtotalAmountSnapshot\" IS NOT NULL AND \"TaxAmountSnapshot\" IS NOT NULL AND \"TaxPercentSnapshot\" IS NOT NULL AND \"SubtotalAmountSnapshot\" > 0 AND \"TaxAmountSnapshot\" >= 0 AND \"TaxPercentSnapshot\" BETWEEN 0 AND 100 AND \"Amount\" = \"SubtotalAmountSnapshot\" + \"TaxAmountSnapshot\")");
+
                             t.HasCheckConstraint("CK_Payment_Values", "\"Amount\" > 0 AND \"Currency\" = 'IRT' AND \"Status\" IN ('Pending','Paid','Failed','Cancelled','Expired') AND \"Type\" IN ('Subscription','AiCredit') AND (\"Type\" <> 'AiCredit' OR (\"CreditPackageId\" IS NOT NULL AND \"CreditAmountUsdSnapshot\" > 0 AND \"EffectiveUsdToIrtSnapshot\" > 0)) AND (\"Status\" <> 'Paid' OR (\"PaidAtUtc\" IS NOT NULL AND \"ProviderTransactionId\" IS NOT NULL))");
                         });
                 });
@@ -635,12 +649,25 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<decimal?>("DiscountAmountSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
                     b.Property<decimal>("DiscountPercentSnapshot")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("OriginalAmountSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
 
                     b.Property<string>("PackageCodeSnapshot")
                         .IsRequired()
@@ -668,6 +695,13 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasPrecision(18)
                         .HasColumnType("numeric(18,0)");
 
+                    b.Property<decimal>("ProratedCreditAmountSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<Guid?>("ReplacesSubscriptionId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("RetentionDaysSnapshot")
                         .HasColumnType("integer");
 
@@ -680,14 +714,58 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "PaymentId");
 
+                    b.HasIndex("OrganizationId", "ReplacesSubscriptionId");
+
                     b.HasIndex("PackageId", "PackagePeriodId");
 
                     b.HasIndex("OrganizationId", "CreatedAtUtc", "Id");
 
                     b.ToTable("SubscriptionPurchases", t =>
                         {
+                            t.HasCheckConstraint("CK_Purchase_Operation", "\"Operation\" IN ('purchase','renewal','upgrade') AND \"ProratedCreditAmountSnapshot\" BETWEEN 0 AND \"PriceAmountSnapshot\" AND ((\"Operation\" = 'upgrade' AND \"ReplacesSubscriptionId\" IS NOT NULL) OR (\"Operation\" <> 'upgrade' AND \"ReplacesSubscriptionId\" IS NULL AND \"ProratedCreditAmountSnapshot\" = 0))");
+
                             t.HasCheckConstraint("CK_Purchase_Values", "\"PeriodMonthsSnapshot\" BETWEEN 1 AND 120 AND \"PriceAmountSnapshot\" > 0 AND \"CurrencySnapshot\" = 'IRT' AND \"AiPricePerMinuteUsdSnapshot\" > 0 AND \"RetentionDaysSnapshot\" > 0");
                         });
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.SubscriptionReplacement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("EndedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("SubscriptionId")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "PaymentId");
+
+                    b.HasIndex("OrganizationId", "SubscriptionId");
+
+                    b.HasIndex("OrganizationId", "CreatedAtUtc", "Id");
+
+                    b.ToTable("SubscriptionReplacements");
                 });
 
             modelBuilder.Entity("HireYar.Domain.InterviewTemplates.InterviewQuestion", b =>
@@ -1997,10 +2075,39 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HireYar.Domain.Billing.OrganizationSubscription", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ReplacesSubscriptionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("HireYar.Domain.Billing.PackagePeriod", null)
                         .WithMany()
                         .HasForeignKey("PackageId", "PackagePeriodId")
                         .HasPrincipalKey("PackageId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.SubscriptionReplacement", b =>
+                {
+                    b.HasOne("HireYar.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Billing.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "PaymentId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Billing.OrganizationSubscription", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "SubscriptionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

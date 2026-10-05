@@ -1,3 +1,13 @@
+# تحویل اشتراک و اعتبار — 2026-10-05
+
+برنچ `codex/subscription-credit-panel` از `panel-wizard` طبق درخواست کاربر و Git پاک ساخته شد؛ تغییرات این نوبت commit نشده‌اند. [SUBSCRIPTION_CREDIT_API](SUBSCRIPTION_CREDIT_API.md) را به فرانت بدهید؛ overview یکپارچه تب وضعیت/اعتبار، کاتالوگ موجود، preview quote و سپس checkout با quoteFingerprint، financial-history با totals تمام بازه و invoice JSON پوشش داده می‌شوند. Role/tenant scope و عنوان فارسی Swagger حفظ‌اند. اشتراک پنل قبلی درخواست مستقل تازه دارد؛ متن تاریخی پایین درباره دست‌نخوردن Billing دیگر محدوده نوبت جاری نیست.
+
+ارتقا با فرض کاری شروع دوره جدید و کسر ارزش روزهای کامل باقی‌مانده، با snapshot اعتبار/tax و رکورد SubscriptionReplacement مستقل انجام می‌شود. old subscription/purchase immutable و billing جلسه قبلاً شروع‌شده وابسته به قرارداد خودش باقی است. قفل سازمان، unique source/payment، FK مرکب و trigger effective overlap و fulfillment در commit برقرارند. صف آینده/پرداخت Pending مانع upgrade و pending upgrade مانع خرید اشتراک دیگری از مسیر قدیمی هم می‌شود؛ recovery پرداخت نامعلوم لازم است، expiry نمایشی آن را خودکار آزاد نمی‌کند.
+
+Migration `20261005133142_AddSubscriptionCreditPanel` در مقصد لازم است؛ فقط DBهای تصادفی این نوبت تغییر کردند. old quote/payment تغییر مبلغ یا tax ندارد؛ قیمت seed ویرایش‌شده مدیر محفوظ و seedهای دست‌نخورده با discount ۵/۱۰٪ تطبیق یافته‌اند. tax پنل `BillingPanel__SubscriptionTaxPercent` پیش‌فرض ۱۰٪، قابل تنظیم است؛ tax جدید فقط checkout پنل اعمال می‌شود. سوابق PaidAtUtc و ledger مصرف دارند، credit purchase دوباره شمرده نمی‌شود، grant غیرنقدی درآمد/فاکتور نقدی نیست و ارزها جمع نمی‌شوند.
+
+بررسی: restore/tool restore موفق، build صفر warning/error؛ ۱۶۱/۱۶۱ تست موفق PostgreSQL 18 مستقل localhost:55453، صفر Skip، شش تست تازه پنل؛ `TestResults/subscription-credit-final.trx`. EF بدون drift؛ script idempotent دو بار روی baseline قبلی با خرید/اشتراک مصنوعی و قیمت سفارشی مدیر موفق بود. DBهای تصادفی حذف و cluster پس از بررسی متوقف شد. مقدار duration همان window مالی server است، نه audio decoded. runtime gateway Disabled است، quote/read فعال و checkout جدید 503؛ adapter/PDF فاکتور/Angular اضافه نشده‌اند. هیچ پرداخت/AI واقعی، commit، push، deploy یا تغییر production انجام نشده است.
+
 # تحویل پنل ویزاردی — 2026-10-05
 
 برنچ `dev`، Git شروع پاک؛ تغییرات این نوبت commit نشده‌اند. [PANEL_WIZARD_API](PANEL_WIZARD_API.md) را به فرانت بدهید؛ ورودی مرحله ۱ فقط عنوان/شرح، مرحله ۲ فقط قالب متنی با ۵..۳۰ سؤال/نوع/پیام‌ها، مرحله ۳ multipart اطلاعات کارجو/رزومه/نوع واقعی دعوت است. برگشت مراحل با state فرانت و شناسه‌های ثبت‌شده؛ draft سروری اضافه نشده. سرویس جدید PanelWizardService از EF abstraction استفاده می‌کند و سؤال/مهارت snapshot محلی موتور موجود را می‌سازد؛ APIهای قدیمی حفظ‌اند و Repository جدید نیست.

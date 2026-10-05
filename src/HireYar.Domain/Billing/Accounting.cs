@@ -22,8 +22,21 @@ public sealed class Payment
     public decimal? CreditAmountUsdSnapshot { get; set; }
     // Fixed-price credit products: this is the effective contracted IRT/USD ratio, not a live forex quote.
     public decimal? EffectiveUsdToIrtSnapshot { get; set; }
+    public decimal? SubtotalAmountSnapshot { get; set; }
+    public decimal? TaxPercentSnapshot { get; set; }
+    public decimal? TaxAmountSnapshot { get; set; }
 }
 public enum SubscriptionStatus { Scheduled, Active, Expired, Cancelled, Suspended }
+// Append-only cutover: preserve the purchased contract and interviews that started against it.
+public sealed class SubscriptionReplacement
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid OrganizationId { get; set; }
+    public Guid SubscriptionId { get; set; }
+    public Guid PaymentId { get; set; }
+    public DateTimeOffset EndedAtUtc { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
 public sealed class OrganizationSubscription
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -54,6 +67,11 @@ public sealed class SubscriptionPurchase
     public int RetentionDaysSnapshot { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public List<SubscriptionEntitlement> Entitlements { get; set; } = [];
+    public string Operation { get; set; } = "purchase";
+    public decimal? OriginalAmountSnapshot { get; set; }
+    public decimal? DiscountAmountSnapshot { get; set; }
+    public decimal ProratedCreditAmountSnapshot { get; set; }
+    public Guid? ReplacesSubscriptionId { get; set; }
 }
 public sealed class SubscriptionEntitlement
 {
