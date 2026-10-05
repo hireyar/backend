@@ -1,5 +1,13 @@
 # وضعیت جاری
 
+## پنل ویزاردی — 2026-10-05
+
+روی `dev` از Git پاک، براساس `panel_v5.html` ارسالی APIهای ساده ساخت/ویرایش موقعیت و قالب متنی و دعوت multipart در `api/panel-wizard` اضافه شدند. انتخاب نوع عمومی/تخصصی مستقل از قالب، حداقل پنج سؤال، ترتیب و پیام‌های شروع/پایان، اطلاعات کارجو و رزومه خصوصی تا ۱۰ MiB آماده‌اند. فهرست مصاحبه‌ها با جستجو/چند وضعیت/موقعیت/بازه تاریخ، metadata و درصد مبتنی بر evidence، صدور مجدد با ابطال توکن قدیمی، لغو، دانلود scoped رزومه و آمار/آخرین مصاحبه‌های داشبورد اضافه شدند. سؤال و شرح شغل و پیام‌ها هنگام دعوت snapshot می‌شوند؛ HR جدید نیاز به Skill/PositionSkill/BankQuestion ندارد. قالب همان سازمان برای موقعیت دیگر در دعوت کپی می‌شود تا FK پذیرفته‌شده حفظ شود.
+
+قرارداد فرانت جدید: [PANEL_WIZARD_API](PANEL_WIZARD_API.md). مسیرهای قدیمی و همه عنوان‌های فارسی Swagger حفظ شده‌اند. subscription/wallet/pricing و سیاست مصرف اعتبار تغییری ندارند. Angular، ارسال واقعی ایمیل/SMS، ویدیو و تنظیمات مدت سازمانی اجرا نشده‌اند؛ delivery برابر NotConfigured و videoAvailable=false است تا UI موفقیت ارسال یا وجود ویدیو را ادعا نکند.
+
+اعتبارسنجی واقعی: restore موفق؛ ابزار EF پس از خطای feed موجود با config موقت منبع عمومی بازیابی شد. build صفر warning/error؛ **۱۵۵ Passed، صفر Failed، صفر Skipped** با PostgreSQL 18 مستقل loopback:55451 و provider آزمایشی؛ TRX در `TestResults/panel-wizard-final.trx`. چهار تست جدید ویزارد، flow بدون ساخت مهارت، snapshot/ترتیب/پیام، stale version، scope، file/type/phone validation، reuse قالب، resend/expiry/cancel و entitlement عمومی/تخصصی را پوشش می‌دهند. تست فارسی OpenAPI هم موفق است. EF بدون pending model changes؛ migration `20261005130515_AddPanelWizard` و script idempotent با baseline قبلی و داده مصنوعی، دو بار موفق؛ backfill general و پیام‌ها بررسی شد. دیتابیس‌های تصادفی حذف و cluster مستقل تست پس از بررسی متوقف شد. migration مقصد، commit، push و deploy انجام نشده‌اند.
+
 اسکریپت دسترسی همکاران برای تست: [Grant-ColleagueTestAccess.sql](../scripts/Grant-ColleagueTestAccess.sql) به سازمان‌های دارای کاربر فعال، پیش‌فرض ۱۰۰ USD اعتبار PromotionalCredit و Advanced یک‌ماهه می‌دهد. اجرای مجدد campaign تکراری شارژ نمی‌کند؛ Advanced فعال موجود حفظ می‌شود، اشتراک متداخل دیگر باعث rollback کامل است. سند پرداخت `InternalTestGrant` صرفاً اعطای غیرنقدی با مبلغ اسمی کاتالوگ است و باید از گزارش درآمد نقدی کنار گذاشته شود. روی DB کاربران اجرا نشده؛ PostgreSQL 18 با سه کاربر مصنوعی/دو سازمان، اجرای تکراری و حفظ موجودی پس از مصرف موفق؛ build صفر warning/error.
 
 ## Pricing و Billing — 2026-10-01

@@ -9,7 +9,8 @@ public sealed record InterviewDecisionContext(string PositionTitle, Guid Current
     int AnsweredQuestionCount, int MaxQuestionCount, int RemainingSeconds,
     InterviewQuestionSnapshot Question, string CandidateTranscript,
     IReadOnlyList<InterviewSkill> Skills, IReadOnlyList<CandidateSkillState> SkillStates,
-    IReadOnlyList<InterviewCoveredTopic> CoveredTopics, IReadOnlyList<InterviewQuestionSnapshot> AvailableQuestions);
+    IReadOnlyList<InterviewCoveredTopic> CoveredTopics, IReadOnlyList<InterviewQuestionSnapshot> AvailableQuestions,
+    string? PositionDescription = null);
 public interface ISpeechToTextService
 {
     Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct);

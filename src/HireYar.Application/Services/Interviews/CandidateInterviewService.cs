@@ -108,8 +108,9 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
             try
             {
                 if (capabilities.Contains("answer_analysis") || capabilities.Contains("adaptive_questions"))
-                  decision = await decisions.EvaluateAsync(new(position.Title, question.QuestionId, s.Status.ToString(), s.AnsweredQuestionCount,
-                    s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow()), question, answer.Transcript!, s.Skills, s.SkillStates, s.CoveredTopics, shortlist), ct);
+                  decision = await decisions.EvaluateAsync(new(s.PositionTitleSnapshot ?? position.Title, question.QuestionId, s.Status.ToString(), s.AnsweredQuestionCount,
+                    s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow()), question, answer.Transcript!, s.Skills, s.SkillStates, s.CoveredTopics, shortlist,
+                    s.PositionDescriptionSnapshot ?? position.Description), ct);
             }
             catch (InterviewProviderException e) { failureCode = e.Code; }
             await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
@@ -188,6 +189,6 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         return new(s.Id, s.Status.ToString(), s.Status == InterviewStatus.WaitingForAnswer && s.RemainingSeconds(time.GetUtcNow()) > 0,
             s.Status == InterviewStatus.ProcessingAnswer && !canRetry, q,
             new(s.AnsweredQuestionCount, s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow())),
-            a is null ? null : new(a.Id, a.QuestionId, a.Status.ToString(), canRetry, a.Status == AnswerStatus.Failed ? "answer_retry_available" : null), s.CompletionReason?.ToString());
+            a is null ? null : new(a.Id, a.QuestionId, a.Status.ToString(), canRetry, a.Status == AnswerStatus.Failed ? "answer_retry_available" : null), s.CompletionReason?.ToString(), s.WelcomeMessage, s.GoodbyeMessage);
     }
 }

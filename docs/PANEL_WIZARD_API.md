@@ -1,0 +1,109 @@
+# قرارداد پنل ویزاردی — 2026-10-05
+
+مرجع طراحی: `panel_v5.html` ارسالی کاربر. این سند قرارداد بک‌اند برای موقعیت، قالب، دعوت و فهرست مصاحبه‌هاست. Angular در این ریپو نیست. Billing، قیمت‌ها، اشتراک و اعتبار تغییر نکرده‌اند؛ قابلیت‌های قرارداد فعلی همچنان enforce می‌شوند. مسیرهای قدیمی برای مصرف‌کننده‌های موجود حفظ شده‌اند؛ فرانت جدید مسیر ساده زیر را مصرف کند و نیازی به ساخت Skill/PositionSkill/BankQuestion ندارد.
+
+همه درخواست‌های HR با Bearer حساب معتبر Owner/Recruiter در سازمان جاری‌اند. شناسه سازمان/نقش در ورودی نیست. شناسه متعلق به سازمان دیگر 404 است. تاریخ‌ها UTC و ISO 8601؛ نمایش شمسی در فرانت. خطاها همان ProblemDetails جاری است.
+
+## مرحله ۱: موقعیت
+
+انتخاب موجود: `GET /api/job-positions?page=1&pageSize=20&search=...&status=Active`، جزئیات: `GET /api/job-positions/{id}`. موقعیت Archived قابل دعوت نیست.
+
+ساخت ساده: `POST /api/panel-wizard/positions`:
+
+```json
+{ "title": "توسعه‌دهنده بک‌اند", "description": "وظایف و مهارت‌های موردنیاز" }
+```
+
+هر دو الزامی؛ عنوان حداکثر ۱۰۰، شرح حداکثر ۱۰۰۰ کاراکتر. پاسخ همان JobDto با `id` و `rowVersion` است. وضعیت اولیه Active و seniority داخلی NotSpecified است؛ فرم نیاز به ورودی اضافی ندارد.
+
+ویرایش: `PUT /api/panel-wizard/positions/{id}` با `{ "position": { "title": "...", "description": "..." }, "rowVersion": "Base64" }`. وضعیت و seniority جاری حفظ می‌شوند؛ نسخه قدیمی 409 می‌دهد.
+
+## مرحله ۲: نوع و قالب/بانک سؤال
+
+انتخاب قالب سازمان: `GET /api/interview-templates?page=1&pageSize=20`؛ فیلتر اختیاری `jobPositionId`. برای نمایش سؤال‌ها و پیام‌ها: `GET /api/interview-templates/{id}`. فهرست علاوه بر فیلدهای قبلی `interviewType` و `questionCount` دارد؛ جزئیات `welcomeMessage` و `goodbyeMessage` هم دارد. `isArchived` را برای انتخاب بررسی کنید. قالب‌های قدیمی با کمتر از پنج سؤال باید تکمیل شوند تا از ویزارد قابل دعوت باشند.
+
+ساخت: `POST /api/panel-wizard/templates`:
+
+```json
+{
+  "jobPositionId": "00000000-0000-0000-0000-000000000001",
+  "title": "سؤال‌های اولیه",
+  "interviewType": "general",
+  "questions": ["سؤال اول", "سؤال دوم", "سؤال سوم", "سؤال چهارم", "سؤال پنجم"],
+  "welcomeMessage": "به مصاحبه خوش آمدید.",
+  "goodbyeMessage": "از وقت شما متشکریم.",
+  "durationMinutes": 60
+}
+```
+
+`general` / `specialized` مقادیر معتبرند. عنوان، پیام‌ها و ۵..۳۰ متن سؤال الزامی‌اند. سؤال و هر پیام حداکثر ۲۰۰۰، عنوان ۲۰۰ کاراکتر. ترتیب آرایه ترتیب بانک است؛ جابه‌جایی سؤال در UI فقط آرایه را جابه‌جا می‌کند. duration پیش‌فرض ۶۰ و بازه ۵..۶۰ دقیقه مطابق محدودیت موتور موجود است. UI می‌تواند پنج ردیف خالی اولیه نشان دهد؛ بک‌اند سؤال ساختگی پیش‌فرض تولید نمی‌کند.
+
+ویرایش: `PUT /api/panel-wizard/templates/{id}` با `{ "template": { ...همان ورودی ساخت... }, "rowVersion": "Base64" }`. stale version برابر 409 است. تغییر موقعیت قالب موجود از این مسیر مجاز نیست. کل سؤال‌ها به‌صورت transaction جایگزین می‌شوند؛ جلسه‌های قبلی snapshot مستقل دارند.
+
+بانک سؤال برای این UI همان سؤال‌های قالب است؛ entity بانک جدیدی اضافه نشده. قالب سازمان را می‌توان برای موقعیت دیگر انتخاب کرد؛ در ثبت دعوت، بک‌اند یک کپی در موقعیت مقصد می‌سازد تا FK سازمان/موقعیت حفظ شود. قالب مبدأ تغییر نمی‌کند. `interviewType` قالب پیشنهاد اولیه UI است؛ نوع واقعی هر دعوت از انتخاب مرحله ۲ می‌آید و مستقل از بانک است.
+
+## مرحله ۳: کارجو، رزومه و دعوت
+
+`POST /api/panel-wizard/invitations` با `multipart/form-data` و نام فیلدهای زیر:
+
+| فیلد | قرارداد |
+|---|---|
+| jobPositionId, templateId | شناسه‌های منتخب مراحل قبلی |
+| interviewType | general یا specialized؛ پیش‌فرض general؛ انتخاب مرحله ۲ را حتماً بفرستید |
+| firstName, lastName | الزامی، هرکدام حداکثر ۲۰۰ |
+| email | الزامی، ایمیل معتبر، حداکثر ۲۵۶ |
+| phone | الزامی، موبایل ایران با 09 و ۱۱ رقم ASCII؛ ارقام فارسی در UI normalize شوند |
+| deadlineDays | ۱..۱۴ روز، پیش‌فرض ۳؛ گزینه‌های طراحی ۱/۲/۳/۵/۷/۱۴ |
+| resume | فایل الزامی PDF/DOC/DOCX، حداکثر ۱۰ MiB |
+
+پسوند و signature فایل بررسی می‌شوند؛ DOCX باید ZIP شامل `[Content_Types].xml` و `word/document.xml` باشد. فایل در storage خصوصی ذخیره می‌شود و نام فایل کاربر ذخیره/بازگردانده نمی‌شود. این بررسی اعتبارسنجی نوع فایل است، نه اسکن ضدبدافزار یا parser رزومه. رکورد کارجو، جلسه و کپی احتمالی قالب در یک SaveChanges اتمیک‌اند؛ در شکست ثبت، فایل تازه حذف می‌شود.
+
+نوع عمومی قابلیت `hr_interview` و تخصصی `technical_interview` می‌خواهد؛ هر دو `ai_interview` می‌خواهند. سازمان فاقد entitlement برابر 403 می‌گیرد. این همان سیاست Billing موجود است؛ نام پکیج در منطق ویزارد hardcode نشده. شروع توسط داوطلب همچنان رزرو اعتبار موجود را انجام می‌دهد و می‌تواند با insufficient_ai_credit مواجه شود.
+
+پاسخ:
+
+```json
+{
+  "invitation": {
+    "interviewId": "00000000-0000-0000-0000-000000000002",
+    "token": "<one-time-sensitive-token>",
+    "expiresAtUtc": "2026-10-08T00:00:00+00:00",
+    "candidateRoute": "/api/candidate/interviews/00000000-0000-0000-0000-000000000002"
+  },
+  "emailDelivery": "NotConfigured",
+  "smsDelivery": "NotConfigured"
+}
+```
+
+`candidateRoute` مسیر API است، نه URL صفحه فرانت. توکن فقط یک بار به HR داده می‌شود و سرور hash آن را ذخیره می‌کند؛ توکن در Authorization داوطلب مصرف می‌شود. آن را در log/analytics یا query string API نگذارید. پیام درست فعلی UI «دعوت ساخته شد» است؛ عبارت HTML «ایمیل و پیامک ارسال شد» فعلاً قابل نمایش نیست. ارسال پیام واقعی و integration لینک فرانت موجود نیستند و این تغییر آن‌ها را ادعا نمی‌کند.
+
+سؤال‌ها، ترتیب، عنوان/شرح شغل، عنوان قالب، پیام‌ها و نوع دعوت هنگام صدور ثابت می‌شوند. موتور موجود در حالت adaptive می‌تواند از shortlist سؤال دیگری انتخاب کند؛ ترتیب بانک اولویت حالت قطعی است، الزام ترتیب ثابت موتور adaptive نیست. `welcomeMessage` و `goodbyeMessage` در پاسخ‌های start/current/answer/complete داوطلب برمی‌گردند. چرخه صوتی و retry همان [قرارداد قبلی](FRONTEND_INTERVIEWS_HANDOFF.md) را دارند.
+
+فرانت شناسه مراحل ۱ و ۲ و داده فرم را نگه دارد؛ برگشت بین مراحل درخواست جدید لازم ندارد. ثبت موقعیت/قالب در همان مرحله پایدار است و خروج از ویزارد آن‌ها را حذف نمی‌کند. کلیک تکراری ارسال نهایی می‌تواند دعوت دیگری بسازد؛ هنگام ارسال دکمه غیرفعال شود و POST نهایی خودکار retry نشود.
+
+## فهرست، داشبورد و اکشن‌ها
+
+`GET /api/interviews` پاسخ Page با `items`, `total`, `pageNumber`, `pageSize` می‌دهد. query:
+
+- `page`, `pageSize` (حداکثر ۱۰۰)، `jobPositionId`, `search` روی نام کامل/ایمیل/موبایل.
+- فیلتر چندانتخابی با تکرار پارامتر: `statuses=pending&statuses=inProgress`؛ مقادیر دیگر completed/expired/cancelled. مقدار نامعتبر 400 است.
+- `invitedFromUtc`, `invitedToUtc`, `completedFromUtc`, `completedToUtc`؛ کران‌ها شامل زمان انتخاب‌شده‌اند. بازه برعکس 400 است. فیلتر completed فقط جلسات تکمیل‌شده را شامل می‌شود.
+
+هر ردیف شامل نام، ایمیل، موبایل، شناسه/عنوان موقعیت و قالب، نوع مصاحبه، وضعیت، تاریخ دعوت/انقضا/شروع/پایان، deadlineDays، evaluationPercent، reportUrl، resumeUrl و پرچم اکشن‌هاست. وضعیت‌ها: Created معتبر → pending، جلسه شروع‌شده → inProgress، Completed → completed، انقضای دعوت غیرنهایی → expired، Cancelled → cancelled. درصد فقط برای completed با evidence موجود برمی‌گردد: میانگین نمره مهارت‌های دارای evidence ×۱۰۰؛ بدون evidence مقدار null، نه نمره ساختگی. درصد تصمیم استخدام نیست.
+
+`GET /api/dashboard` فیلدهای قبلی را حفظ و `completedInterviews`, `pendingInterviews`, `recentInterviews` (پنج مورد اخیر) را اضافه می‌کند. pending شمارش دعوت‌های معتبر شروع‌نشده است.
+
+| اکشن | API و رفتار |
+|---|---|
+| گزارش | GET /api/interviews/{id}؛ شواهد، transcript و URLهای صوت خصوصی |
+| رزومه | GET /api/interviews/{id}/resume؛ دانلود با Bearer سازمان؛ نام امن resume.ext |
+| صدور مجدد | POST /api/interviews/{id}/resend با `{ "deadlineDays": 3 }`؛ فقط شروع‌نشده و لغونشده، حتی اگر منقضی شده؛ توکن قبلی باطل و expiry تازه صادر می‌شود |
+| لغو | POST /api/interviews/{id}/cancel؛ دسترسی داوطلب باطل و چرخه release مالی فعلی استفاده می‌شود |
+
+صدور مجدد ایمیل/SMS نمی‌فرستد و همان delivery flags را دارد. شروع‌شده/نهایی برای resend برابر 409 است. لغو و دانلود سازمان دیگر 404 است. ردیف `canResend` و `canCancel` را به UI می‌دهد. ویدیو/دانلود ویدیو در موتور صوتی موجود نیست: `videoAvailable=false`؛ دکمه ویدیو غیرفعال باشد. تنظیمات حساب، مدت سازمانی، subscription و wallet همان قرارداد قبلی‌اند؛ این تغییر API تنظیمات سازمانی تازه یا ضبط ویدیو ندارد.
+
+## استقرار و اعتبارسنجی
+
+Migration جدید `20261005130515_AddPanelWizard` پیش از مصرف API لازم است؛ migration مقصد در این نوبت اعمال نشده. قالب‌های قدیمی general و پیام‌های پیش‌فرض می‌گیرند؛ جلسه قدیمی nullable snapshot دارد و رفتار قبلی خود را ادامه می‌دهد. پسوند داخلی storage مشترک همچنان `.audio` است، نوع دانلود رزومه از metadata می‌آید. پوشه خصوصی `resumes` کنار answers/questions در volume موجود است.
+
+build صفر warning/error؛ کل تست‌ها و نتیجه دقیق در [STATUS](STATUS.md). PostgreSQL واقعی مستقل، عدم drift مدل، migration baseline → جدید با داده مصنوعی و اجرای دوباره script بررسی شده‌اند. هیچ پیام واقعی، AI واقعی، push، deploy یا تغییر production در این نوبت انجام نشده است.

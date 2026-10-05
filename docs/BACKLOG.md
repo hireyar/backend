@@ -1,5 +1,9 @@
 # Backlog
 
+## HY-015 — تطبیق API با پنل ویزاردی (2026-10-05): Verified
+
+درخواست مستقل HTML پنل انجام شد: API ساده موقعیت و قالب، دعوت multipart با رزومه و انتخاب مستقل نوع، snapshot، فهرست/فیلتر/metadata، resend/cancel، دانلود scoped و داشبورد. راهنمای [PANEL_WIZARD_API](PANEL_WIZARD_API.md)، migration جدید و ۱۵۵ تست موفق واقعی PostgreSQL (چهار تست جدید ویزارد) آماده‌اند؛ Swagger فارسی حفظ است. اشتراک و اعتبار طبق خواست کاربر دست‌نخورده‌اند. این تکمیل frontend یا تمام امکانات HTML نیست: integration ارسال ایمیل/SMS با لینک فرانت، ویدیو، تنظیمات مدت سازمانی و migration محیط مقصد جداگانه باقی‌اند؛ backlog مجوز اجرای خودکارشان نیست. پاسخ API نبود delivery/video را صریح می‌گوید. فرم جدید نیاز به ساخت دستی مهارت/بانک موقعیت ندارد؛ محدودیت قدیمی راهنمای HR برای این مسیر superseded است.
+
 پیشرفت HY-404: اسکریپت دستی اعطای Advanced و اعتبار تست همکاران در `scripts/Grant-ColleagueTestAccess.sql` با ledger و idempotency روی PostgreSQL واقعی بررسی شد. اجرای مقصد و provisioning عملیاتی همچنان انجام نشده‌اند؛ این اعطای غیرنقدی با provider داخلی باید از درآمد نقدی مستثنا شود.
 
 ## Pricing — نتیجه 2026-10-01

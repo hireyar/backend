@@ -14,6 +14,9 @@ public sealed class CandidateApplicationConfiguration : IEntityTypeConfiguration
         b.HasKey(x => x.Id); b.HasAlternateKey(x => new { x.OrganizationId, x.JobPositionId, x.Id });
         b.Property(x => x.FirstName).HasMaxLength(200).IsRequired(); b.Property(x => x.LastName).HasMaxLength(200).IsRequired();
         b.Property(x => x.Email).HasMaxLength(256).IsRequired(); b.Property(x => x.Phone).HasMaxLength(30);
+        b.Property(x => x.ResumeStorageKey).HasMaxLength(512);
+        b.Property(x => x.ResumeContentType).HasMaxLength(100);
+        b.Property(x => x.ResumeExtension).HasMaxLength(10);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         b.HasOne<JobPosition>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.JobPositionId }).HasPrincipalKey(x => new { x.OrganizationId, x.Id });
         b.HasIndex(x => new { x.OrganizationId, x.JobPositionId, x.CreatedAtUtc });
@@ -69,6 +72,11 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
         b.Property(x => x.AccessTokenHash).HasMaxLength(64).IsRequired(); b.HasIndex(x => x.AccessTokenHash).IsUnique();
         b.Property(x => x.RequiredCapabilityCode).HasMaxLength(64);
+        b.Property(x => x.PositionTitleSnapshot).HasMaxLength(200);
+        b.Property(x => x.PositionDescriptionSnapshot).HasMaxLength(10000);
+        b.Property(x => x.TemplateTitleSnapshot).HasMaxLength(200);
+        b.Property(x => x.WelcomeMessage).HasMaxLength(2000);
+        b.Property(x => x.GoodbyeMessage).HasMaxLength(2000);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         b.Property(x => x.CompletionReason).HasConversion<string>().HasMaxLength(30);
         b.Ignore(x => x.AnsweredQuestionCount);

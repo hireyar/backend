@@ -6,7 +6,7 @@ namespace HireYar.Infrastructure.Interviews;
 public sealed partial class LocalInterviewAudioStorage(IOptions<InterviewStorageOptions> options) : IInterviewAudioStorage
 {
     private readonly string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.Value.RootPath));
-    [GeneratedRegex("^(answers|questions)/[a-f0-9]{32}/[a-f0-9]{32}\\.audio$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(answers|questions|resumes)/[a-f0-9]{32}/[a-f0-9]{32}\\.audio$", RegexOptions.CultureInvariant)]
     private static partial Regex KeyPattern();
     private string Resolve(string key)
     {

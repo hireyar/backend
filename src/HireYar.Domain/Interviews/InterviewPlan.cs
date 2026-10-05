@@ -11,14 +11,16 @@ public sealed record InterviewQuestionSnapshot
     public string Topic { get; private set; } = "";
     public int Difficulty { get; private set; }
     public bool IsActive { get; private set; }
+    public int Order { get; private set; }
 
-    public InterviewQuestionSnapshot(Guid questionId, Guid skillId, string text, string topic, int difficulty, bool isActive)
+    public InterviewQuestionSnapshot(Guid questionId, Guid skillId, string text, string topic, int difficulty, bool isActive, int order = 0)
     {
         InterviewRules.Require(questionId != Guid.Empty && skillId != Guid.Empty, "invalid_id");
         InterviewRules.Require(difficulty is >= 1 and <= 5, "invalid_difficulty");
         QuestionId = questionId; SkillId = skillId;
         Text = InterviewRules.Text(text, 2000); Topic = InterviewRules.Text(topic, 200);
         Difficulty = difficulty; IsActive = isActive;
+        InterviewRules.Require(order is >= 0 and <= 30, "invalid_question_order"); Order = order;
     }
 }
 

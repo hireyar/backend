@@ -21,7 +21,7 @@ public sealed class InterviewPolicy
             .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).IsRequired)
             .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).Priority)
             .ThenBy(q => Math.Abs(q.Difficulty - (adaptDifficulty ? TargetDifficulty(session, q.SkillId) : session.Skills.Single(s => s.SkillId == q.SkillId).TargetDifficulty)))
-            .ThenBy(q => q.QuestionId).Take(shortlistLimit).ToArray();
+            .ThenBy(q => q.Order).ThenBy(q => q.QuestionId).Take(shortlistLimit).ToArray();
     }
 
     public InterviewQuestionSnapshot? SelectFallback(InterviewSession session, DateTimeOffset now, int shortlistLimit = 10) =>

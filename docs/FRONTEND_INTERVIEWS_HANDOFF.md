@@ -1,5 +1,7 @@
 # تحویل مصاحبه صوتی هوشمند به فرانت‌اند
 
+به‌روزرسانی پنل 2026-10-05: برای ساخت موقعیت/قالب/دعوت و فهرست مصاحبه‌ها، [PANEL_WIZARD_API](PANEL_WIZARD_API.md) مرجع جدید است. محدودیت‌های تاریخی پایین درباره نبود فهرست و نیاز به ساخت دستی مهارت/بانک برای فرم HR با مسیر جدید ویزارد رفع شده‌اند. قرارداد candidate، صوت، retry و گزارش این سند همچنان معتبر است. ایمیل/SMS و ویدیو همچنان پیاده نشده‌اند و پاسخ ویزارد آن‌ها را صریح نشان می‌دهد.
+
 تغییر قرارداد backend Pricing، 2026-10-01: قبل از invite/start، اشتراک و AI Credit سازمان را از `/api/billing/subscription` و `/api/billing/ai-credit` بررسی کنید. `active_subscription_required`/`subscription_feature_required` برابر 403 و `insufficient_ai_credit` برابر 409 هستند؛ در UI داوطلب جزئیات کیف پول عرضه نشود. CreateInterviewRequest اکنون `requiredCapabilityCode` اختیاری دارد (پیش‌فرض technical_interview، برای HR مقدار hr_interview). API و نمونه‌های purchase و gatewayEnabled=false در [BILLING](BILLING.md). فرانت قیمت authoritative یا billable duration ارسال نکند؛ rate/billing/feature snapshot سروری است. متن قدیمی این راهنما دربارهٔ شروع بدون Billing با این بند superseded است.
 
 مرجع قرارداد فعلی بک‌اند HireYar، 2026-10-01. این فایل را همراه درخواست انتهای آن به Codex در **ریپوی فعلی فرانت‌اند** بدهید. پنل Angular در ریپوی بک‌اند نیست. رابط را با ساختار، کامپوننت‌ها و کلاینت HTTP موجود بسازید؛ پروژه یا معماری جدید لازم نیست.

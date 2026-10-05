@@ -740,6 +740,16 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("integer");
 
+                    b.Property<string>("GoodbyeMessage")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("InterviewType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
@@ -770,6 +780,11 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("WelcomeMessage")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId", "JobPositionId", "CreatedAtUtc", "Id");
@@ -779,6 +794,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Template_Duration", "\"DurationMinutes\" BETWEEN 5 AND 60");
 
                             t.HasCheckConstraint("CK_Template_FollowUps", "\"MaxFollowUpQuestionsPerQuestion\" BETWEEN 0 AND 3");
+
+                            t.HasCheckConstraint("CK_Template_Type", "\"InterviewType\" IN ('general','specialized')");
                         });
                 });
 
@@ -871,6 +888,18 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("ResumeContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ResumeExtension")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ResumeStorageKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1049,6 +1078,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("SkillId")
                         .HasColumnType("uuid");
 
@@ -1102,6 +1134,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("GoodbyeMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<Guid>("InterviewTemplateId")
                         .HasColumnType("uuid");
 
@@ -1119,6 +1155,14 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("PositionDescriptionSnapshot")
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<string>("PositionTitleSnapshot")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTimeOffset?>("ProcessingLeaseExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1149,6 +1193,14 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("TemplateTitleSnapshot")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("WelcomeMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.HasKey("Id");
 

@@ -14,6 +14,7 @@ internal static class OpenApiText
         برای درخواست‌های غیر GET در `/api/auth`، مقدار `token` از `GET /api/auth/csrf` را در هدر `X-CSRF-TOKEN` بفرستید و کوکی همان درخواست را نگه دارید. پس از ورود، CSRF را با Bearer جدید دوباره بگیرید. برای تمدید نشست، Bearer را حذف کنید و با کوکی refresh، ابتدا CSRF و سپس `POST /api/auth/refresh` را بزنید.
 
         پس از ورود: موقعیت شغلی بسازید، سپس قالب مصاحبهٔ مربوط به آن را ثبت کنید.
+        **ویزارد پنل:** انتخاب موقعیت با `GET /api/job-positions` یا ساخت با `POST /api/panel-wizard/positions`؛ انتخاب قالب با `GET /api/interview-templates` یا ساخت با `POST /api/panel-wizard/templates`؛ ثبت کارجو و رزومه با `POST /api/panel-wizard/invitations` (multipart). توکن دعوت محرمانه است. ارسال ایمیل و پیامک فعلاً `NotConfigured` است؛ صدور توکن را ارسال پیام نمایش ندهید.
         """;
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
@@ -51,6 +52,15 @@ internal static class OpenApiText
         ("InterviewTemplates", "Create") => "ساخت قالب برای موقعیت شغلی",
         ("InterviewTemplates", "Update") => "ویرایش قالب و سؤال‌ها",
         ("Dashboard", "Get") => "آمار سازمان جاری",
+        ("PanelWizard", "CreatePosition") => "ویزارد موقعیت: ثبت عنوان و شرح شغل",
+        ("PanelWizard", "UpdatePosition") => "ویزارد موقعیت: ویرایش عنوان و شرح شغل",
+        ("PanelWizard", "CreateTemplate") => "ویزارد قالب: ثبت نوع، سؤال‌ها و پیام‌ها",
+        ("PanelWizard", "UpdateTemplate") => "ویزارد قالب: ویرایش سؤال‌ها و پیام‌ها",
+        ("PanelWizard", "Invite") => "ویزارد دعوت: ثبت کارجو، رزومه و صدور دعوت",
+        ("Interviews", "List") => "فهرست و جستجوی مصاحبه‌ها با فیلتر وضعیت و تاریخ",
+        ("Interviews", "Resend") => "صدور مجدد دعوت و ابطال توکن قبلی",
+        ("Interviews", "Cancel") => "لغو مصاحبه و دسترسی داوطلب",
+        ("Interviews", "Resume") => "دانلود خصوصی رزومه کارجو",
         ("Interviews", "CreateApplication") => "ثبت داوطلب برای موقعیت",
         ("Interviews", "CreateSkill") => "تعریف مهارت سازمان",
         ("Interviews", "SetSkill") => "تنظیم مهارت موقعیت",
