@@ -1,5 +1,11 @@
 # وضعیت جاری
 
+## رفع 500 ذخیره رزومه دعوت — 2026-10-06
+
+لاگ مقصد برای `POST /api/panel-wizard/invitations` با traceId `00-84eab4a04b430563040f0607ad411f60-8e12eee948539082-00` علت را تأیید کرد: UnauthorizedAccessException در Directory.CreateDirectory داخل LocalInterviewAudioStorage.SaveAsync؛ SQLSTATE خالی است. Dockerfile قبلی فقط /keys را برای APP_UID آماده می‌کرد، نه storage پیش‌فرض زیر /app. روی dev پوشه خصوصی /app/storage/interviews با مالکیت APP_UID و مجوز 700 و volume پایدار interview-storage در هر دو Compose اضافه شد؛ مسیر storage صریح است. schema/runtime API تغییر نکرد.
+
+build صفر warning/error؛ ۲۱ تست مرتبط PanelWizardTests، InterviewAudioTests و AdvancedQuestionTests روی PostgreSQL 18 محلی اختصاصی موفق، صفر شکست/Skip؛ `tests/HireYar.Tests/TestResults/invitations-storage-fix.trx`. هر دو Compose با config --quiet معتبرند (development با مقادیر مصنوعی). Docker daemon در محیط موجود نیست؛ build/run image و مالکیت volume روی Linux هنوز تأیید نشده‌اند. دیتابیس‌های fixture حذف شدند. رفع مقصد نیازمند rebuild/recreate مجاز و بررسی مسیر/مالکیت volume است؛ push/deploy یا تغییر production انجام نشده. فایل قبلی احتمالی پیش از mount تازه باید با حفظ keyهای نسبی منتقل شود؛ [INTERVIEWS](INTERVIEWS.md).
+
 ## سؤال‌های پیشرفته مطابق HTML — 2026-10-06: Verified محلی
 
 روی dev: پیشنهاد کل بانک/بازسازی یک موضوع از JD scoped، سه سطح در ۵ تا ۱۰ موضوع، تأیید/ویرایش ویزارد با RowVersion، شمارنده‌های بانک/مصاحبه، snapshot و یک پرسش در هر موضوع اضافه شدند. معمولی و قالب‌های تاریخی محفوظ؛ entitlement در تولید/ذخیره/دعوت/شروع بررسی می‌شود. migration `20261006110718_AddAdvancedTopicQuestions` در مقصد لازم است؛ Angular در ریپو نیست. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). restore و tool restore موفق؛ build صفر warning/error؛ **۱۷۰/۱۷۰ تست موفق، صفر شکست و صفر Skip** روی PostgreSQL 18 محلی، شامل ۶ تست جدید موضوعی و ۴ تست adapter پیشنهاد AI. `tests/HireYar.Tests/TestResults/advanced-questions-final.trx`. مسیر کامل ۱۵ سؤال بانک → ۵ پاسخ/پنج موضوع → Completed، scope، تأیید/ویرایش و stale version، Basic، خروجی خراب/timeout و افت اشتراک پیشرفته به معمولی پیش از start تأیید شدند. EF بدون drift؛ اسکریپت idempotent دو بار روی baseline قبلی با قالب/سؤال/جلسه مصنوعی اجرا شد و legacy/constraint حفظ شدند. دیتابیس تصادفی حذف شد. AI/پرداخت واقعی، push/deploy و DB مقصد تغییر نکرده‌اند.
