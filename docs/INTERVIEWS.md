@@ -1,5 +1,7 @@
 # Candidate AI Interview
 
+به‌روزرسانی 2026-10-06: [CANDIDATE_TURN_API](CANDIDATE_TURN_API.md) قرارداد جاری پاسخ نوبتی با clientTurnId اتمیک، lastSpeechEndUtc، duration ذخیره‌شده، ویدیوی اختیاری، transcript داوطلب و messages است. mediaCapabilities در پاسخ داوطلب سقف‌ها و پشتیبانی ویدیو را می‌دهد؛ دانلود HR همان scope/retention موجود را دارد. migration `20261006170044_AddCandidateAnswerCapture` لازم است. WebRTC/Realtime طبق تصحیح کاربر اضافه نشده؛ جریان STT/ارزیابی/TTS و سیاست مالی قبل حفظ‌اند.
+
 به‌روزرسانی Pricing در 2026-10-01 روی `codex/pricing`: invite/start اکنون اشتراک فعال با قابلیت HR/فنی و ai_interview می‌خواهند؛ start اعتبار حداکثر هزینه را reserve می‌کند و completion/revoke/expiry settlement مربوط دارند. `requiredCapabilityCode` در CreateInterviewRequest اختیاری و پیش‌فرض `technical_interview` است؛ HR از `hr_interview` استفاده کند. rate/feature/retention snapshot و rule مدت مالی در [BILLING](BILLING.md) مرجع‌اند. گزارش تاریخی حفظ می‌شود ولی audio download بعد از retention قرارداد 404 می‌دهد. درگاه runtime غیرفعال است و provisioning اولیه بدون fake success لازم دارد. قرارداد domain/lease/provider قبلی حفظ شده است.
 
 راهنمای مستقل قابل تحویل به تیم فرانت‌اند و پرامپت اجرای آن: [FRONTEND_INTERVIEWS_HANDOFF](FRONTEND_INTERVIEWS_HANDOFF.md).

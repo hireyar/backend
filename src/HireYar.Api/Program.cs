@@ -99,6 +99,32 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
     routeValues.TryGetValue("controller", out var controller);
     routeValues.TryGetValue("action", out var action);
     operation.Summary = OpenApiText.Summary(controller, action);
+    if (controller == "CandidateInterviews" && action == "Answer")
+    {
+        operation.RequestBody = new OpenApiRequestBody
+        {
+            Required = true,
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["multipart/form-data"] = new()
+                {
+                    Schema = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object, Required = new HashSet<string> { "questionId", "audio" },
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["questionId"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" },
+                            ["audio"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary", Description = "Required audio file; default maximum 20 MiB. See mediaCapabilities for configured limits." },
+                            ["durationSeconds"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "Client-observed duration, default maximum 600 seconds; does not determine billing." },
+                            ["lastSpeechEndUtc"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "date-time", Description = "UTC timestamp of the last detected speech, excluding the silence wait." },
+                            ["clientTurnId"] = new OpenApiSchema { Type = JsonSchemaType.String, MaxLength = 128, Description = "Stable identifier for one turn, unique within the interview. Reuse for transport retries; another question with the same identifier returns 409." },
+                            ["video"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary", Description = "Optional WebM/MP4 video, default maximum 40 MiB; only record when mediaCapabilities.videoAnswers is true." }
+                        }
+                    }
+                }
+            }
+        };
+    }
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
         operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : "Bearer", context.Document)] = [] }];
     if (context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true && context.Description.HttpMethod != "GET")

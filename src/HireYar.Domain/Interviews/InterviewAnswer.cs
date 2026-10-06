@@ -10,6 +10,25 @@ public sealed class InterviewAnswer
     public string AudioContentType { get; private set; } = "";
     public long AudioSizeBytes { get; private set; }
     public DateTimeOffset SubmittedAtUtc { get; private set; }
+    public string? ClientTurnId { get; private set; }
+    public DateTimeOffset? LastSpeechEndUtc { get; private set; }
+    public int? DurationSeconds { get; private set; }
+    public string? VideoStorageKey { get; private set; }
+    public string? VideoContentType { get; private set; }
+    public long? VideoSizeBytes { get; private set; }
+    public void SetCaptureMetadata(string? clientTurnId, DateTimeOffset? lastSpeechEndUtc, int? durationSeconds,
+        string? videoKey, string? videoContentType, long? videoSize)
+    {
+        InterviewRules.Require(Status == AnswerStatus.Uploaded && ClientTurnId is null && VideoStorageKey is null, "invalid_answer_state");
+        if (lastSpeechEndUtc is { } ended) InterviewRules.Utc(ended);
+        InterviewRules.Require(durationSeconds is null or > 0, "answer_duration_invalid");
+        InterviewRules.Require(videoKey is null ? videoContentType is null && videoSize is null : videoContentType is not null && videoSize > 0, "video_invalid");
+        ClientTurnId = clientTurnId is null ? null : InterviewRules.Text(clientTurnId, 128);
+        LastSpeechEndUtc = lastSpeechEndUtc; DurationSeconds = durationSeconds;
+        VideoStorageKey = videoKey is null ? null : InterviewRules.Text(videoKey, 512);
+        VideoContentType = videoContentType is null ? null : InterviewRules.Text(videoContentType, 100);
+        VideoSizeBytes = videoSize;
+    }
     public int BillableSeconds { get; private set; }
     internal void SetBillableSeconds(int seconds) => BillableSeconds = seconds;
     public DateTimeOffset? ProcessedAtUtc { get; private set; }

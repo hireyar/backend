@@ -41,4 +41,5 @@ public sealed class InterviewOptions
     public int LeaseSeconds { get; set; } = 300;
     public int MaxAnswerSeconds { get; set; } = 600;
     public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
+    public long MaxVideoUploadBytes { get; set; } = 40 * 1024 * 1024;
 }

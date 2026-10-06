@@ -1,5 +1,13 @@
 # معماری و تصمیم‌ها
 
+## ADR-023 — پاسخ نوبتی با ویدیو و شناسه کلاینت (2026-10-06)
+
+طبق قرارداد ارسالی فرانت، جریان HTTP فعلی با clientTurnId، lastSpeechEndUtc، durationSeconds ذخیره‌شده و ویدیوی اختیاری گسترش یافت؛ کاربر انتخاب اولیه WebRTC را تصحیح و Realtime را از این درخواست حذف کرد. سرویس/provider جدید بلادرنگ اضافه نشده. زمان پایان speech و مدت کلاینت metadata هستند و سیاست مالی محدود سرور تغییر نکرده است.
+
+clientTurnId رشته opaque تا ۱۲۸ کاراکتر و در هر جلسه unique با partial index PostgreSQL است؛ null برای کلاینت قدیمی مجاز. replay همان شناسه/سؤال همان answer با وضعیت جاری می‌دهد و پردازش/هزینه دوباره ندارد؛ استفاده برای سؤال دیگر conflict است. upload/network بیرون transaction، persistence با قفل سازمان موجود، recheck دسترسی/مالی/state پس از قفل و optimistic RowVersion برای processing حفظ‌اند. نخستین commit برنده و فایل‌های بازنده حذف می‌شوند؛ retry پردازش همچنان مسیر answer.id مستقل است.
+
+storage خصوصی موجود category=videos را با type/size metadata و constraint کامل‌بودن سه فیلد می‌پذیرد؛ WebM/MP4 با signature محدود، بدون decode یا ارسال ویدیو به AI. دانلود فقط HR scoped زیر retention موجود و range processing است؛ global filter یا Repository تازه نداریم. mediaCapabilities در پاسخ candidate و videoAvailable مبتنی بر وجود فایل در لیست پنل‌اند. transcript خود داوطلب و messages فقط سؤال‌های مطرح‌شده/پاسخ‌های همان جلسه را عرضه می‌کنند؛ timestamp سؤال هنگام مطرح‌شدن persist و برای legacy از زمان سرور fallback می‌شود، نه backfill حدسی. Swagger فرم و فایل‌های binary را صریح توصیف می‌کند. [CANDIDATE_TURN_API](CANDIDATE_TURN_API.md) قرارداد فعلی فرانت است.
+
 ## ADR-022 — بانک موضوعی پیشرفته و پیشنهاد گذرای AI (2026-10-06)
 
 ساختار گروهی opt-in در ویزارد است؛ قابلیت‌های موجود advanced_ai_workflow/adaptive_questions/adaptive_difficulty تعیین دسترسی می‌کنند، نه package code. قالب‌های ساده و جلسات قدیمی تغییر خودکار نمی‌کنند. گروه با TopicOrder/TopicName و Difficulty=1/3/5 روی سؤال ذخیره می‌شود؛ unique سطح در گروه و check PostgreSQL، اعتبارسنجی بانک کامل در Application. TopicOrder ترتیب آرایه و نام موضوع یکتا است؛ موجودیت اضافی برای گروه بی‌متادیتا لازم نیست. UseTopicQuestions قالب و AskOneQuestionPerTopic جلسه، snapshot ساختار را مستقل از ویرایش آینده نگه می‌دارند. Domain و Policy یک سؤال در هر موضوع را enforce می‌کنند؛ هر موضوع skill snapshot مستقل و سطح هدف از میانگین شواهد معتبر موضوع‌های قبلی، شروع متوسط. پیشنهاد AI صرفاً پاسخ گذرا، از JD scoped، با JSON محدود/اعتبارسنجی و تأیید صریح در save است؛ network زیر قفل سازمان نیست. قراردادهای مالی immutable و قابلیت جلسه پس از شروع از خرید billing خودش باقی‌اند. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md).

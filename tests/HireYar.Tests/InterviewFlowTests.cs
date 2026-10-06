@@ -72,6 +72,17 @@ public sealed class InterviewFlowTests(ApiFixture f)
             Task.FromException<StoredAudio>(new IOException("Synthetic unavailable storage"));
         public Task DeleteAsync(string key, CancellationToken ct) => Task.CompletedTask;
     }
+    private sealed class FailingVideoStorage(IInterviewAudioStorage inner) : IInterviewAudioStorage
+    {
+        public string? AudioKey; public bool Deleted;
+        public async Task<StoredAudio> SaveAsync(Stream source, string category, Guid owner, long maximum, CancellationToken ct)
+        {
+            if (category == "videos") throw new IOException("Synthetic video write failure");
+            var saved = await inner.SaveAsync(source, category, owner, maximum, ct); AudioKey = saved.Key; return saved;
+        }
+        public Task<Stream> OpenReadAsync(string key, CancellationToken ct) => inner.OpenReadAsync(key, ct);
+        public async Task DeleteAsync(string key, CancellationToken ct) { await inner.DeleteAsync(key, ct); Deleted = true; }
+    }
     private async Task<(Account Hr, InterviewInvitation Invite)> Invite()
     {
         f.InterviewAi.Reset(); var hr = await f.RegisterOwner();
@@ -105,6 +116,128 @@ public sealed class InterviewFlowTests(ApiFixture f)
     {
         var r = await c.PostAsync($"/api/candidate/interviews/{id}/start", null); Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         return (await r.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+    }
+    private static async Task<HttpResponseMessage> SubmitCaptured(HttpClient c, Guid id, Guid question, string turn,
+        DateTimeOffset ended, bool video = true, string videoMime = "video/webm", long? advertisedVideoBytes = null)
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(question.ToString()), "questionId");
+        form.Add(new StringContent(turn), "clientTurnId");
+        form.Add(new StringContent(ended.ToString("O")), "lastSpeechEndUtc");
+        form.Add(new StringContent("10"), "durationSeconds");
+        var bytes = new byte[] { 0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        var audio = new ByteArrayContent(bytes); audio.Headers.ContentType = new("audio/webm"); form.Add(audio, "audio", "answer.webm");
+        if (video)
+        {
+            var movie = new ByteArrayContent(advertisedVideoBytes is { } size ? new byte[checked((int)size)] : bytes);
+            movie.Headers.ContentType = new(videoMime); form.Add(movie, "video", "capture.webm");
+        }
+        return await c.PostAsync($"/api/candidate/interviews/{id}/answers", form);
+    }
+
+    [PostgresFact]
+    public async Task Captured_turn_persists_video_transcript_history_and_replays_without_processing_again()
+    {
+        var (hr, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);
+        Assert.True(start.MediaCapabilities!.VideoAnswers); Assert.Equal(40 * 1024 * 1024, start.MediaCapabilities.MaxVideoBytes);
+        var capturedNow = f.Clock.GetUtcNow();
+        var ended = new DateTimeOffset(capturedNow.Ticks - capturedNow.Ticks % 10, TimeSpan.Zero);
+        var turn = Guid.NewGuid().ToString(); var sttCalls = f.InterviewAi.SttCalls;
+        var response = await SubmitCaptured(c, invite.InterviewId, start.Question!.Id, turn, ended);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = (await response.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        Assert.Equal("Synthetic job-related answer", result.Answer!.Transcript); Assert.True(result.Answer.VideoAvailable);
+        Assert.Equal(turn, result.Answer.ClientTurnId); Assert.Equal(ended, result.Answer.LastSpeechEndUtc); Assert.Equal(10, result.Answer.DurationSeconds);
+        var replay = await SubmitCaptured(c, invite.InterviewId, start.Question.Id, turn, ended, video: false);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(result.Answer.Id, (await replay.Content.ReadFromJsonAsync<CandidateInterviewDto>())!.Answer!.Id);
+        Assert.Equal(sttCalls + 1, f.InterviewAi.SttCalls);
+        Assert.Equal(HttpStatusCode.Conflict, (await SubmitCaptured(c, invite.InterviewId, result.Question!.Id, turn, ended)).StatusCode);
+        var report = (await (await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).Content.ReadFromJsonAsync<HrInterviewDto>())!;
+        var videoUrl = Assert.Single(report.Answers).VideoUrl!;
+        var movie = await hr.Client.Send(HttpMethod.Get, videoUrl); Assert.Equal(HttpStatusCode.OK, movie.StatusCode);
+        Assert.Equal("video/webm", movie.Content.Headers.ContentType!.MediaType);
+        Assert.Equal(16, (await movie.Content.ReadAsByteArrayAsync()).Length);
+        var stranger = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, videoUrl)).StatusCode);
+        using var reopened = Candidate(invite);
+        var history = (await (await reopened.GetAsync($"/api/candidate/interviews/{invite.InterviewId}/messages")).Content.ReadFromJsonAsync<CandidateMessageDto[]>())!;
+        Assert.Equal(3, history.Length); Assert.Equal("assistant", history[0].Role); Assert.Equal("candidate", history[1].Role);
+        Assert.Equal(result.Answer.Id, history[1].AnswerId); Assert.Equal(result.Answer.Transcript, history[1].Text);
+        Assert.Equal(3, history.Select(m => m.Id).Distinct().Count());
+        Assert.Equal(HttpStatusCode.NotFound, (await reopened.GetAsync($"/api/candidate/interviews/{Guid.NewGuid()}/messages")).StatusCode);
+        await f.Db(async db => {
+            var answer = await db.InterviewAnswers.SingleAsync(a => a.Id == result.Answer.Id);
+            Assert.NotNull(answer.VideoStorageKey); Assert.Equal(ended, answer.LastSpeechEndUtc);
+        });
+    }
+
+    [PostgresFact]
+    public async Task Captured_turn_validates_video_size_type_and_utc_without_creating_an_answer()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);
+        var ended = f.Clock.GetUtcNow();
+        Assert.Equal(HttpStatusCode.BadRequest, (await SubmitCaptured(c, invite.InterviewId, start.Question!.Id, "bad-video", ended, videoMime: "application/pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SubmitCaptured(c, invite.InterviewId, start.Question.Id, "bad-date", ended.ToOffset(TimeSpan.FromHours(3)))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SubmitCaptured(c, invite.InterviewId, start.Question.Id, "future", ended.AddHours(1))).StatusCode);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, (await SubmitCaptured(c, invite.InterviewId, start.Question.Id, "large-video", ended, advertisedVideoBytes: 40 * 1024 * 1024 + 1)).StatusCode);
+        await f.Db(async db => Assert.Empty(await db.InterviewAnswers.Where(a => a.InterviewSessionId == invite.InterviewId).ToListAsync()));
+        Assert.Equal(HttpStatusCode.OK, (await SubmitCaptured(c, invite.InterviewId, start.Question.Id, "audio-only", ended, video: false)).StatusCode);
+    }
+
+    [PostgresFact]
+    public async Task Simultaneous_same_turn_returns_one_answer_and_runs_provider_once()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite); var started = await Start(c, invite.InterviewId);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var ownerScope = f.Services.CreateAsyncScope();
+        var storage = new SimultaneousStorage(ownerScope.ServiceProvider.GetRequiredService<IInterviewAudioStorage>());
+        var sttCalls = f.InterviewAi.SttCalls; var turn = Guid.NewGuid().ToString();
+        async Task<CandidateInterviewDto> SubmitInScope()
+        {
+            await using var scope = f.Services.CreateAsyncScope();
+            var service = ActivatorUtilities.CreateInstance<CandidateInterviewService>(scope.ServiceProvider, new TestAccess(invite.InterviewId), storage);
+            using var source = new MemoryStream(new byte[] { 0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+            return await service.SubmitAsync(invite.InterviewId, started.Question!.Id, source, "a.webm", "audio/webm", source.Length, 1, timeout.Token, new(turn, f.Clock.GetUtcNow()));
+        }
+        var results = await Task.WhenAll(SubmitInScope(), SubmitInScope());
+        Assert.Equal(results[0].Answer!.Id, results[1].Answer!.Id); Assert.Equal(sttCalls + 1, f.InterviewAi.SttCalls);
+        Assert.Equal(2, storage.Saved.Count); Assert.Single(storage.Deleted);
+        await f.Db(async db => Assert.Single(await db.InterviewAnswers.Where(a => a.InterviewSessionId == invite.InterviewId).ToListAsync()));
+    }
+
+    [PostgresFact]
+    public async Task Video_write_failure_removes_audio_and_does_not_persist_the_turn()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite); var started = await Start(c, invite.InterviewId);
+        await using var scope = f.Services.CreateAsyncScope();
+        var storage = new FailingVideoStorage(scope.ServiceProvider.GetRequiredService<IInterviewAudioStorage>());
+        var service = ActivatorUtilities.CreateInstance<CandidateInterviewService>(scope.ServiceProvider, new TestAccess(invite.InterviewId), storage);
+        var bytes = new byte[] { 0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        using var audio = new MemoryStream(bytes); using var video = new MemoryStream(bytes);
+        await Assert.ThrowsAsync<IOException>(() => service.SubmitAsync(invite.InterviewId, started.Question!.Id, audio, "a.webm", "audio/webm", bytes.Length, 1, default,
+            new("failed-video", f.Clock.GetUtcNow(), video, "v.webm", "video/webm", bytes.Length)));
+        Assert.True(storage.Deleted); Assert.NotNull(storage.AudioKey);
+        await Assert.ThrowsAsync<FileNotFoundException>(() => storage.OpenReadAsync(storage.AudioKey!, default));
+        await f.Db(async db => Assert.Empty(await db.InterviewAnswers.Where(a => a.InterviewSessionId == invite.InterviewId).ToListAsync()));
+    }
+
+    [PostgresFact]
+    public async Task Database_rejects_reusing_client_turn_id_for_another_question()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite); var started = await Start(c, invite.InterviewId);
+        var response = await SubmitCaptured(c, invite.InterviewId, started.Question!.Id, "unique-turn", f.Clock.GetUtcNow(), video: false);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var state = (await response.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        await f.Db(async db =>
+        {
+            var exception = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "InterviewAnswers" ("Id", "InterviewSessionId", "QuestionId", "AudioStorageKey", "AudioContentType", "AudioSizeBytes", "SubmittedAtUtc", "Status", "BillableSeconds", "ClientTurnId")
+                SELECT {Guid.NewGuid()}, "InterviewSessionId", {state.Question!.Id}, "AudioStorageKey", "AudioContentType", "AudioSizeBytes", "SubmittedAtUtc", "Status", "BillableSeconds", "ClientTurnId"
+                FROM "InterviewAnswers" WHERE "Id" = {state.Answer!.Id}
+                """));
+            Assert.Equal(PostgresErrorCodes.UniqueViolation, exception.SqlState);
+            Assert.Equal("IX_InterviewAnswers_InterviewSessionId_ClientTurnId", exception.ConstraintName);
+        });
     }
     [PostgresFact]
     public async Task Vertical_flow_persists_snapshots_evidence_audio_and_completion_and_token_boundary()
@@ -334,9 +467,10 @@ public sealed class InterviewFlowTests(ApiFixture f)
                 Assert.Equal(1, state.Progress.AnsweredQuestions); return null;
             }
             catch (DbUpdateException e) { return e; }
+            catch (HireYar.Application.Common.AppException e) when (e.Status == 409) { return e; }
         }
         var outcomes = await Task.WhenAll(SubmitInScope(), SubmitInScope());
-        Assert.Single(outcomes, x => x is null); Assert.Single(outcomes, x => x is DbUpdateException);
+        Assert.Single(outcomes, x => x is null); Assert.Single(outcomes, x => x is DbUpdateException or HireYar.Application.Common.AppException);
         Assert.Equal(2, storage.Saved.Count); Assert.Single(storage.Deleted);
         Assert.Equal(sttCalls + 1, f.InterviewAi.SttCalls);
         await Assert.ThrowsAsync<FileNotFoundException>(() => storage.OpenReadAsync(storage.Deleted.Single(), default));

@@ -1,5 +1,11 @@
 # Backlog
 
+## HY-019 — پاسخ خودکار نوبتی داوطلب (2026-10-06): Verified محلی
+
+قرارداد فرانت در [CANDIDATE_TURN_API](CANDIDATE_TURN_API.md) پیاده شد: audio قبلی، video اختیاری، clientTurnId اتمیک و replay، lastSpeechEndUtc و duration metadata، transcript/messages، capability/limits و Swagger binary. ۱۷۵ تست واقعی PostgreSQL و build موفق؛ migration/script و حفظ legacy تأیید شدند. طبق تصحیح صریح کاربر WebRTC/Realtime از این درخواست خارج شد و زیرساخت آن اضافه نشده است.
+
+باقی تحویل: اعمال migration `20261006170044_AddCandidateAnswerCapture` در مقصد، اتصال Angular با MediaRecorder/تشخیص ۲ ثانیه سکوت و محدودیت mediaCapabilities، بررسی واقعی مجوز/codec مرورگر و timeout/حجم proxy، ضبط ویدیو و retention/cleanup عملیاتی. این موارد مجوز push/deploy یا شروع خودکار Realtime نیستند؛ مالی قبلی، مدت server و AI متن/صوت حفظ‌اند.
+
 ## رفع 500 دعوت ویزارد — 2026-10-06: اصلاح محلی؛ مقصد باز
 
 لاگ traceId گزارش‌شده UnauthorizedAccessException هنگام ساخت پوشه رزومه را تأیید کرد. Dockerfile و هر دو Compose اکنون storage خصوصی متعلق به APP_UID و volume پایدار دارند؛ ۲۱ تست مرتبط PostgreSQL واقعی، build و config هر دو Compose موفق‌اند. اجرای Docker image به علت نبود daemon تأیید نشد. باقی: rebuild/recreate در مقصد با مجوز مستقل، حفظ/انتقال فایل قبلی احتمالی پیش از mount volume تازه، بررسی نوشتن با حساب سرویس و ارسال دعوت از پنل. migration تازه لازم نیست؛ push/deploy/production تغییر نکرده‌اند.

@@ -112,6 +112,9 @@ public sealed class InterviewAnswerConfiguration : IEntityTypeConfiguration<Inte
         b.Property(x => x.Id).ValueGeneratedNever();
         b.HasKey(x => x.Id); b.HasAlternateKey(x => new { x.InterviewSessionId, x.Id });
         b.HasIndex(x => new { x.InterviewSessionId, x.QuestionId }).IsUnique();
+        b.Property(x => x.ClientTurnId).HasMaxLength(128);
+        b.HasIndex(x => new { x.InterviewSessionId, x.ClientTurnId }).IsUnique().HasFilter("\"ClientTurnId\" IS NOT NULL");
+        b.Property(x => x.VideoStorageKey).HasMaxLength(512); b.Property(x => x.VideoContentType).HasMaxLength(100);
         b.HasOne<InterviewQuestionSnapshot>().WithMany().HasForeignKey(x => new { x.InterviewSessionId, x.QuestionId });
         b.Property(x => x.AudioStorageKey).HasMaxLength(512).IsRequired(); b.Property(x => x.AudioContentType).HasMaxLength(100).IsRequired();
         b.Property(x => x.Transcript).HasMaxLength(32000); b.Property(x => x.TranscriptProvider).HasMaxLength(100);
@@ -122,6 +125,7 @@ public sealed class InterviewAnswerConfiguration : IEntityTypeConfiguration<Inte
         b.ToTable(t => {
             t.HasCheckConstraint("CK_Answer_Status", "\"Status\" IN ('Uploaded','Transcribing','Transcribed','Evaluating','Processed','Failed')");
             t.HasCheckConstraint("CK_Answer_Size", "\"AudioSizeBytes\" > 0");
+            t.HasCheckConstraint("CK_Answer_Video", "(\"VideoStorageKey\" IS NULL AND \"VideoContentType\" IS NULL AND \"VideoSizeBytes\" IS NULL) OR (\"VideoStorageKey\" IS NOT NULL AND \"VideoContentType\" IS NOT NULL AND \"VideoSizeBytes\" IS NOT NULL AND \"VideoSizeBytes\" > 0)");
             t.HasCheckConstraint("CK_Answer_BillableSeconds", "\"BillableSeconds\" BETWEEN 0 AND 120");
         });
     }

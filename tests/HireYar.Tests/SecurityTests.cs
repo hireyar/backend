@@ -104,6 +104,17 @@ public sealed class SecurityTests(ApiFixture f)
         var openApi = await openApiResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Contains("ورود با موبایل", openApi.GetProperty("info").GetProperty("description").GetString());
         Assert.Contains("ثبت‌نام", openApi.GetProperty("paths").GetProperty("/api/auth/otp/verify").GetProperty("post").GetProperty("summary").GetString());
+        var uploadContent = openApi.GetProperty("paths").GetProperty("/api/candidate/interviews/{interviewId}/answers").GetProperty("post").GetProperty("requestBody").GetProperty("content");
+        Assert.False(uploadContent.TryGetProperty("application/x-www-form-urlencoded", out _));
+        var uploadSchema = uploadContent.GetProperty("multipart/form-data").GetProperty("schema");
+        if (uploadSchema.TryGetProperty("$ref", out var reference))
+            uploadSchema = openApi.GetProperty("components").GetProperty("schemas").GetProperty(reference.GetString()!.Split('/').Last());
+        foreach (var field in new[] { "audio", "video" })
+        {
+            var file = uploadSchema.GetProperty("properties").GetProperty(field);
+            Assert.Equal("string", file.GetProperty("type").GetString());
+            Assert.Equal("binary", file.GetProperty("format").GetString());
+        }
         foreach (var path in openApi.GetProperty("paths").EnumerateObject())
         {
             if (path.Name == "/health") continue;
