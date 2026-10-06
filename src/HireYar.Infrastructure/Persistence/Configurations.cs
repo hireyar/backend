@@ -73,7 +73,13 @@ public sealed class QuestionConfiguration : IEntityTypeConfiguration<InterviewQu
         b.HasKey(x => x.Id); b.Property(x => x.Text).HasMaxLength(2000).IsRequired(); b.Property(x => x.Competency).HasMaxLength(200).IsRequired();
         b.Property(x => x.EvaluationGuidance).HasMaxLength(4000).IsRequired(); b.HasIndex(x => new { x.InterviewTemplateId, x.Order }).IsUnique();
         b.HasOne<InterviewTemplate>().WithMany(x => x.Questions).HasForeignKey(x => x.InterviewTemplateId);
-        b.ToTable(t => t.HasCheckConstraint("CK_Question_Order", "\"Order\" BETWEEN 1 AND 30"));
+        b.Property(x => x.TopicName).HasMaxLength(200);
+        b.Property(x => x.Difficulty).HasDefaultValue(3);
+        b.HasIndex(x => new { x.InterviewTemplateId, x.TopicOrder, x.Difficulty }).IsUnique().HasFilter("\"TopicOrder\" IS NOT NULL");
+        b.ToTable(t => {
+            t.HasCheckConstraint("CK_Question_Order", "\"Order\" BETWEEN 1 AND 30");
+            t.HasCheckConstraint("CK_Question_Topic", "(\"TopicOrder\" IS NULL AND \"TopicName\" IS NULL AND \"Difficulty\" = 3) OR (\"TopicOrder\" IS NOT NULL AND \"TopicOrder\" BETWEEN 1 AND 10 AND \"TopicName\" IS NOT NULL AND length(trim(\"TopicName\")) > 0 AND \"Difficulty\" IN (1,3,5))");
+        });
     }
 }
 public sealed class RefreshConfiguration : IEntityTypeConfiguration<RefreshToken>

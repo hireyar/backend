@@ -149,4 +149,34 @@ public sealed class InterviewProviderTests
         var client = new NetArzClient(new HttpClient(handler), Options.Create(new NetArzOptions { Enabled = false, ApiKey = "synthetic-test-key" }), NullLogger<NetArzClient>.Instance);
         Assert.Equal("provider_not_configured", (await Assert.ThrowsAsync<InterviewProviderException>(() => client.GenerateAsync("Question", default))).Code);
     }
+    [Fact]
+    public async Task Suggestions_send_JD_as_data_and_return_only_inner_JSON_without_logging_it()
+    {
+        var logger = new CaptureLogger();
+        const string result = "{\"topics\":[]}";
+        var handler = new Handler(async (request, ct) =>
+        {
+            Assert.Equal("/v1/chat/completions", request.RequestUri!.AbsolutePath);
+            using var body = System.Text.Json.JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+            Assert.Equal("json_object", body.RootElement.GetProperty("response_format").GetProperty("type").GetString());
+            var messages = body.RootElement.GetProperty("messages");
+            Assert.Equal("system", messages[0].GetProperty("role").GetString());
+            Assert.Contains("untrusted", messages[0].GetProperty("content").GetString());
+            using var data = System.Text.Json.JsonDocument.Parse(messages[1].GetProperty("content").GetString()!);
+            Assert.Equal("Synthetic confidential JD", data.RootElement.GetProperty("positionDescription").GetString());
+            Assert.Equal(7, data.RootElement.GetProperty("topicCount").GetInt32());
+            return new(HttpStatusCode.OK) { Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(new { choices = new[] { new { message = new { content = result } } } })) };
+        });
+        var client = new NetArzClient(new HttpClient(handler), Options.Create(new NetArzOptions { ApiKey = "synthetic-key", BaseUrl = "https://provider.example.test/v1" }), logger);
+        Assert.Equal(result, await client.SuggestAsync(new("Synthetic job", "Synthetic confidential JD", 7, null), default));
+        Assert.DoesNotContain("Synthetic confidential JD", string.Join("", logger.Lines));
+        Assert.DoesNotContain("synthetic-key", string.Join("", logger.Lines));
+    }
+    [Theory]
+    [InlineData("{}")][InlineData("{\"choices\":[]}")][InlineData("not-json")]
+    public async Task Suggestions_reject_invalid_upstream_envelopes(string json)
+    {
+        var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) }));
+        Assert.Equal("llm_invalid_response", (await Assert.ThrowsAsync<InterviewProviderException>(() => Client(handler).SuggestAsync(new("Synthetic", "Synthetic JD", 5, null), default))).Code);
+    }
 }

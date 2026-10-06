@@ -40,6 +40,8 @@ internal static class OpenApiText
         ("PanelWizard", "UpdatePosition") => "ویزارد موقعیت: ویرایش عنوان و شرح شغل",
         ("PanelWizard", "CreateTemplate") => "ویزارد قالب: ثبت نوع، سؤال‌ها و پیام‌ها",
         ("PanelWizard", "UpdateTemplate") => "ویزارد قالب: ویرایش سؤال‌ها و پیام‌ها",
+        ("QuestionSuggestions", "Generate") => "پیشرفته: پیشنهاد موضوع‌ها و سه سطح سؤال بر اساس شرح شغل؛ بدون ذخیره",
+        ("QuestionSuggestions", "RegenerateTopic") => "پیشرفته: بازسازی سؤال‌های یک موضوع؛ بدون تغییر سایر موضوع‌ها",
         ("PanelWizard", "Invite") => "ویزارد دعوت: ثبت کارجو، رزومه و صدور دعوت",
         ("Interviews", "List") => "فهرست و جستجوی مصاحبه‌ها با فیلتر وضعیت و تاریخ",
         ("Interviews", "Resend") => "صدور مجدد دعوت و ابطال توکن قبلی",

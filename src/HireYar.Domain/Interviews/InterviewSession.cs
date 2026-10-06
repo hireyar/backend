@@ -26,6 +26,14 @@ public sealed class InterviewSession
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
     public Guid? CurrentQuestionId { get; private set; }
+    public bool AskOneQuestionPerTopic { get; private set; }
+    public void EnableTopicQuestions()
+    {
+        InterviewRules.Require(Status == InterviewStatus.Created && MaxQuestionCount is >= 5 and <= 10 && skills.Count == MaxQuestionCount &&
+            questions.GroupBy(q => q.Topic).Count() == MaxQuestionCount && questions.GroupBy(q => q.Topic).All(g =>
+                g.Count() == 3 && g.Select(q => q.Difficulty).Order().SequenceEqual(new[] { 1, 3, 5 }) && g.Select(q => q.SkillId).Distinct().Count() == 1), "invalid_topic_plan");
+        AskOneQuestionPerTopic = true;
+    }
     public string RequiredCapabilityCode { get; private set; } = "technical_interview";
     public string? PositionTitleSnapshot { get; private set; }
     public string? PositionDescriptionSnapshot { get; private set; }
@@ -232,7 +240,8 @@ public sealed class InterviewSession
     }
 
     private void CheckQuestion(Guid questionId) => InterviewRules.Require(Questions.Any(x => x.QuestionId == questionId && x.IsActive) &&
-        answers.All(x => x.QuestionId != questionId), "question_not_allowed");
+        answers.All(x => x.QuestionId != questionId) && (!AskOneQuestionPerTopic ||
+            answers.All(a => questions.Single(q => q.QuestionId == a.QuestionId).Topic != questions.Single(q => q.QuestionId == questionId).Topic)), "question_not_allowed");
 
     private void CheckTime(DateTimeOffset now)
     {

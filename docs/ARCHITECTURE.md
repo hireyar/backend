@@ -1,5 +1,10 @@
 # معماری و تصمیم‌ها
 
+## ADR-022 — بانک موضوعی پیشرفته و پیشنهاد گذرای AI (2026-10-06)
+
+ساختار گروهی opt-in در ویزارد است؛ قابلیت‌های موجود advanced_ai_workflow/adaptive_questions/adaptive_difficulty تعیین دسترسی می‌کنند، نه package code. قالب‌های ساده و جلسات قدیمی تغییر خودکار نمی‌کنند. گروه با TopicOrder/TopicName و Difficulty=1/3/5 روی سؤال ذخیره می‌شود؛ unique سطح در گروه و check PostgreSQL، اعتبارسنجی بانک کامل در Application. TopicOrder ترتیب آرایه و نام موضوع یکتا است؛ موجودیت اضافی برای گروه بی‌متادیتا لازم نیست. UseTopicQuestions قالب و AskOneQuestionPerTopic جلسه، snapshot ساختار را مستقل از ویرایش آینده نگه می‌دارند. Domain و Policy یک سؤال در هر موضوع را enforce می‌کنند؛ هر موضوع skill snapshot مستقل و سطح هدف از میانگین شواهد معتبر موضوع‌های قبلی، شروع متوسط. پیشنهاد AI صرفاً پاسخ گذرا، از JD scoped، با JSON محدود/اعتبارسنجی و تأیید صریح در save است؛ network زیر قفل سازمان نیست. قراردادهای مالی immutable و قابلیت جلسه پس از شروع از خرید billing خودش باقی‌اند. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md).
+
+
 ## ADR-021 — حساب موبایلی تک‌کاربر و حذف منطقی پنل (2026-10-06)
 
 طبق درخواست کاربر، API ایمیل/رمز و تیم و سرویس SMTP حذف شدند. Identity برای هویت/refresh باقی است. JWT/refresh/OTP فقط Owner فعال با موبایل تأییدشده را می‌پذیرند؛ DB unique سازمان برای IsActive و check نقش Owner مانع چند حساب فعال و Recruiter فعال‌اند. migration دسترسی Recruiter و refresh/invitation معلق را بازنشسته می‌کند ولی سابقه را پاک نمی‌کند. Entity/enum تاریخی برای سازگاری schema باقی است. انتقال Owner ایمیلی به شماره باید با بررسی مالکیت همان حساب باشد، نه تطبیق حدسی یا انتقال tenant.

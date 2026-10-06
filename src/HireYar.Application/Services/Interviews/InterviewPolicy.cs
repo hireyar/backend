@@ -13,15 +13,17 @@ public sealed class InterviewPolicy
             return [];
         var asked = session.Answers.Select(x => x.QuestionId).ToHashSet();
         if (session.CurrentQuestionId is { } current) asked.Add(current);
+        var askedTopics = session.Questions.Where(q => asked.Contains(q.QuestionId)).Select(q => q.Topic).ToHashSet();
         var covered = session.CoveredTopics.Where(x => x.Coverage >= coverageThreshold)
             .Select(x => (x.SkillId, x.Topic)).ToHashSet();
-        return session.Questions.Where(q => q.IsActive && !asked.Contains(q.QuestionId) &&
-                !covered.Contains((q.SkillId, q.Topic)) && session.Skills.Any(s => s.SkillId == q.SkillId))
+        var candidates = session.Questions.Where(q => q.IsActive && !asked.Contains(q.QuestionId) &&
+                (!session.AskOneQuestionPerTopic || !askedTopics.Contains(q.Topic)) && !covered.Contains((q.SkillId, q.Topic)) && session.Skills.Any(s => s.SkillId == q.SkillId))
             .OrderBy(q => session.SkillStates.Single(s => s.SkillId == q.SkillId).EvidenceCount)
             .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).IsRequired)
             .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).Priority)
             .ThenBy(q => Math.Abs(q.Difficulty - (adaptDifficulty ? TargetDifficulty(session, q.SkillId) : session.Skills.Single(s => s.SkillId == q.SkillId).TargetDifficulty)))
-            .ThenBy(q => q.Order).ThenBy(q => q.QuestionId).Take(shortlistLimit).ToArray();
+            .ThenBy(q => q.Order).ThenBy(q => q.QuestionId);
+        return (session.AskOneQuestionPerTopic ? candidates.DistinctBy(q => q.Topic) : candidates).Take(shortlistLimit).ToArray();
     }
 
     public InterviewQuestionSnapshot? SelectFallback(InterviewSession session, DateTimeOffset now, int shortlistLimit = 10) =>
@@ -44,6 +46,11 @@ public sealed class InterviewPolicy
 
     private static int TargetDifficulty(InterviewSession session, Guid skillId)
     {
+        if (session.AskOneQuestionPerTopic)
+        {
+            var observed = session.SkillStates.Where(s => s.EvidenceCount > 0).ToArray();
+            return observed.Length == 0 ? 3 : 1 + (int)Math.Round(observed.Average(s => s.CurrentScore) * 4);
+        }
         var state = session.SkillStates.Single(x => x.SkillId == skillId);
         return state.EvidenceCount == 0 ? session.Skills.Single(x => x.SkillId == skillId).TargetDifficulty : 1 + (int)Math.Round(state.CurrentScore * 4);
     }

@@ -10,13 +10,18 @@ public sealed record WizardTemplateRequest(
     Guid JobPositionId,
     [Required, StringLength(200)] string Title,
     [Required, RegularExpression("^(general|specialized)$")] string InterviewType,
-    [Required, MinLength(5), MaxLength(30)] List<string> Questions,
+    [MinLength(5), MaxLength(30)] List<string>? Questions,
     [Required, StringLength(2000)] string WelcomeMessage,
     [Required, StringLength(2000)] string GoodbyeMessage,
-    [Range(5, 60)] int DurationMinutes = 60) : IValidatableObject
+    [Range(5, 60)] int DurationMinutes = 60,
+    [MinLength(5), MaxLength(10)] List<QuestionTopicRequest>? Topics = null) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
     {
+        if ((Questions is null) == (Topics is null))
+            yield return new("فقط یکی از سؤال‌های معمولی یا موضوع‌های پیشرفته را ارسال کنید.");
+        if (Topics is not null && !QuestionTopicRules.IsValid(Topics))
+            yield return new("۵ تا ۱۰ موضوع یکتا، هرکدام با سه سؤال آسان، متوسط و سخت، لازم است.", [nameof(Topics)]);
         if (Questions is not null && Questions.Any(x => string.IsNullOrWhiteSpace(x) || x.Length > 2000))
             yield return new("متن هر سؤال الزامی و حداکثر ۲۰۰۰ کاراکتر است.", [nameof(Questions)]);
     }

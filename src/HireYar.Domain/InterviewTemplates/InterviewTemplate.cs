@@ -12,6 +12,7 @@ public sealed class InterviewTemplate
     public string GoodbyeMessage { get; set; } = "از وقتی که گذاشتید متشکریم.";
     public int DurationMinutes { get; set; }
     public int MaxFollowUpQuestionsPerQuestion { get; set; }
+    public bool UseTopicQuestions { get; set; }
     public bool IsArchived { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
@@ -25,6 +26,9 @@ public sealed class InterviewQuestion
     public Guid InterviewTemplateId { get; set; }
     public string Text { get; set; } = "";
     public int Order { get; set; }
+    public string? TopicName { get; set; }
+    public int? TopicOrder { get; set; }
+    public int Difficulty { get; set; } = 3;
     public string Competency { get; set; } = "";
     public string EvaluationGuidance { get; set; } = "";
 }

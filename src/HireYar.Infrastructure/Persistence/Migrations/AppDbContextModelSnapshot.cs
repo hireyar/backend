@@ -779,6 +779,11 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int>("Difficulty")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3);
+
                     b.Property<string>("EvaluationGuidance")
                         .IsRequired()
                         .HasMaxLength(4000)
@@ -795,14 +800,27 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<string>("TopicName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("TopicOrder")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("InterviewTemplateId", "Order")
                         .IsUnique();
 
+                    b.HasIndex("InterviewTemplateId", "TopicOrder", "Difficulty")
+                        .IsUnique()
+                        .HasFilter("\"TopicOrder\" IS NOT NULL");
+
                     b.ToTable("InterviewQuestions", t =>
                         {
                             t.HasCheckConstraint("CK_Question_Order", "\"Order\" BETWEEN 1 AND 30");
+
+                            t.HasCheckConstraint("CK_Question_Topic", "(\"TopicOrder\" IS NULL AND \"TopicName\" IS NULL AND \"Difficulty\" = 3) OR (\"TopicOrder\" IS NOT NULL AND \"TopicOrder\" BETWEEN 1 AND 10 AND \"TopicName\" IS NOT NULL AND length(trim(\"TopicName\")) > 0 AND \"Difficulty\" IN (1,3,5))");
                         });
                 });
 
@@ -860,6 +878,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("UseTopicQuestions")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("WelcomeMessage")
                         .IsRequired()
@@ -1195,6 +1216,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("AskOneQuestionPerTopic")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("CandidateApplicationId")
                         .HasColumnType("uuid");

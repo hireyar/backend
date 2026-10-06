@@ -70,6 +70,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == r.TemplateId
         && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.JobPositionId == jobId && !x.IsArchived, ct)
             ?? throw AppException.NotFound();
+        if (template.UseTopicQuestions) throw AppException.Invalid("use_wizard_for_topic_template");
         var skills = await (from p in db.PositionSkills
                             where p.OrganizationId == user.OrganizationId && p.JobPositionId == jobId
                             join s in db.Skills on p.SkillId equals s.Id

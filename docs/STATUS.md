@@ -1,5 +1,10 @@
 # وضعیت جاری
 
+## سؤال‌های پیشرفته مطابق HTML — 2026-10-06: Verified محلی
+
+روی dev: پیشنهاد کل بانک/بازسازی یک موضوع از JD scoped، سه سطح در ۵ تا ۱۰ موضوع، تأیید/ویرایش ویزارد با RowVersion، شمارنده‌های بانک/مصاحبه، snapshot و یک پرسش در هر موضوع اضافه شدند. معمولی و قالب‌های تاریخی محفوظ؛ entitlement در تولید/ذخیره/دعوت/شروع بررسی می‌شود. migration `20261006110718_AddAdvancedTopicQuestions` در مقصد لازم است؛ Angular در ریپو نیست. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). restore و tool restore موفق؛ build صفر warning/error؛ **۱۷۰/۱۷۰ تست موفق، صفر شکست و صفر Skip** روی PostgreSQL 18 محلی، شامل ۶ تست جدید موضوعی و ۴ تست adapter پیشنهاد AI. `tests/HireYar.Tests/TestResults/advanced-questions-final.trx`. مسیر کامل ۱۵ سؤال بانک → ۵ پاسخ/پنج موضوع → Completed، scope، تأیید/ویرایش و stale version، Basic، خروجی خراب/timeout و افت اشتراک پیشرفته به معمولی پیش از start تأیید شدند. EF بدون drift؛ اسکریپت idempotent دو بار روی baseline قبلی با قالب/سؤال/جلسه مصنوعی اجرا شد و legacy/constraint حفظ شدند. دیتابیس تصادفی حذف شد. AI/پرداخت واقعی، push/deploy و DB مقصد تغییر نکرده‌اند.
+
+
 ## پاک‌سازی حساب و حذف پنل — 2026-10-06: Verified محلی
 
 روی dev، تغییرات مستندی و اسکریپت تشخیص قبلی حفظ شدند. APIهای ایمیل/رمز و تیم و SMTP/Mailpit حذف شدند؛ حساب فعال فقط Owner با موبایل تأییدشده، حداکثر یک حساب فعال در هر سازمان. DELETE موقعیت/قالب/مصاحبه با حذف منطقی، scope، حفظ تاریخچه، منع دعوت تازه و تسویه مصرف/آزادسازی رزرو اضافه شد. [PANEL_CLEANUP_API](PANEL_CLEANUP_API.md) تحویل فرانت و شرایط انتقال Owner ایمیلی است. Angular/production تغییر نکردند؛ باگ entitlement ویزارد مشاهده‌شده در مرورگر هنوز اصلاح فرانت می‌خواهد و علت API آن این نوبت ادعا نشده است.

@@ -5,17 +5,20 @@ using Microsoft.EntityFrameworkCore;
 using HireYar.Application.Interviews;
 namespace HireYar.Application.InterviewTemplates;
 
-public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user, TimeProvider time)
+public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user, TimeProvider time, HireYar.Application.Billing.ISubscriptionEntitlementService entitlements)
 {
     private IQueryable<InterviewTemplate> Scoped => db.InterviewTemplates.Where(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null);
     private static TemplateDto Map(InterviewTemplate x) => new(x.Id, x.JobPositionId, x.Title, x.Language, x.DurationMinutes, x.MaxFollowUpQuestionsPerQuestion, x.IsArchived, x.RowVersion,
-        x.Questions.OrderBy(q => q.Order).Select(q => new QuestionDto(q.Id, q.Text, q.Order, q.Competency, q.EvaluationGuidance)).ToArray(), x.InterviewType, x.WelcomeMessage, x.GoodbyeMessage);
+        x.Questions.OrderBy(q => q.Order).Select(q => new QuestionDto(q.Id, q.Text, q.Order, q.Competency, q.EvaluationGuidance)).ToArray(), x.InterviewType, x.WelcomeMessage, x.GoodbyeMessage, x.UseTopicQuestions,
+        x.UseTopicQuestions ? x.Questions.GroupBy(q => q.TopicOrder).OrderBy(g => g.Key).Select(g => new QuestionTopicRequest(g.First().TopicName!,
+            g.OrderBy(q => q.Difficulty).Select(q => new TopicQuestionRequest(QuestionTopicRules.Level(q.Difficulty), q.Text)).ToList())).ToArray() : null,
+        x.UseTopicQuestions ? x.Questions.Select(q => q.TopicOrder).Distinct().Count() : x.Questions.Count);
     public async Task<Page<TemplateListDto>> ListAsync(PageQuery page, Guid? jobPositionId, CancellationToken ct)
     {
         var query = Scoped.AsNoTracking(); if (jobPositionId.HasValue) query = query.Where(x => x.JobPositionId == jobPositionId);
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.CreatedAtUtc).ThenBy(x => x.Id).Skip(page.Skip).Take(page.PageSize)
-            .Select(x => new TemplateListDto(x.Id, x.JobPositionId, x.Title, x.Language, x.DurationMinutes, x.IsArchived, x.RowVersion, x.InterviewType, x.Questions.Count)).ToListAsync(ct);
+            .Select(x => new TemplateListDto(x.Id, x.JobPositionId, x.Title, x.Language, x.DurationMinutes, x.IsArchived, x.RowVersion, x.InterviewType, x.Questions.Count, x.UseTopicQuestions, x.UseTopicQuestions ? x.Questions.Select(q => q.TopicOrder).Distinct().Count() : x.Questions.Count)).ToListAsync(ct);
         return new(rows, total, page.Page, page.PageSize);
     }
     public async Task<TemplateDto> GetAsync(Guid id, CancellationToken ct) => Map(await Scoped.AsNoTracking().Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound());
@@ -36,17 +39,29 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         // Existing session FKs require templates to retain their position. Cross-position reuse is a copy at invitation.
         if (id.HasValue && row.JobPositionId != r.JobPositionId) throw AppException.Invalid("template_position_immutable");
         row.InterviewType = r.InterviewType; row.WelcomeMessage = r.WelcomeMessage.Trim(); row.GoodbyeMessage = r.GoodbyeMessage.Trim();
+        if (r.Topics is not null)
+        {
+            if (!QuestionTopicRules.IsValid(r.Topics) || r.Questions is not null) throw AppException.Invalid("invalid_question_topics");
+            await entitlements.RequireAsync(user.OrganizationId, ["advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"], ct);
+        }
+        row.UseTopicQuestions = r.Topics is not null;
         var request = new TemplateRequest(r.JobPositionId, r.Title, r.DurationMinutes, 0,
-            r.Questions.Select((text, index) => new QuestionRequest(null, text, index + 1, "ارزیابی شغلی", "شواهد مرتبط با شرح شغل را بررسی کنید.")).ToList());
+            (r.Questions ?? r.Topics!.SelectMany(t => t.Questions.OrderBy(q => QuestionTopicRules.Difficulty(q.Level)).Select(q => q.Text)).ToList()).Select((text, index) => new QuestionRequest(null, text, index + 1, "ارزیابی شغلی", "شواهد مرتبط با شرح شغل را بررسی کنید.")).ToList());
         Apply(row, request);
-        if (id.HasValue) { db.SetOriginalVersion(row, version!); await db.ReplaceQuestionsAsync(row, Questions(row.Id, request), ct); }
-        else { row.Questions = Questions(row.Id, request); db.InterviewTemplates.Add(row); await db.SaveChangesAsync(ct); }
+        var questions = Questions(row.Id, request);
+        if (r.Topics is not null)
+            for (var i = 0; i < r.Topics.Count; i++)
+                foreach (var q in questions.Skip(i * 3).Take(3))
+                { q.TopicOrder = i + 1; q.TopicName = r.Topics[i].Name.Trim(); q.Competency = q.TopicName; q.Difficulty = new[] { 1, 3, 5 }[(q.Order - 1) % 3]; }
+        if (id.HasValue) { db.SetOriginalVersion(row, version!); await db.ReplaceQuestionsAsync(row, questions, ct); }
+        else { row.Questions = questions; db.InterviewTemplates.Add(row); await db.SaveChangesAsync(ct); }
         return Map(row);
     }
     public Task<TemplateDto> UpdateAsync(Guid id, UpdateTemplateRequest request, CancellationToken ct) => db.WithOrganizationBillingLockAsync(user.OrganizationId, () => UpdateAsyncLocked(id, request, ct), ct);
     private async Task<TemplateDto> UpdateAsyncLocked(Guid id, UpdateTemplateRequest request, CancellationToken ct)
     {
         var row = await Scoped.Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound();
+        if (row.UseTopicQuestions) throw AppException.Invalid("use_wizard_for_topic_template");
         await CheckJob(request.Template.JobPositionId, ct);
         if (request.Template.Questions.Any(x => x.Id.HasValue && row.Questions.All(q => q.Id != x.Id))) throw AppException.Invalid("unknown_question");
         db.SetOriginalVersion(row, request.RowVersion); Apply(row, request.Template);

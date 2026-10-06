@@ -19,7 +19,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             ?? throw AppException.NotFound();
         if (template.Questions.Count is < 5 or > 30) throw AppException.Invalid("template_requires_five_questions");
         var capability = r.InterviewType == "specialized" ? "technical_interview" : "hr_interview";
-        await entitlements.RequireAsync(user.OrganizationId, [capability, "ai_interview"], ct);
+        await entitlements.RequireAsync(user.OrganizationId, template.UseTopicQuestions ? [capability, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"] : [capability, "ai_interview"], ct);
         var sourceTemplateId = template.Id;
         var file = await ResumeUploadValidator.ReadAsync(resume, filename, ct);
         var now = time.GetUtcNow();
@@ -27,11 +27,11 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         if (template.JobPositionId != job.Id)
         {
             template = new InterviewTemplate { OrganizationId = user.OrganizationId, JobPositionId = job.Id,
-                Title = template.Title, InterviewType = template.InterviewType, Language = template.Language,
+                UseTopicQuestions = template.UseTopicQuestions, Title = template.Title, InterviewType = template.InterviewType, Language = template.Language,
                 WelcomeMessage = template.WelcomeMessage, GoodbyeMessage = template.GoodbyeMessage,
                 DurationMinutes = template.DurationMinutes, MaxFollowUpQuestionsPerQuestion = 0, CreatedAtUtc = now, UpdatedAtUtc = now,
                 Questions = template.Questions.OrderBy(x => x.Order).Select(x => new InterviewQuestion {
-                    Text = x.Text, Order = x.Order, Competency = x.Competency, EvaluationGuidance = x.EvaluationGuidance }).ToList() };
+                    TopicName = x.TopicName, TopicOrder = x.TopicOrder, Difficulty = x.Difficulty, Text = x.Text, Order = x.Order, Competency = x.Competency, EvaluationGuidance = x.EvaluationGuidance }).ToList() };
             foreach (var question in template.Questions) question.InterviewTemplateId = template.Id;
             db.InterviewTemplates.Add(template);
         }
@@ -40,11 +40,16 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             CreatedAtUtc = now, UpdatedAtUtc = now, ResumeContentType = file.ContentType, ResumeExtension = file.Extension };
         // A simple text bank uses a session-local job-evidence skill; no HR skill setup is required.
         var skillId = Guid.NewGuid();
+        var topicSkills = template.UseTopicQuestions ? template.Questions.GroupBy(x => x.TopicOrder)
+            .ToDictionary(g => g.Key!.Value, g => new InterviewSkill(Guid.NewGuid(), g.First().TopicName!, true, 100, 3)) : [];
         var questions = template.Questions.OrderBy(x => x.Order).Select(x => new InterviewQuestionSnapshot(
-            x.Id, skillId, x.Text, $"question-{x.Order}", 3, true, x.Order)).ToArray();
+            x.Id, template.UseTopicQuestions ? topicSkills[x.TopicOrder!.Value].SkillId : skillId,
+            x.Text, template.UseTopicQuestions ? x.TopicName! : $"question-{x.Order}", x.Difficulty, true, x.Order)).ToArray();
         var session = new InterviewSession(user.OrganizationId, job.Id, application.Id, template.Id,
-            questions, [new InterviewSkill(skillId, "ارزیابی شغلی", true, 100, 3)], questions.Length,
+            questions, template.UseTopicQuestions ? topicSkills.Values : [new InterviewSkill(skillId, "ارزیابی شغلی", true, 100, 3)],
+            template.UseTopicQuestions ? topicSkills.Count : questions.Length,
             template.DurationMinutes * 60, now, now.AddDays(r.DeadlineDays));
+        if (template.UseTopicQuestions) session.EnableTopicQuestions();
         session.SetRequiredCapability(capability);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
         var token = InterviewTokens.Create(); session.SetAccessTokenHash(InterviewTokens.Hash(token));

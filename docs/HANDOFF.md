@@ -1,5 +1,10 @@
 # تحویل پاک‌سازی حساب و حذف پنل — 2026-10-06
 
+## تحویل سؤال‌های پیشرفته — 2026-10-06
+
+تغییر روی dev؛ API مطابق [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). `POST /api/panel-wizard/question-suggestions` و `/topic` خروجی گذرا دارند. تأیید با POST/PUT templates و `topics`؛ معمولی همچنان `questions`. اولین سطح متوسط، سپس نزدیک‌ترین سطح بر مبنای شواهد؛ فقط یک سؤال در هر موضوع. بانک جدید opt-in و legacy محفوظ است. migration `20261006110718_AddAdvancedTopicQuestions` را قبل کد تازه اعمال کنید؛ EF tooling نیاز به ConnectionStrings__Default دارد. source/frontend جداست، نه deploy و نه DB مقصد تغییر کرده. restore/tool restore و build بدون warning/error موفق؛ ۱۷۰ تست بدون شکست/Skip، EF بدون drift و migration دوبار روی baseline قدیمی با حفظ داده مصنوعی تأیید شدند. TRX: `tests/HireYar.Tests/TestResults/advanced-questions-final.trx`. اسکریپت قابل انتشار در artifacts/advanced-questions-migrations.sql تولید شده (ignored). AI واقعی فقط با HTTP handler تست شده، نه تماس واقعی؛ بررسی Angular و provider مقصد هنوز انجام نشده است.
+
+
 درخواست جاری روی dev اجرا شد؛ تغییرات موجود docs/STATUS/BACKLOG/HANDOFF و scripts/Check-PanelSchema.sql حفظ شدند. [PANEL_CLEANUP_API](PANEL_CLEANUP_API.md) را به فرانت بدهید: فقط OTP، بدون email/password/member routes و dashboard counters تیم، سه DELETE جدید. migration تیم تاریخی را غیرفعال و refresh/invitation را باطل می‌کند؛ رکوردهای تاریخی باقی‌اند. Owner بدون موبایل تأییدشده پیش از انتشار باید به شماره معتبر همان حساب متصل شود؛ کاربران واقعی/production تغییر نکردند.
 
 حذف موقعیت قالب‌های خودش را پنهان می‌کند؛ دعوت قبلی همچنان snapshot دارد. حذف جلسه دسترسی/lease را باطل و مصرف پاسخ persistشده را تسویه و باقی رزرو را آزاد می‌کند؛ تاریخچه مالی/فایل فیزیکی حذف نمی‌شود. global filter/Repository جدید نداریم. قفل سازمان برای قالب/دعوت/حذف reuse و ReplaceQuestions با transaction caller سازگار شد. cancel/revoke قدیمی مستقل‌اند.
