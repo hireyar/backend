@@ -11,6 +11,9 @@ public sealed class AnswerUpload
     public Guid QuestionId { get; set; }
     [Required] public IFormFile Audio { get; set; } = null!;
     public int? DurationSeconds { get; set; }
+    [StringLength(128, MinimumLength = 1)] public string? ClientTurnId { get; set; }
+    public DateTimeOffset? LastSpeechEndUtc { get; set; }
+    public IFormFile? Video { get; set; }
 }
 [ApiController, Route("api/candidate/interviews/{interviewId:guid}")]
 [Authorize(AuthenticationSchemes = InterviewAuthenticationHandler.SchemeName)]
@@ -19,11 +22,14 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
 {
     [HttpPost("start")] public Task<CandidateInterviewDto> Start(Guid interviewId, CancellationToken ct) => service.StartAsync(interviewId, ct);
     [HttpGet("current")] public Task<CandidateInterviewDto> Current(Guid interviewId, CancellationToken ct) => service.CurrentAsync(interviewId, ct);
-    [HttpPost("answers"), RequestSizeLimit(54 * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 54 * 1024 * 1024)]
+    [HttpGet("messages")] public Task<IReadOnlyList<CandidateMessageDto>> Messages(Guid interviewId, CancellationToken ct) => service.MessagesAsync(interviewId, ct);
+    [HttpPost("answers"), Consumes("multipart/form-data"), RequestSizeLimit(92 * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 92 * 1024 * 1024)]
     public async Task<CandidateInterviewDto> Answer(Guid interviewId, [FromForm] AnswerUpload upload, CancellationToken ct)
     {
         await using var stream = upload.Audio.OpenReadStream();
-        return await service.SubmitAsync(interviewId, upload.QuestionId, stream, upload.Audio.FileName, upload.Audio.ContentType, upload.Audio.Length, upload.DurationSeconds, ct);
+        await using var video = upload.Video?.OpenReadStream();
+        return await service.SubmitAsync(interviewId, upload.QuestionId, stream, upload.Audio.FileName, upload.Audio.ContentType, upload.Audio.Length, upload.DurationSeconds, ct,
+            new(upload.ClientTurnId, upload.LastSpeechEndUtc, video, upload.Video?.FileName, upload.Video?.ContentType, upload.Video?.Length ?? 0));
     }
     [HttpPost("answers/{answerId:guid}/retry")] public Task<CandidateInterviewDto> Retry(Guid interviewId, Guid answerId, CancellationToken ct) => service.RetryAsync(interviewId, answerId, ct);
     [HttpPost("complete")] public Task<CandidateInterviewDto> Complete(Guid interviewId, CancellationToken ct) => service.CompleteAsync(interviewId, ct);

@@ -1,5 +1,11 @@
 # وضعیت جاری
 
+## گفت‌وگوی خودکار نوبتی داوطلب — 2026-10-06: Verified محلی
+
+روی dev پاک، POST answers با فیلدهای قبلی و clientTurnId/lastSpeechEndUtc/ویدیوی اختیاری گسترش یافت؛ metadata ذخیره می‌شود، unique نوبت در PostgreSQL و replay بدون پردازش دوباره، transcript داوطلب، messages با id/time سرور، mediaCapabilities و دانلود خصوصی HR و ویدیو واقعی در لیست پنل اضافه شدند. Swagger فقط multipart با فایل‌های binary دارد. طبق تصحیح کاربر، WebRTC/Realtime در محدوده نیست. سقف پیش‌فرض صوت ۲۰ MiB، ویدیو ۴۰ MiB و مدت ۶۰۰ ثانیه است؛ زمان کلاینت سیاست مالی را تغییر نمی‌دهد. [CANDIDATE_TURN_API](CANDIDATE_TURN_API.md).
+
+build صفر warning/error و **۱۷۵/۱۷۵ تست PostgreSQL 18 اختصاصی موفق، صفر شکست/Skip**، شامل ۵ تست جدید: replay/تاریخچه/ویدیو/scope، validation اندازه/type/UTC، رقابت همان شناسه، cleanup شکست video write و unique DB برای سؤال دیگر؛ آزمون OpenAPI نیز فرم binary را بررسی کرد. `tests/HireYar.Tests/TestResults/candidate-capture-final.trx`. EF بدون drift؛ script idempotent دو بار روی baseline قبلی با سؤال/پاسخ legacy مصنوعی، حفظ transcript/مالی و رد metadata ناقص ویدیو را تأیید کرد. DBهای تصادفی حذف شدند. migration `20261006170044_AddCandidateAnswerCapture` پیش از نسخه جدید در مقصد لازم است. Angular، ضبط/codec واقعی مرورگر، تنظیم proxy، AI واقعی، push/deploy و DB مقصد تغییر نکرده‌اند.
+
 ## رفع 500 ذخیره رزومه دعوت — 2026-10-06
 
 لاگ مقصد برای `POST /api/panel-wizard/invitations` با traceId `00-84eab4a04b430563040f0607ad411f60-8e12eee948539082-00` علت را تأیید کرد: UnauthorizedAccessException در Directory.CreateDirectory داخل LocalInterviewAudioStorage.SaveAsync؛ SQLSTATE خالی است. Dockerfile قبلی فقط /keys را برای APP_UID آماده می‌کرد، نه storage پیش‌فرض زیر /app. روی dev پوشه خصوصی /app/storage/interviews با مالکیت APP_UID و مجوز 700 و volume پایدار interview-storage در هر دو Compose اضافه شد؛ مسیر storage صریح است. schema/runtime API تغییر نکرد.

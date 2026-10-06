@@ -1,5 +1,13 @@
 # تحویل پاک‌سازی حساب و حذف پنل — 2026-10-06
 
+## تحویل گفت‌وگوی خودکار نوبتی — 2026-10-06
+
+شروع روی dev پاک و بدون تغییر کاربر بود؛ کد/مستندات این نوبت commitنشده‌اند. کاربر ابتدا WebRTC را انتخاب کرد، سپس صریحاً آن را تصحیح کرد: Realtime اجرا نشود. پاسخ خودکار با HTTP/MediaRecorder است. [CANDIDATE_TURN_API](CANDIDATE_TURN_API.md) را به فرانت بدهید؛ فیلدهای قبلی و POST/retry سازگارند، clientTurnId برای فرانت جدید لازم و برای legacy nullable، timestamp پایان speech بدون سکوت فقط metadata است. ویدیو اختیاری ذخیره و فقط HR scoped با retention دانلود می‌کند؛ به AI ارسال نمی‌شود. candidate current/start/answer/retry/complete قابلیت‌ها/سقف‌ها را می‌دهند، messages و transcript بازیابی متن را فراهم می‌کنند.
+
+نتیجه: build بدون warning/error، **۱۷۵ تست موفق PostgreSQL واقعی و صفر Skip**؛ TRX `tests/HireYar.Tests/TestResults/candidate-capture-final.trx`. replay هم‌زمان همان answer را با یک STT ثبت می‌کند؛ خطای video save فایل صوت را پاک می‌کند؛ Swagger audio/video را binary multipart نشان می‌دهد. EF بدون drift؛ `artifacts/candidate-capture-migrations.sql` دوبار روی baseline قبلی با legacy مصنوعی موفق، history/مالی محفوظ و constraint ناقص ویدیو رد شد. DBهای تصادفی حذف و cluster اختصاصی متوقف شد. هیچ AI واقعی، پیام، push/deploy یا تغییر production انجام نشد.
+
+پیش از انتشار migration `20261006170044_AddCandidateAnswerCapture` را اعمال کنید؛ API جدید با schema قبلی اجرا نشود. فرانت فقط با videoAnswers=true ویدیو ضبط کند، در retry شبکه همان clientTurnId را حفظ و برای retry پردازش مسیر answer.id را مصرف کند. proxy باید حجم فایل‌های صوت+ویدیو و زمان پردازش را بپذیرد؛ تنظیم proxy و test codec/camera/browser در این ریپو تأیید نشده‌اند. signature validation معادل decode/اسکن نیست؛ زمان دقیق صوت همچنان ادعا نمی‌شود. .NET tool restore به علت دسترسی sandbox به NuGet.Config شکست داشت و با اجرای مجاز EF pinشده و config منبع عمومی موجود بازیابی شد؛ وابستگی تازه نصب نشده است.
+
 ## تحویل رفع خطای ذخیره رزومه — 2026-10-06
 
 روی dev پاک شروع شد. لاگ سرور برای traceId `00-84eab4a04b430563040f0607ad411f60-8e12eee948539082-00` خطای UnauthorizedAccessException در ساخت پوشه LocalInterviewAudioStorage.SaveAsync را نشان داد؛ خطای مورد گزارش از دسترسی filesystem است. Dockerfile قبل USER پوشه /app/storage/interviews را با مالکیت APP_UID و مجوز 700 می‌سازد؛ هر دو Compose RootPath صریح و volume interview-storage دارند. فقط تنظیمات container/storage و مستندات تغییر کردند؛ migration لازم نیست.

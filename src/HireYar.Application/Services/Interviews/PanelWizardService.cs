@@ -122,6 +122,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                 TemplateTitle = x.s.TemplateTitleSnapshot ?? x.t.Title, x.s.RequiredCapabilityCode, x.status,
                 x.s.CreatedAtUtc, x.s.ExpiresAtUtc, x.s.StartedAtUtc, x.s.CompletedAtUtc, x.a.ResumeStorageKey,
                 x.s.AccessRevokedAtUtc,
+                VideoAvailable = x.s.Answers.Any(a => a.VideoStorageKey != null),
                 Score = x.s.SkillStates.Where(y => y.EvidenceCount > 0).Select(y => (decimal?)y.CurrentScore).Average() }).ToListAsync(ct);
         return new(rows.Select(x => new PanelInterviewDto(x.Id, x.FirstName, x.LastName, x.Email, x.Phone, x.JobPositionId,
             x.PositionTitle, x.TemplateId, x.TemplateTitle, x.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized",
@@ -129,6 +130,6 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             x.status == "completed" && x.Score.HasValue ? decimal.Round(x.Score.Value * 100, 2) : null,
             $"/api/interviews/{x.Id}", x.ResumeStorageKey is null ? null : $"/api/interviews/{x.Id}/resume",
             x.status is "pending" or "expired" && x.StartedAtUtc is null && x.AccessRevokedAtUtc is null,
-            x.status is not ("completed" or "cancelled"), false)).ToArray(), total, r.Page, r.PageSize);
+            x.status is not ("completed" or "cancelled"), x.VideoAvailable)).ToArray(), total, r.Page, r.PageSize);
     }
 }

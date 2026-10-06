@@ -12,6 +12,8 @@ public sealed record InterviewQuestionSnapshot
     public int Difficulty { get; private set; }
     public bool IsActive { get; private set; }
     public int Order { get; private set; }
+    public DateTimeOffset? AskedAtUtc { get; private set; }
+    internal void MarkAsked(DateTimeOffset now) { InterviewRules.Utc(now); AskedAtUtc ??= now; }
 
     public InterviewQuestionSnapshot(Guid questionId, Guid skillId, string text, string topic, int difficulty, bool isActive, int order = 0)
     {

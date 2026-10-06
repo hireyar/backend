@@ -144,6 +144,7 @@ public sealed class InterviewSession
         InterviewRules.Require(Status == InterviewStatus.Created, "interview_already_started");
         InterviewRules.Require(now < ExpiresAtUtc, "interview_expired");
         CheckQuestion(questionId); StartedAtUtc = now; CurrentQuestionId = questionId;
+        questions.Single(q => q.QuestionId == questionId).MarkAsked(now);
         Status = InterviewStatus.WaitingForAnswer;
     }
 
@@ -207,6 +208,7 @@ public sealed class InterviewSession
         CheckTime(now); RequireProcessed();
         InterviewRules.Require(AnsweredQuestionCount < MaxQuestionCount && RemainingSeconds(now) > 0, "interview_limit");
         CheckQuestion(questionId); CurrentQuestionId = questionId; QuestionReadyAtUtc = null; Status = InterviewStatus.WaitingForAnswer;
+        questions.Single(q => q.QuestionId == questionId).MarkAsked(now);
     }
 
     public void Complete(InterviewCompletionReason reason, DateTimeOffset now)

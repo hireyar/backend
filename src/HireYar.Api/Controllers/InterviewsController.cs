@@ -53,4 +53,12 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
         var cached = await audio.ResolveAsync(s.OrganizationId, q.Text, false, ct) ?? throw AppException.NotFound();
         return File(await storage.OpenReadAsync(cached.AudioStorageKey, ct), "audio/mpeg", enableRangeProcessing: true);
     }
+    [HttpGet("api/interviews/{id:guid}/answers/{answerId:guid}/video")]
+    public async Task<IActionResult> AnswerVideo(Guid id, Guid answerId, CancellationToken ct)
+    {
+        var s = await service.MediaScopedAsync(id, ct);
+        var answer = s.Answers.SingleOrDefault(x => x.Id == answerId) ?? throw AppException.NotFound();
+        if (answer.VideoStorageKey is null) throw AppException.NotFound();
+        return File(await storage.OpenReadAsync(answer.VideoStorageKey, ct), answer.VideoContentType!, enableRangeProcessing: true);
+    }
 }
