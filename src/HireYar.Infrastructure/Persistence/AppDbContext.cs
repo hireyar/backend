@@ -65,7 +65,8 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public void SetOriginalVersion(object entity, byte[] version) => Entry(entity).Property("RowVersion").OriginalValue = version;
     public async Task ReplaceQuestionsAsync(InterviewTemplate template, IReadOnlyList<InterviewQuestion> questions, CancellationToken ct)
     {
-        await using var tx = await Database.BeginTransactionAsync(ct);
+        // Join the organization transaction when called by template mutations.
+        await using var tx = Database.CurrentTransaction is null ? await Database.BeginTransactionAsync(ct) : null;
         // Persist the parent version check before replacing children. Delete/insert permits order swaps under a unique index.
         await SaveChangesAsync(ct);
         InterviewQuestions.RemoveRange(template.Questions);
@@ -73,6 +74,6 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
         template.Questions = questions.ToList();
         InterviewQuestions.AddRange(template.Questions);
         await SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        if (tx is not null) await tx.CommitAsync(ct);
     }
 }

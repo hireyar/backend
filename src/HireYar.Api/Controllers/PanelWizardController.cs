@@ -24,7 +24,7 @@ public sealed class WizardInvitationForm
 public sealed record UpdateWizardPositionRequest([Required] WizardPositionRequest Position,
     [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
 
-[ApiController, Authorize(Roles = "Owner,Recruiter"), Route("api/panel-wizard")]
+[ApiController, Authorize(Roles = "Owner"), Route("api/panel-wizard")]
 public sealed class PanelWizardController(JobService jobs, TemplateService templates, PanelWizardService wizard) : ControllerBase
 {
     [HttpPost("positions")]

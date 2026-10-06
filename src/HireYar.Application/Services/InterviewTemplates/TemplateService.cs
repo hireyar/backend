@@ -7,7 +7,7 @@ namespace HireYar.Application.InterviewTemplates;
 
 public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user, TimeProvider time)
 {
-    private IQueryable<InterviewTemplate> Scoped => db.InterviewTemplates.Where(x => x.OrganizationId == user.OrganizationId);
+    private IQueryable<InterviewTemplate> Scoped => db.InterviewTemplates.Where(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null);
     private static TemplateDto Map(InterviewTemplate x) => new(x.Id, x.JobPositionId, x.Title, x.Language, x.DurationMinutes, x.MaxFollowUpQuestionsPerQuestion, x.IsArchived, x.RowVersion,
         x.Questions.OrderBy(q => q.Order).Select(q => new QuestionDto(q.Id, q.Text, q.Order, q.Competency, q.EvaluationGuidance)).ToArray(), x.InterviewType, x.WelcomeMessage, x.GoodbyeMessage);
     public async Task<Page<TemplateListDto>> ListAsync(PageQuery page, Guid? jobPositionId, CancellationToken ct)
@@ -19,14 +19,16 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         return new(rows, total, page.Page, page.PageSize);
     }
     public async Task<TemplateDto> GetAsync(Guid id, CancellationToken ct) => Map(await Scoped.AsNoTracking().Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound());
-    public async Task<TemplateDto> CreateAsync(TemplateRequest request, CancellationToken ct)
+    public Task<TemplateDto> CreateAsync(TemplateRequest request, CancellationToken ct) => db.WithOrganizationBillingLockAsync(user.OrganizationId, () => CreateAsyncLocked(request, ct), ct);
+    private async Task<TemplateDto> CreateAsyncLocked(TemplateRequest request, CancellationToken ct)
     {
         await CheckJob(request.JobPositionId, ct);
         if (request.Questions.Any(x => x.Id.HasValue)) throw AppException.Invalid("unknown_question");
         var row = new InterviewTemplate { OrganizationId = user.OrganizationId, CreatedAtUtc = time.GetUtcNow() };
         Apply(row, request); row.Questions = Questions(row.Id, request); db.InterviewTemplates.Add(row); await db.SaveChangesAsync(ct); return Map(row);
     }
-    public async Task<TemplateDto> SaveWizardAsync(Guid? id, WizardTemplateRequest r, byte[]? version, CancellationToken ct)
+    public Task<TemplateDto> SaveWizardAsync(Guid? id, WizardTemplateRequest r, byte[]? version, CancellationToken ct) => db.WithOrganizationBillingLockAsync(user.OrganizationId, () => SaveWizardAsyncLocked(id, r, version, ct), ct);
+    private async Task<TemplateDto> SaveWizardAsyncLocked(Guid? id, WizardTemplateRequest r, byte[]? version, CancellationToken ct)
     {
         await CheckJob(r.JobPositionId, ct);
         var row = id.HasValue ? await Scoped.Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == id, ct)
@@ -41,7 +43,8 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         else { row.Questions = Questions(row.Id, request); db.InterviewTemplates.Add(row); await db.SaveChangesAsync(ct); }
         return Map(row);
     }
-    public async Task<TemplateDto> UpdateAsync(Guid id, UpdateTemplateRequest request, CancellationToken ct)
+    public Task<TemplateDto> UpdateAsync(Guid id, UpdateTemplateRequest request, CancellationToken ct) => db.WithOrganizationBillingLockAsync(user.OrganizationId, () => UpdateAsyncLocked(id, request, ct), ct);
+    private async Task<TemplateDto> UpdateAsyncLocked(Guid id, UpdateTemplateRequest request, CancellationToken ct)
     {
         var row = await Scoped.Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound();
         await CheckJob(request.Template.JobPositionId, ct);
@@ -50,7 +53,13 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         await db.ReplaceQuestionsAsync(row, Questions(row.Id, request.Template), ct); return Map(row);
     }
     private async Task CheckJob(Guid id, CancellationToken ct)
-    { if (!await db.JobPositions.AnyAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId, ct)) throw AppException.NotFound(); }
+    { if (!await db.JobPositions.AnyAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null, ct)) throw AppException.NotFound(); }
+    public Task DeleteAsync(Guid id, CancellationToken ct) => db.WithOrganizationBillingLockAsync(user.OrganizationId, async () =>
+    {
+        var row = await Scoped.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound();
+        row.DeletedAtUtc = time.GetUtcNow(); row.UpdatedAtUtc = row.DeletedAtUtc.Value; row.IsArchived = true;
+        return true;
+    }, ct);
     private static List<InterviewQuestion> Questions(Guid id, TemplateRequest r) => r.Questions.Select(q => new InterviewQuestion
     {
         Id = q.Id ?? Guid.NewGuid(),

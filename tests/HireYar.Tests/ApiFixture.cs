@@ -19,18 +19,6 @@ public sealed class PostgresFactAttribute : FactAttribute
 {
     public PostgresFactAttribute() { if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("HIREYAR_TEST_POSTGRES"))) Skip = "Set HIREYAR_TEST_POSTGRES to a local PostgreSQL test connection; no database substitute is used."; }
 }
-public sealed class TestEmail : IEmailSender
-{
-    public ConcurrentDictionary<string, string> Messages { get; } = new();
-    public bool Fail { get; set; }
-    public Task SendAsync(string recipient, string subject, string body, CancellationToken ct)
-    { if (Fail) throw new IOException("Simulated delivery failure."); Messages[recipient] = body; return Task.CompletedTask; }
-    public string Token(string email)
-    {
-        var body = Messages[email]; var marker = "token="; var start = body.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
-        return Uri.UnescapeDataString(body[start..].Split('\n')[0].Trim());
-    }
-}
 public sealed class TestPhoneOtp : IPhoneOtpSender
 {
     public ConcurrentDictionary<string, string> Codes { get; } = new();
@@ -45,11 +33,10 @@ public sealed class TestClock : TimeProvider
 public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public bool Production { get; init; }
-    public bool AutoConfirmEmailOnRegistration { get; init; }
     public bool UseFixedOtp { get; init; }
     public bool DisabledPayments { get; init; }
     public FakePaymentGateway PaymentGateway { get; } = new();
-    public TestEmail Email { get; } = new(); public TestClock Clock { get; } = new();
+    public TestClock Clock { get; } = new();
     public TestPhoneOtp PhoneOtp { get; } = new();
     public FakeInterviewProvider InterviewAi { get; } = new();
     private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
@@ -61,12 +48,10 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("SkipLocalSettings", "true");
         b.UseSetting("ConnectionStrings:Default", connection!);
         b.UseSetting("Security:SigningKey", Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
-        b.UseSetting("Security:AutoConfirmEmailOnRegistration", AutoConfirmEmailOnRegistration.ToString());
         b.UseSetting("Kavenegar:UseFixedOtp", UseFixedOtp.ToString());
         b.UseSetting("Kavenegar:FixedOtpCode", "123456");
         b.UseSetting("Security:Issuer", "HireYar.Tests"); b.UseSetting("Security:Audience", "HireYar.Tests");
         b.UseSetting("Security:FrontendUrl", Production ? "https://localhost:4200" : "http://localhost:4200"); b.UseSetting("Security:AllowedOrigins:0", Production ? "https://localhost:4200" : "http://localhost:4200");
-        b.UseSetting("Smtp:Host", "localhost"); b.UseSetting("Smtp:Port", "1025"); b.UseSetting("Smtp:From", "no-reply@hireyar.test");
         b.UseSetting("Security:DataProtectionPath", Path.Combine(Path.GetTempPath(), database));
         b.UseSetting("AuthRateLimit:PermitLimit", "1000");
         b.UseSetting("AI:Provider", "Disabled");
@@ -75,8 +60,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.ConfigureServices(s =>
         {
             if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }
-            s.RemoveAll<IEmailSender>();
-            s.AddSingleton<IEmailSender>(Email); s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
+            s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
             s.RemoveAll<IPhoneOtpSender>(); s.AddSingleton<IPhoneOtpSender>(PhoneOtp);
             s.RemoveAll<HireYar.Application.Interviews.ISpeechToTextService>(); s.AddSingleton<HireYar.Application.Interviews.ISpeechToTextService>(InterviewAi);
             s.RemoveAll<HireYar.Application.Interviews.IInterviewDecisionService>(); s.AddSingleton<HireYar.Application.Interviews.IInterviewDecisionService>(InterviewAi);
@@ -97,15 +81,22 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         await DisposeAsync();
     }
     public Browser Browser() => new(CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false, AllowAutoRedirect = false, BaseAddress = new Uri(Production ? "https://localhost" : "http://localhost") }));
-    public async Task<Account> RegisterConfirmed()
+    public async Task<HttpResponseMessage> SignInAsync(Browser browser, string mobile)
     {
-        var browser = Browser(); var address = $"{Guid.NewGuid():N}@example.test"; var password = "Test-" + Guid.NewGuid().ToString("N") + "!aA7";
-        var response = await browser.Send(HttpMethod.Post, "/api/auth/register", new RegisterRequest("Test Person", "Test Organization", address, password));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode); var registration = (await response.Content.ReadFromJsonAsync<RegistrationResult>(BillingJson.Options))!;
-        var confirmation = await browser.Send(HttpMethod.Post, "/api/auth/confirm-email", new TokenRequest(registration.UserId, Email.Token(address))); Assert.Equal(HttpStatusCode.NoContent, confirmation.StatusCode);
-        var login = await browser.Send(HttpMethod.Post, "/api/auth/login", new LoginRequest(address, password)); Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        var session = (await login.Content.ReadFromJsonAsync<AccessResponse>(BillingJson.Options))!; browser.AccessToken = session.AccessToken;
-        return new(browser, address, password, registration.UserId);
+        // Permit another synthetic OTP challenge without delaying the suite or changing the global clock.
+        await Db(async db => { var challenge = await db.OtpChallenges.SingleOrDefaultAsync(x => x.Mobile == mobile); if (challenge is not null) { challenge.CreatedAtUtc = Clock.GetUtcNow().AddMinutes(-2); await db.SaveChangesAsync(); } });
+        Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile))).StatusCode);
+        var response = await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", new VerifyOtpRequest(mobile, UseFixedOtp ? "123456" : PhoneOtp.Codes[mobile]));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        browser.AccessToken = (await response.Content.ReadFromJsonAsync<AccessResponse>())!.AccessToken;
+        return response;
+    }
+    public async Task<Account> RegisterOwner()
+    {
+        var browser = Browser(); var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
+        await SignInAsync(browser, mobile);
+        var me = (await (await browser.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        return new(browser, mobile, me.Id);
     }
     public async Task Db(Func<AppDbContext, Task> action) { await using var scope = Services.CreateAsyncScope(); await action(scope.ServiceProvider.GetRequiredService<AppDbContext>()); }
     public async Task FundInterviewsAsync(Account account)
@@ -120,7 +111,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     }
 }
 public sealed record PricingResponse(IReadOnlyList<HireYar.Application.Billing.PackageDto> Packages);
-public sealed record Account(Browser Client, string Email, string Password, Guid Id);
+public sealed record Account(Browser Client, string Mobile, Guid Id);
 public sealed class Browser(HttpClient client)
 {
     private readonly Dictionary<string, string> cookies = new();

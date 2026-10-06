@@ -19,7 +19,7 @@ public sealed class InterviewAuthenticationHandler(IOptionsMonitor<Authenticatio
         var token = header[7..];
         if (token.Length != 64 || !token.All(char.IsAsciiHexDigit)) return AuthenticateResult.Fail("Invalid interview access.");
         var hash = InterviewTokens.Hash(token);
-        var s = await db.InterviewSessions.AsNoTracking().Where(x => x.AccessTokenHash == hash)
+        var s = await db.InterviewSessions.AsNoTracking().Where(x => x.AccessTokenHash == hash && x.DeletedAtUtc == null)
             .Select(x => new { x.Id, x.AccessTokenHash, x.ExpiresAtUtc, x.AccessRevokedAtUtc }).SingleOrDefaultAsync(Context.RequestAborted);
         if (s is null || s.AccessRevokedAtUtc is not null || s.ExpiresAtUtc <= time.GetUtcNow() || !InterviewTokens.Matches(token, s.AccessTokenHash))
             return AuthenticateResult.Fail("Invalid interview access.");

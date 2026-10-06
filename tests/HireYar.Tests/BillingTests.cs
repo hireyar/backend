@@ -37,7 +37,7 @@ public sealed class BillingTests(ApiFixture f)
     private async Task<Guid> Org(Account a) { Guid org = default; await f.Db(async db => org = await db.Users.Where(x => x.Id == a.Id).Select(x => x.OrganizationId).SingleAsync()); return org; }
     private async Task<Account> Admin()
     {
-        var a = await f.RegisterConfirmed(); await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == a.Id); u.IsSystemAdmin = true; await db.SaveChangesAsync(); }); return a;
+        var a = await f.RegisterOwner(); await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == a.Id); u.IsSystemAdmin = true; await db.SaveChangesAsync(); }); return a;
     }
     private async Task<PackageDto> SeedPackage(string code) => (await (await f.Browser().Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!.Packages.Single(x => x.Code == code);
     private static PackageRequest Request(PackageDto p, decimal? rate = null, bool? active = null) => new(p.Code, p.Name, p.Description, active ?? p.IsActive, p.IsPublic, p.SortOrder, rate ?? p.AiPricePerMinuteUsd, p.RetentionDays);
@@ -93,7 +93,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Normal_hr_cannot_administer_pricing_and_admin_revocation_is_immediate()
     {
-        var a = await f.RegisterConfirmed(); Assert.Equal(HttpStatusCode.Forbidden, (await a.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        var a = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.Forbidden, (await a.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
         var admin = await Admin(); Assert.Equal(HttpStatusCode.OK, (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
         await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == admin.Id); u.IsSystemAdmin = false; await db.SaveChangesAsync(); });
         Assert.Equal(HttpStatusCode.Forbidden, (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
@@ -101,7 +101,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Duplicate_callbacks_and_concurrent_credit_verifications_fulfill_once()
     {
-        var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterConfirmed(); var pending = await BuyCredit(a, product.Id);
+        var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterOwner(); var pending = await BuyCredit(a, product.Id);
         Assert.Equal(PaymentStatus.Pending, pending.Payment.Status); Assert.Equal(123456m, pending.Payment.Amount);
         using var c = f.CreateClient(); var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => c.PostAsync($"/api/payment-callbacks/{pending.Payment.Id}", null)));
         Assert.All(responses, x => Assert.Equal(HttpStatusCode.NoContent, x.StatusCode)); await Verify(a, pending.Payment.Id);
@@ -111,7 +111,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Duplicate_provider_transaction_rolls_back_second_wallet_fulfillment()
     {
-        var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterConfirmed(); var b = await f.RegisterConfirmed();
+        var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterOwner(); var b = await f.RegisterOwner();
         var first = await BuyCredit(a, product.Id); var second = await BuyCredit(b, product.Id); var txn = "shared-test-" + Guid.NewGuid();
         f.PaymentGateway.Results[first.Payment.Id] = new(true, txn, first.Payment.Amount, "IRT"); f.PaymentGateway.Results[second.Payment.Id] = new(true, txn, second.Payment.Amount, "IRT");
         await Verify(a, first.Payment.Id); Assert.Equal(HttpStatusCode.Conflict, (await b.Client.Send(HttpMethod.Post, $"/api/billing/payments/{second.Payment.Id}/verify")).StatusCode);
@@ -121,7 +121,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Failed_or_mismatched_verification_never_credits_wallet()
     {
-        var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterConfirmed();
+        var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterOwner();
         foreach (var failure in new[] { new PaymentVerificationResult(false, null, 123456m, "IRT"), new(true, "invalid-amount", 1m, "IRT"), new(true, "invalid-currency", 123456m, "USD") })
         {
             var pending = await BuyCredit(a, product.Id); f.PaymentGateway.Results[pending.Payment.Id] = failure; await Verify(a, pending.Payment.Id);
@@ -132,7 +132,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Client_cannot_supply_authoritative_price_or_access_other_org_payment()
     {
-        var a = await f.RegisterConfirmed(); var b = await f.RegisterConfirmed(); var p = await SeedPackage("basic"); var period = p.Periods[0].Id;
+        var a = await f.RegisterOwner(); var b = await f.RegisterOwner(); var p = await SeedPackage("basic"); var period = p.Periods[0].Id;
         Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new { packagePeriodId = period, price = 1 })).StatusCode);
         var pending = await Buy(a, period);
         Assert.Equal(HttpStatusCode.NotFound, (await b.Client.Send(HttpMethod.Get, $"/api/billing/payments/{pending.Payment.Id}")).StatusCode);
@@ -142,7 +142,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Subscription_renewals_schedule_and_credit_purchase_does_not_extend_subscription()
     {
-        var a = await f.RegisterConfirmed(); var package = await SeedPackage("basic"); var p1 = await Buy(a, package.Periods[0].Id); await Verify(a, p1.Payment.Id);
+        var a = await f.RegisterOwner(); var package = await SeedPackage("basic"); var p1 = await Buy(a, package.Periods[0].Id); await Verify(a, p1.Payment.Id);
         var p2 = await Buy(a, package.Periods[0].Id); await Task.WhenAll(Verify(a, p2.Payment.Id), Verify(a, p2.Payment.Id));
         var org = await Org(a); await f.Db(async db => {
             var s = await db.OrganizationSubscriptions.Where(x => x.OrganizationId == org).OrderBy(x => x.StartedAtUtc).ToListAsync();
@@ -154,7 +154,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Snapshot_survives_catalog_price_rate_and_feature_changes_before_verification()
     {
-        var admin = await Admin(); var a = await f.RegisterConfirmed();
+        var admin = await Admin(); var a = await f.RegisterOwner();
         var create = await admin.Client.Send(HttpMethod.Post, "/api/admin/pricing/packages", new PackageRequest("contract_" + Guid.NewGuid().ToString("N"), "Original", "", true, true, 0, 0.123456m, 75));
         var p = (await create.Content.ReadFromJsonAsync<PackageDto>(BillingJson.Options))!;
         var period = await admin.Client.Send(HttpMethod.Post, $"/api/admin/pricing/packages/{p.Id}/periods", new PeriodWriteRequest(new(2, 123m, "IRT", 12m, true, 0), p.RowVersion));
@@ -173,7 +173,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Ledger_adjustment_is_idempotent_and_history_is_immutable_in_application_and_postgres()
     {
-        var a = await f.RegisterConfirmed(); var org = await Org(a); var key = Guid.NewGuid();
+        var a = await f.RegisterOwner(); var org = await Org(a); var key = Guid.NewGuid();
         async Task Adjust() { await using var scope = f.Services.CreateAsyncScope(); await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(org, new(key, 1.234567m, "Synthetic adjustment"), default); }
         await Task.WhenAll(Adjust(), Adjust()); Assert.Equal(1.234567m, (await Wallet(a)).Balance);
         await f.Db(async db => { var tx = await db.AiCreditTransactions.SingleAsync(x => x.ReferenceId == key); tx.Amount = 2; await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync()); });
@@ -182,7 +182,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Concurrent_reservations_cannot_overspend_and_cancel_releases_full_maximum()
     {
-        var a = await f.RegisterConfirmed(); var package = await SeedPackage("advanced"); var purchase = await Buy(a, package.Periods[0].Id); await Verify(a, purchase.Payment.Id);
+        var a = await f.RegisterOwner(); var package = await SeedPackage("advanced"); var purchase = await Buy(a, package.Periods[0].Id); await Verify(a, purchase.Payment.Id);
         var org = await Org(a); await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 5m, "Synthetic credit"), default);
         var i1 = await Invite(a); var i2 = await Invite(a); using var c1 = Candidate(i1); using var c2 = Candidate(i2);
         var results = await Task.WhenAll(c1.PostAsync($"/api/candidate/interviews/{i1.InterviewId}/start", null), c2.PostAsync($"/api/candidate/interviews/{i2.InterviewId}/start", null));
@@ -195,7 +195,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Completion_bills_server_window_once_and_releases_unused_reservation()
     {
-        var a = await f.RegisterConfirmed(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
+        var a = await f.RegisterOwner(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
         var start = await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null); var current = (await start.Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
         f.Clock.Offset = TimeSpan.FromSeconds(42);
         try
@@ -216,7 +216,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Long_disconnected_window_and_provider_retry_do_not_add_billable_time()
     {
-        var a = await f.RegisterConfirmed(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
+        var a = await f.RegisterOwner(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
         var current = (await (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null)).Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
         f.Clock.Offset = TimeSpan.FromSeconds(200); f.InterviewAi.FailStt = true;
         try
@@ -233,7 +233,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Expiry_during_started_interview_keeps_rate_but_blocks_new_start()
     {
-        var a = await f.RegisterConfirmed(); await f.FundInterviewsAsync(a); var org = await Org(a);
+        var a = await f.RegisterOwner(); await f.FundInterviewsAsync(a); var org = await Org(a);
         DateTimeOffset expiry = default; await f.Db(async db => expiry = await db.OrganizationSubscriptions.Where(x => x.OrganizationId == org).Select(x => x.ExpiresAtUtc).SingleAsync());
         f.Clock.Offset = expiry - DateTimeOffset.UtcNow - TimeSpan.FromSeconds(30);
         try
@@ -250,7 +250,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Expired_reservation_releases_available_credit_and_no_answer_cost()
     {
-        var a = await f.RegisterConfirmed(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
+        var a = await f.RegisterOwner(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
         Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null)).StatusCode);
         f.Clock.Offset = TimeSpan.FromHours(2);
         try { var w = await Wallet(a); Assert.Equal(0m, w.ReservedCredit); Assert.Equal(100m, w.AvailableCredit); await f.Db(async db => Assert.Equal(ReservationStatus.Expired, (await db.AiCreditReservations.SingleAsync(x => x.InterviewSessionId == invite.InterviewId)).Status)); }
@@ -259,7 +259,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Basic_entitlement_blocks_technical_invite_but_allows_hr_and_candidate_cannot_access_finance()
     {
-        var a = await f.RegisterConfirmed(); var p = await SeedPackage("basic"); var purchase = await Buy(a, p.Periods[0].Id); await Verify(a, purchase.Payment.Id);
+        var a = await f.RegisterOwner(); var p = await SeedPackage("basic"); var purchase = await Buy(a, p.Periods[0].Id); await Verify(a, purchase.Payment.Id);
         await using (var scope = f.Services.CreateAsyncScope())
         {
             var e = scope.ServiceProvider.GetRequiredService<ISubscriptionEntitlementService>(); var org = await Org(a);
@@ -278,7 +278,7 @@ public sealed class BillingTests(ApiFixture f)
         var disabled = new ApiFixture { DisabledPayments = true }; await disabled.InitializeAsync();
         try
         {
-            var a = await disabled.RegisterConfirmed(); var pricing = (await (await a.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
+            var a = await disabled.RegisterOwner(); var pricing = (await (await a.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
             var pending = (await (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(pricing.Packages[0].Periods[0].Id))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options))!;
             Assert.False(pending.GatewayEnabled); Assert.Null(pending.RedirectUrl); Assert.Equal(PaymentStatus.Pending, pending.Payment.Status);
             Assert.Equal(HttpStatusCode.ServiceUnavailable, (await a.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Payment.Id}/verify")).StatusCode);
@@ -289,7 +289,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Database_rejects_unledgered_wallet_mutation_and_cross_org_financial_relation()
     {
-        var a = await f.RegisterConfirmed(); var b = await f.RegisterConfirmed(); var orgA = await Org(a); var orgB = await Org(b); await Wallet(a);
+        var a = await f.RegisterOwner(); var b = await f.RegisterOwner(); var orgA = await Org(a); var orgB = await Org(b); await Wallet(a);
         await f.Db(async db => await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"OrganizationAiWallets\" SET \"Balance\" = 99 WHERE \"OrganizationId\" = {orgA}")));
         Assert.Equal(0m, (await Wallet(a)).Balance);
         await f.Db(async db => {
@@ -302,7 +302,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Credit_contract_and_conversion_ratio_survive_product_edit()
     {
-        var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterConfirmed(); var pending = await BuyCredit(a, product.Id);
+        var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterOwner(); var pending = await BuyCredit(a, product.Id);
         Assert.Equal(HttpStatusCode.OK, (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/ai-credit-packages/{product.Id}",
             new CreditPackageUpdateRequest(new("Changed synthetic product", 100m, 987654m, "IRT", false, false, 0), product.RowVersion))).StatusCode);
         await Verify(a, pending.Payment.Id); Assert.Equal(10m, (await Wallet(a)).Balance);
@@ -311,7 +311,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Concurrent_start_of_same_interview_reserves_only_once()
     {
-        var a = await f.RegisterConfirmed(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var first = Candidate(invite); using var second = Candidate(invite);
+        var a = await f.RegisterOwner(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var first = Candidate(invite); using var second = Candidate(invite);
         // Both starts use the same snapshot; the later UI response may race on the session version after generating audio.
         var responses = await Task.WhenAll(first.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null), second.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null));
         Assert.Contains(responses, x => x.StatusCode == HttpStatusCode.OK); Assert.All(responses, x => Assert.Contains(x.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
@@ -321,7 +321,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Bill_rate_is_preserved_after_package_edit_and_ledger_equals_wallet()
     {
-        var a = await f.RegisterConfirmed(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
+        var a = await f.RegisterOwner(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
         Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null)).StatusCode);
         var admin = await Admin(); var package = await SeedPackage("advanced");
         // Edit and restore the catalog without changing any existing purchase snapshot.
@@ -337,7 +337,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Basic_hr_interview_does_not_use_advanced_analysis_or_adaptive_llm()
     {
-        var a = await f.RegisterConfirmed(); var p = await SeedPackage("basic"); var purchase = await Buy(a, p.Periods[0].Id); await Verify(a, purchase.Payment.Id);
+        var a = await f.RegisterOwner(); var p = await SeedPackage("basic"); var purchase = await Buy(a, p.Periods[0].Id); await Verify(a, purchase.Payment.Id);
         await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(await Org(a), new(Guid.NewGuid(), 5m, "Synthetic HR credit"), default);
         var invite = await Invite(a, "hr_interview"); using var c = Candidate(invite); var calls = f.InterviewAi.LlmCalls;
         var started = (await (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null)).Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
@@ -350,7 +350,7 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Media_access_expires_using_purchased_retention_snapshot()
     {
-        var a = await f.RegisterConfirmed(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
+        var a = await f.RegisterOwner(); await f.FundInterviewsAsync(a); var invite = await Invite(a); using var c = Candidate(invite);
         var started = (await (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null)).Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
         Assert.Equal(HttpStatusCode.OK, (await a.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}/questions/{started.Question!.Id}/audio")).StatusCode);
         f.Clock.Offset = TimeSpan.FromDays(61);

@@ -1,5 +1,13 @@
 # معماری و تصمیم‌ها
 
+## ADR-021 — حساب موبایلی تک‌کاربر و حذف منطقی پنل (2026-10-06)
+
+طبق درخواست کاربر، API ایمیل/رمز و تیم و سرویس SMTP حذف شدند. Identity برای هویت/refresh باقی است. JWT/refresh/OTP فقط Owner فعال با موبایل تأییدشده را می‌پذیرند؛ DB unique سازمان برای IsActive و check نقش Owner مانع چند حساب فعال و Recruiter فعال‌اند. migration دسترسی Recruiter و refresh/invitation معلق را بازنشسته می‌کند ولی سابقه را پاک نمی‌کند. Entity/enum تاریخی برای سازگاری schema باقی است. انتقال Owner ایمیلی به شماره باید با بررسی مالکیت همان حساب باشد، نه تطبیق حدسی یا انتقال tenant.
+
+DeletedAtUtc از archive مجزاست؛ فیلترها در Application صریح‌اند و global filter نداریم، تا FK و مالی تاریخچه همچنان دیده شوند. حذف موقعیت قالب‌های خودش را در همان transaction پنهان می‌کند؛ دعوت قبلی snapshot دارد. ثبت قالب/دعوت و حذف زیر قفل موجود سازمان سریال‌اند؛ upload/network خارج transaction دعوت می‌ماند. ReplaceQuestions در transaction caller شرکت می‌کند و فقط transaction خودش را commit می‌کند؛ Repository جدید نیست.
+
+حذف جلسه زیر قفل مالی، دسترسی و lease را باطل، جلسه غیرنهایی را Cancel و مصرف پاسخ persistشده را تسویه می‌کند؛ باقی رزرو آزاد و history immutable است. پاسخ‌ها پس از گرفتن قفل بارگذاری می‌شوند تا انتظار قفل موجب تسویه داده کهنه نشود. حذف فیزیکی فایل/هویت یا restore اضافه نشد؛ این حذف از پنل است. cancel/revoke قدیمی مستقل‌اند. Swagger فارسی/tenant 404 حفظ و counters تیم از DTO داشبورد حذف شدند.
+
 ## ADR-020 — اشتراک و اعتبار پنل و ارتقای روزشمار (2026-10-05)
 
 درخواست مستقل `subscription_credit.html` روی برنچ مشتق از panel-wizard اجرا شد. APIهای panel، quote/checkout، financial-history و invoice داده چهار تب را می‌دهند؛ Controller → Application Service → EF abstraction و SQL فقط Infrastructure باقی‌اند. کاتالوگ پویا و feature-based است؛ ارتقا با حفظ تمام قابلیت‌ها و افزایش امکانات/محدودیت/retention تشخیص داده می‌شود، نام پکیج شرط runtime نیست. قیمت دوره قبلی final بعد از discount است؛ tax تنظیمی پیش‌فرض ۱۰٪ فقط checkout جدید و بر خالص پس از credit اعمال می‌شود. fingerprint محاسبه سرور تغییر قیمت/صف/اعتبار/tax بین preview و checkout را 409 می‌کند؛ داده مالی از client authoritative نیست.

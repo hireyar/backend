@@ -11,15 +11,16 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
 {
     public async Task<PanelInvitationResult> InviteAsync(WizardInvitationRequest r, Stream resume, string filename, CancellationToken ct)
     {
-        var job = await db.JobPositions.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.Id == r.JobPositionId, ct)
+        var job = await db.JobPositions.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == r.JobPositionId, ct)
             ?? throw AppException.NotFound();
         if (job.Status == HireYar.Domain.JobPositions.JobStatus.Archived) throw AppException.Invalid("position_archived");
         var template = await db.InterviewTemplates.AsNoTracking().Include(x => x.Questions)
-            .SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.Id == r.TemplateId && !x.IsArchived, ct)
+            .SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == r.TemplateId && !x.IsArchived, ct)
             ?? throw AppException.NotFound();
         if (template.Questions.Count is < 5 or > 30) throw AppException.Invalid("template_requires_five_questions");
         var capability = r.InterviewType == "specialized" ? "technical_interview" : "hr_interview";
         await entitlements.RequireAsync(user.OrganizationId, [capability, "ai_interview"], ct);
+        var sourceTemplateId = template.Id;
         var file = await ResumeUploadValidator.ReadAsync(resume, filename, ct);
         var now = time.GetUtcNow();
         // Keep the agreed position/template FK and reuse an organization's template by copying it to the selected position.
@@ -51,9 +52,15 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         try
         {
             application.ResumeStorageKey = saved.Key;
-            db.CandidateApplications.Add(application); db.InterviewSessions.Add(session);
-            // Application, optional template copy and session commit atomically in one SaveChanges.
-            await db.SaveChangesAsync(ct);
+            await db.WithOrganizationBillingLockAsync(user.OrganizationId, async () =>
+            {
+                // Serialize invitation persistence with position/template removal. File upload stays outside the lock.
+                if (!await db.JobPositions.AnyAsync(x => x.Id == job.Id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Status != HireYar.Domain.JobPositions.JobStatus.Archived, ct) ||
+                    !await db.InterviewTemplates.AnyAsync(x => x.Id == sourceTemplateId && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && !x.IsArchived, ct))
+                    throw AppException.NotFound();
+                db.CandidateApplications.Add(application); db.InterviewSessions.Add(session);
+                return true;
+            }, ct);
         }
         catch { await storage.DeleteAsync(saved.Key, CancellationToken.None); throw; }
         return Result(session, token);
@@ -64,7 +71,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
 
     public async Task<PanelInvitationResult> ResendAsync(Guid id, ResendInterviewRequest r, CancellationToken ct)
     {
-        var session = await db.InterviewSessions.SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.Id == id, ct)
+        var session = await db.InterviewSessions.SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)
             ?? throw AppException.NotFound();
         if (session.Status != InterviewStatus.Created || session.AccessRevokedAtUtc is not null) throw AppException.Conflict();
         var token = InterviewTokens.Create(); var now = time.GetUtcNow();
@@ -74,7 +81,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
 
     public async Task<(Stream Content, string ContentType, string Extension)> ResumeAsync(Guid id, CancellationToken ct)
     {
-        var applicationId = await db.InterviewSessions.Where(x => x.Id == id && x.OrganizationId == user.OrganizationId)
+        var applicationId = await db.InterviewSessions.Where(x => x.Id == id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null)
             .Select(x => (Guid?)x.CandidateApplicationId).SingleOrDefaultAsync(ct) ?? throw AppException.NotFound();
         var a = await db.CandidateApplications.AsNoTracking().SingleAsync(x => x.OrganizationId == user.OrganizationId && x.Id == applicationId, ct);
         if (a.ResumeStorageKey is null) throw AppException.NotFound();
@@ -88,7 +95,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             r.InvitedFromUtc > r.InvitedToUtc || r.CompletedFromUtc > r.CompletedToUtc) throw AppException.Invalid();
         var now = time.GetUtcNow();
         var query = from s in db.InterviewSessions.AsNoTracking().IgnoreAutoIncludes()
-                    where s.OrganizationId == user.OrganizationId
+                    where s.OrganizationId == user.OrganizationId && s.DeletedAtUtc == null
                     join a in db.CandidateApplications on s.CandidateApplicationId equals a.Id
                     join j in db.JobPositions on s.JobPositionId equals j.Id
                     join t in db.InterviewTemplates on s.InterviewTemplateId equals t.Id

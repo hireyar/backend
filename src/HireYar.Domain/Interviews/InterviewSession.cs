@@ -17,6 +17,12 @@ public sealed class InterviewSession
     public InterviewStatus Status { get; private set; } = InterviewStatus.Created;
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset ExpiresAtUtc { get; private set; }
+    public DateTimeOffset? DeletedAtUtc { get; private set; }
+    public void MarkDeleted(DateTimeOffset now)
+    {
+        CheckTime(now); DeletedAtUtc = now; RevokeAccess(now);
+        ProcessingLeaseId = null; ProcessingLeaseExpiresAtUtc = null; ProcessingRevision = Guid.NewGuid();
+    }
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
     public Guid? CurrentQuestionId { get; private set; }

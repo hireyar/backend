@@ -21,9 +21,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<ApplicationUser
         b.HasIndex(x => x.PhoneNumber).IsUnique().HasFilter("\"PhoneNumber\" IS NOT NULL");
         b.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
         b.HasIndex(x => x.NormalizedEmail).IsUnique(); b.HasIndex(x => new { x.OrganizationId, x.IsActive });
-        b.HasIndex(x => x.OrganizationId).IsUnique().HasFilter("\"Role\" = 'Owner'");
+        b.HasIndex(x => x.OrganizationId).IsUnique().HasFilter("\"IsActive\" = TRUE");
         b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
-        b.ToTable(t => t.HasCheckConstraint("CK_User_Role", "\"Role\" IN ('Owner','Recruiter')"));
+        b.ToTable(t => { t.HasCheckConstraint("CK_User_Role", "\"Role\" IN ('Owner','Recruiter')"); t.HasCheckConstraint("CK_User_ActiveOwner", "NOT \"IsActive\" OR \"Role\" = 'Owner'"); });
     }
 }
 public sealed class OtpChallengeConfiguration : IEntityTypeConfiguration<OtpChallenge>

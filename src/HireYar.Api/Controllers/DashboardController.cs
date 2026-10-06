@@ -3,7 +3,6 @@ using HireYar.Application.Common;
 using HireYar.Application.JobPositions;
 using HireYar.Application.InterviewTemplates;
 using HireYar.Application.Organizations;
-using HireYar.Application.Members;
 using HireYar.Application.Dashboard;
 using HireYar.Domain.JobPositions;
 using Microsoft.AspNetCore.Authorization;

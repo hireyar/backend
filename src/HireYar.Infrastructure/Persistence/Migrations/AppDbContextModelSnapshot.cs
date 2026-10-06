@@ -815,6 +815,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("integer");
 
@@ -1209,6 +1212,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CurrentQuestionId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1487,6 +1493,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(10000)
@@ -1641,7 +1650,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId")
                         .IsUnique()
-                        .HasFilter("\"Role\" = 'Owner'");
+                        .HasFilter("\"IsActive\" = TRUE");
 
                     b.HasIndex("PhoneNumber")
                         .IsUnique()
@@ -1651,6 +1660,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("AspNetUsers", null, t =>
                         {
+                            t.HasCheckConstraint("CK_User_ActiveOwner", "NOT \"IsActive\" OR \"Role\" = 'Owner'");
+
                             t.HasCheckConstraint("CK_User_Role", "\"Role\" IN ('Owner','Recruiter')");
                         });
                 });

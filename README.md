@@ -1,16 +1,14 @@
 # HireYar Backend
 
-ورود موبایلی جدید: پس از `GET /api/auth/csrf`، شماره ۱۱ رقمی ایران را به `POST /api/auth/otp/request` و سپس شماره و کد شش‌رقمی را به `POST /api/auth/otp/verify` بفرستید. verify برای موبایل تازه حساب Owner و سازمان اولیه می‌سازد و برای موبایل موجود وارد همان حساب می‌شود. پاسخ access token و کوکی refresh دارد. نام شرکت با `PUT /api/organization` تکمیل می‌شود. پیش از اجرا migration `AddMobileOtp` را اعمال کنید. تنظیمات `Kavenegar` در appsettings آمده‌اند؛ کلید و قالب واقعی را فقط خارج Git وارد کنید. در Development، `UseFixedOtp=true` و کد `123456` فعال است و پیامک ارسال نمی‌شود. مسیرهای ایمیل/رمز تا تصمیم مهاجرت حساب‌های موجود فعال مانده‌اند؛ جزئیات در docs/STATUS.md است.
+ورود و ثبت‌نام فقط با موبایل/OTP است؛ هر سازمان یک حساب فعال Owner دارد. مسیرهای ایمیل/رمز و دعوت/مدیریت اعضای تیم حذف شدند. دعوت کارجو، مصاحبه و Billing باقی‌اند. قرارداد جاری: [PANEL_CLEANUP_API](docs/PANEL_CLEANUP_API.md)، [PANEL_WIZARD_API](docs/PANEL_WIZARD_API.md)، [SUBSCRIPTION_CREDIT_API](docs/SUBSCRIPTION_CREDIT_API.md).
 
-تا زمان فراهم‌شدن SMTP، `Security:AutoConfirmEmailOnRegistration=true` در تنظیمات مشترک فعال است: حساب‌های Owner تازه بدون ایمیل تأیید، قابل ورود هستند. این گزینه مالکیت ایمیل را بررسی نمی‌کند و پس از راه‌اندازی SMTP باید false شود. این تنظیم جای اجرای migration PostgreSQL را نمی‌گیرد.
-
-پایه حساب‌های سازمانی و API پنل HR برای مصاحبه اولیه استخدام. تصمیم نهایی استخدام انسانی است؛ موتور مصاحبه و AI هنوز پیاده نشده‌اند.
+DELETE موقعیت/قالب/مصاحبه، موارد را از پنل پنهان می‌کند و سوابق مصاحبه و مالی را حفظ می‌کند. پیش از انتشار، migration `20261006071854_SimplifyAccountsAndPanelDeletion` را اعمال و Ownerهای ایمیلی فاقد شماره را به موبایل معتبر همان حساب متصل کنید؛ Angular در این ریپو نیست.
 
 نقطه شروع توسعه: [AGENTS](AGENTS.md). مراجع: [محصول](docs/PROJECT.md)، [معماری](docs/ARCHITECTURE.md)، [وضعیت واقعی](docs/STATUS.md)، [Backlog](docs/BACKLOG.md)، [ادامه کار](docs/HANDOFF.md).
 
 ## پیش‌نیاز و راه‌اندازی
 
-.NET SDK 10.0.400، PostgreSQL 18، و Mailpit محلی. Compose از PostgreSQL 18.3 استفاده می‌کند. برای روش container، Docker با Linux containers لازم است.
+.NET SDK 10.0.400 و PostgreSQL 18. Compose از PostgreSQL 18.3 استفاده می‌کند. برای روش container، Docker با Linux containers لازم است.
 
 ```powershell
 # src/HireYar.Api/appsettings.Development.local.json را با مقادیر توسعه بساز.
@@ -32,7 +30,6 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 روش تمام-container پس از migration: `pwsh -File scripts/Start-DevelopmentContainers.ps1 -IncludeApi`. اسکریپت مقدارهای لازم Compose را از appsettings محلی می‌خواند و فقط در محیط همان فرایند قرار می‌دهد؛ `.env` لازم نیست. API هیچ migration خودکاری در startup اجرا نمی‌کند.
 
 - OpenAPI: `http://localhost:5080/openapi/v1.json`؛ UI: `http://localhost:5080/swagger`. راهنمای کوتاه فارسیِ شروع و عنوان فارسی هر API بالای صفحه و کنار عملیات‌ها دیده می‌شود. هر دو در Development و Production بدون توکن در دسترس‌اند؛ endpointهای حساب و داده همچنان مجوز خود را می‌خواهند.
-- Mailpit: `http://localhost:8025`؛ SMTP محلی: پورت 1025.
 - health: `/health` فقط زنده‌بودن فرایند را نشان می‌دهد و آزمون آمادگی دیتابیس نیست.
 - نمونه جریان‌ها: [HireYar.Api.http](src/HireYar.Api/HireYar.Api.http). cookie jar ابزار HTTP باید فعال باشد. OpenAPI مرجع کامل endpointهاست.
 
@@ -47,8 +44,6 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 | `Security__FrontendUrl` | origin پنل برای لینک‌های ایمیل |
 | `Security__AllowedOrigins__0` | origin دقیق بدون slash پایانی؛ برای چند origin اندیس‌های بعدی |
 | `Security__DataProtectionPath` | مسیر دائمی قابل نوشتن برای کلیدهای Identity/CSRF |
-| `Smtp__Host`, `Smtp__Port`, `Smtp__From` | سرویس ارسال ایمیل |
-| `Smtp__EnableSsl`, `Smtp__Username`, `Smtp__Password` | TLS و اطلاعات اتصال SMTP؛ خارج ریپو |
 | `AllowedHosts` | hostnameهای واقعی API؛ پیش‌فرض localhost |
 | `AuthRateLimit__PermitLimit` | پیش‌فرض ۲۰ درخواست در دقیقه برای هر IP روی مسیرهای auth/ارسال دعوت |
 
@@ -56,7 +51,7 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 
 اگر proxy درخواست HTTPS را با HTTP به کانتینر می‌رساند، باید هدر دقیق `X-Forwarded-Proto: https` را ارسال کند. API در Production تنها همین مقدار را برای scheme درخواست اعمال می‌کند تا کوکی CSRF با `Secure` صادر شود؛ هدرهای چندمقداری یا سایر مقادیر پذیرفته نمی‌شوند. مسیر HTTP داخلی API باید با firewall یا شبکه خصوصی فقط برای proxy قابل دسترس باشد؛ هر فرستنده‌ای که مستقیم به آن برسد می‌تواند مقدار این هدر را جعل کند. پس از انتشار، پاسخ HTTPS `GET /api/auth/csrf` باید 200 و کوکی `hireyar.csrf` دارای `Secure` باشد.
 
-برای اجرای سرور با `ASPNETCORE_ENVIRONMENT=Production`، فایل نادیده‌گرفته‌شدهٔ `appsettings.Production.local.json` را کنار فایل‌های منتشرشدهٔ API قرار دهید، یا تنظیمات معادل را با متغیر محیطی بدهید. حداقل `ConnectionStrings:Default`، `Security:SigningKey`، `Security:Issuer`، `Security:Audience`، `Security:FrontendUrl`، `Security:AllowedOrigins`، `Security:DataProtectionPath` و تنظیمات SMTP لازم‌اند. فایل Development محلی همراه Git منتقل نمی‌شود. پس از انتشار نسخهٔ جدید، `/swagger` باید بدون Bearer باز شود؛ پاسخ 401 از `/api/auth/me` بدون Bearer رفتار درست است. کلید JWT سرور را ثابت و اختصاصی همان محیط نگه دارید؛ تغییر آن توکن‌های صادرشدهٔ قبلی را نامعتبر می‌کند.
+برای اجرای سرور با `ASPNETCORE_ENVIRONMENT=Production`، فایل نادیده‌گرفته‌شدهٔ `appsettings.Production.local.json` را کنار فایل‌های منتشرشدهٔ API قرار دهید، یا تنظیمات معادل را با متغیر محیطی بدهید. حداقل `ConnectionStrings:Default`، `Security:SigningKey`، `Security:Issuer`، `Security:Audience`، `Security:FrontendUrl`، `Security:AllowedOrigins`، `Security:DataProtectionPath` لازم‌اند. فایل Development محلی همراه Git منتقل نمی‌شود. پس از انتشار نسخهٔ جدید، `/swagger` باید بدون Bearer باز شود؛ پاسخ 401 از `/api/auth/me` بدون Bearer رفتار درست است. کلید JWT سرور را ثابت و اختصاصی همان محیط نگه دارید؛ تغییر آن توکن‌های صادرشدهٔ قبلی را نامعتبر می‌کند.
 
 برای اجرای همین `docker-compose.yml`، دو مقدار `HIREYAR_DB_CONNECTION` و `HIREYAR_SIGNING_KEY` را در محیط سرور یا فایل `.env` خارج Git تنظیم کنید. Compose بدون این دو مقدار اجرا نمی‌شود. پیش از بررسی ثبت‌نام، دسترسی API به PostgreSQL و اعمال migration را با تنظیمات همان محیط بررسی کنید؛ `GET /api/auth/csrf` به دیتابیس متصل نمی‌شود و موفقیت آن صحت اتصال را ثابت نمی‌کند.
 
@@ -65,16 +60,16 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 ## اتصال Angular و جریان نمونه
 
 ۱. با `withCredentials: true` از `GET /api/auth/csrf` توکن بگیر؛ cookie مربوط به antiforgery خودکار ذخیره می‌شود. مقدار JSON را در حافظه نگه دار و در `X-CSRF-TOKEN` برای تمام درخواست‌های غیر GET مسیر auth بفرست.
-۲. register را با نام، سازمان، ایمیل و رمز بفرست. لینک Mailpit را در صفحه frontend بخوان و `userId` و `token` را با POST به confirm-email بده. هیچ JWT پیش از تأیید صادر نمی‌شود.
-۳. login، Access Token را در JSON و refresh را فقط در cookie HttpOnly می‌دهد. access در حافظه Angular نگه‌داری شود؛ در `Authorization: Bearer ...` ارسال شود.
-۴. پس از login یا تغییر هویت bearer، CSRF جدید با همان bearer دریافت کن. توکن CSRF وابسته به هویت درخواست است. هنگام انقضای access، برای دریافت CSRF و refresh هر دو Authorization را حذف کن؛ سپس access جدید و CSRF متناسب با هویت جدید بگیر. refresh هم‌زمان در چند tab را هماهنگ کن؛ بازپخش، خانواده همان نشست را باطل می‌کند.
+۲. شماره mobile را به `POST /api/auth/otp/request` بفرست؛ سپس mobile/code را به `POST /api/auth/otp/verify` بده.
+۳. verify توکن access و کوکی refresh HttpOnly می‌دهد؛ access در حافظه فرانت نگه‌داری و در هدر Bearer ارسال شود.
+۴. پس از verify یا تغییر هویت bearer، CSRF جدید با همان bearer دریافت کن. توکن CSRF وابسته به هویت درخواست است. هنگام انقضای access، برای دریافت CSRF و refresh هر دو Authorization را حذف کن؛ سپس access جدید و CSRF متناسب با هویت جدید بگیر. refresh هم‌زمان در چند tab را هماهنگ کن؛ بازپخش، خانواده همان نشست را باطل می‌کند.
 ۵. موقعیت بساز، شناسه آن را برای ساخت قالب همراه سؤال‌ها استفاده کن. در ویرایش `rowVersion` پاسخ قبلی را بفرست؛ 409 نیازمند reload و تصمیم کاربر است. آرشیو موقعیت با `status=Archived` و آرشیو قالب با `isArchived=true` در PUT انجام می‌شود.
 
 refresh cookie، host-only، `Path=/api/auth`، `SameSite=Strict` و در production `Secure` است. CORS فقط originهای صریح و credentials را می‌پذیرد. CORS جای CSRF نیست. برای API با origin متفاوت، interceptor خودکار Angular لزوماً هدر XSRF را نمی‌فرستد؛ interceptor محدود به origin API خودتان برای `X-CSRF-TOKEN` بنویسید.
 
-logout فقط نشست refresh جاری را باطل می‌کند؛ logout-all همه نشست‌ها را. JWT صادرشده تا انقضای کوتاهش معتبر می‌ماند. غیرفعال‌شدن و تغییر نقش در هر درخواست از دیتابیس بررسی می‌شوند و بلافاصله اثر دارند. تغییر/بازیابی رمز همه refreshها را باطل می‌کند.
+logout فقط نشست refresh جاری را باطل می‌کند؛ logout-all همه نشست‌ها را. JWT صادرشده تا انقضای کوتاهش معتبر می‌ماند. غیرفعال‌شدن و تغییر نقش در هر درخواست از دیتابیس بررسی می‌شوند و بلافاصله اثر دارند. ورود ایمیلی و تغییر/بازیابی رمز وجود ندارد.
 
-خطاها ProblemDetails با `code` و `traceId` هستند؛ validation دارای `errors` است. پاسخ generic برای forgot/resend تضمین ارسال نیست؛ شکست SMTP با رویداد بدون داده حساس ثبت می‌شود. register و دعوت فیلد وضعیت ارسال دارند و resend در دسترس است.
+خطاها ProblemDetails با code و traceId هستند؛ validation دارای errors است.
 
 برای خطای 500، لاگ سرور با همان `traceId` نوع خطا و خطای داخلی، SQLSTATE در صورت وجود، stack trace، وضعیت HTTPS و فقط وجود هدر forwarded proto را ثبت می‌کند. با جست‌وجوی `traceId` پاسخ در `docker logs hireyar-api` خطای همان درخواست را پیدا کنید. متن exception، مقدار هدر، cookie، token و body ثبت نمی‌شوند؛ پاسخ عمومی نیز جزئیات داخلی را نشان نمی‌دهد.
 
@@ -87,11 +82,11 @@ New-Item -ItemType Directory artifacts -Force
 dotnet ef migrations script --idempotent --project src/HireYar.Infrastructure --startup-project src/HireYar.Api --output artifacts/migrations.sql
 ```
 
-تست‌ها PostgreSQL واقعی و دیتابیس تصادفی با پیشوند `hireyar_tests_` می‌سازند؛ پس از اجرا فقط همان دیتابیس حذف می‌شود. اتصال فقط localhost، 127.0.0.1 یا ::1 مجاز است؛ بدون متغیر محیطی تست‌های SQL به‌صورت صریح Skip می‌شوند. SMTP در تست API جایگزین حافظه‌ای کنترل‌شده دارد و ایمیل واقعی ارسال نمی‌شود. نتیجه تست و محدودیت Docker/SMTP در [STATUS](docs/STATUS.md) ثبت است.
+تست‌ها PostgreSQL واقعی و دیتابیس تصادفی با پیشوند `hireyar_tests_` می‌سازند؛ پس از اجرا فقط همان دیتابیس حذف می‌شود. اتصال فقط localhost، 127.0.0.1 یا ::1 مجاز است؛ بدون متغیر محیطی تست‌های SQL به‌صورت صریح Skip می‌شوند. OTP/AI/payment در تست API provider جعلی دارند و تماس واقعی انجام نمی‌شود. نتیجه تست و محدودیت Docker در [STATUS](docs/STATUS.md) ثبت است.
 
 SQL script باید قبل از انتشار بازبینی و با مجوز جداگانه اعمال شود. روی production خودکار اجرا نکن. برنچ `dev` محل توسعه است؛ `production` اکنون فقط نقطه پایه است و هنوز نسخه آماده انتشار ندارد.
 
-مراحل آینده: داوطلب و دعوت مصاحبه، جلسه صوتی، STT/LLM/TTS و گزارش مستند. حساب HR برای داوطلب ساخته نمی‌شود. هنگام ساخت جلسه باید از سؤال‌ها و معیارهای قالب snapshot گرفت تا ویرایش قالب روی جلسه قبلی اثر نگذارد. در این نسخه جلسه، snapshot engine، AI، فایل، OTP، social login، MFA، پرداخت، platform admin یا زیرساخت توزیع‌شده ساخته نشده است.
+دعوت کارجو، session/snapshot، providerهای AI و billing اکنون موجودند؛ آمادگی محیط مقصد و موارد باقی‌مانده در docs/STATUS.md ثبت است.
 
 
 

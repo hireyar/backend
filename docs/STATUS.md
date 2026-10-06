@@ -1,5 +1,15 @@
 # وضعیت جاری
 
+## پاک‌سازی حساب و حذف پنل — 2026-10-06: Verified محلی
+
+روی dev، تغییرات مستندی و اسکریپت تشخیص قبلی حفظ شدند. APIهای ایمیل/رمز و تیم و SMTP/Mailpit حذف شدند؛ حساب فعال فقط Owner با موبایل تأییدشده، حداکثر یک حساب فعال در هر سازمان. DELETE موقعیت/قالب/مصاحبه با حذف منطقی، scope، حفظ تاریخچه، منع دعوت تازه و تسویه مصرف/آزادسازی رزرو اضافه شد. [PANEL_CLEANUP_API](PANEL_CLEANUP_API.md) تحویل فرانت و شرایط انتقال Owner ایمیلی است. Angular/production تغییر نکردند؛ باگ entitlement ویزارد مشاهده‌شده در مرورگر هنوز اصلاح فرانت می‌خواهد و علت API آن این نوبت ادعا نشده است.
+
+restore/tool restore موفق؛ build صفر warning/error؛ **۱۶۰/۱۶۰ تست PostgreSQL 18 محلی موفق و صفر Skip**، شامل ۱۰ تست cleanup و انتقال fixture از ایمیل به OTP. EF بدون drift؛ script idempotent روی baseline قبلی با Owner/Recruiter/refresh/دعوت مصنوعی دو بار موفق و حفظ هویت/ابطال دسترسی تیم تأیید شد. `tests/HireYar.Tests/TestResults/panel-cleanup-final.trx`. migration `20261006071854_SimplifyAccountsAndPanelDeletion` در مقصد لازم است. پیامک/AI/پرداخت واقعی، push/deploy یا تغییر DB مقصد انجام نشد.
+
+## بررسی 500 پنل و داشبورد مقصد — 2026-10-06: در انتظار شواهد سرور
+
+روی `dev` پاک، گزارش `unexpected_error` برای `/api/billing/panel` و `/api/dashboard` بررسی شد. هر دو مسیر وابسته به schema جدیدند: جدول SubscriptionReplacements در مالی و ستون‌های snapshot/ResumeStorageKey در داشبورد. Program/Docker migration خودکار ندارند؛ نبود migration محتمل است ولی بدون لاگ traceId و وضعیت schema مقصد علت قطعی نیست. build صفر warning/error و ۱۷ تست مرتبط PostgreSQL واقعی بدون Skip موفق شدند؛ `tests/HireYar.Tests/TestResults/panel-errors-diagnostic.trx`. اسکریپت فقط‌خواندنی [Check-PanelSchema.sql](../scripts/Check-PanelSchema.sql) روی baseline قبل از دو migration، اشیای missing و پس از migration همه OK را نشان داد؛ DB مصنوعی حذف شد. کد runtime تغییر نکرد؛ production/push/deploy انجام نشد. برای ادامه، ExceptionType/SQLSTATE/StackTrace همان درخواست و نتیجه schema check از همان DB/search_path API لازم است.
+
 ## اشتراک و اعتبار مطابق پنل — 2026-10-05
 
 برنچ `codex/subscription-credit-panel` از `panel-wizard` پاک ساخته شد؛ APIهای چهار تب فایل `subscription_credit.html` آماده‌اند: `/api/billing/panel` وضعیت/صف/انقضا و wallet/rate/زمان تخمینی از اعتبار آزاد؛ quote/checkout با discount، tax تنظیمی پیش‌فرض ۱۰٪، fingerprint کنترل تغییر خلاصه و ارتقای روزشمار؛ financial-history با فیلتر نوع/تاریخ و totals مستقل از page؛ invoice JSON از پرداخت Paid scoped. owner خرید می‌کند، recruiter فقط مشاهده/preview. Swagger فارسی و مسیرهای قدیمی حفظ شدند؛ محاسبه مدت محدود سرور و billing جلسات قبلی تغییر نکرد.
