@@ -17,7 +17,7 @@ public sealed class PanelWizardTests(ApiFixture f)
         Enumerable.Range(1, count).Select(x => $"سؤال مصنوعی {x}").ToList(), "شروع آزمایشی", "پایان آزمایشی");
     private async Task<(Account Hr, JobDto Job, TemplateDto Template)> Setup()
     {
-        var hr = await f.RegisterConfirmed(); await f.FundInterviewsAsync(hr);
+        var hr = await f.RegisterOwner(); await f.FundInterviewsAsync(hr);
         var jobResponse = await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("موقعیت مصنوعی", "شرح شغل مصنوعی"));
         Assert.Equal(HttpStatusCode.OK, jobResponse.StatusCode);
         var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
@@ -66,7 +66,7 @@ public sealed class PanelWizardTests(ApiFixture f)
     [PostgresFact]
     public async Task Wizard_validates_fields_files_scope_and_reuses_organization_template_by_copy()
     {
-        var (hr, job, template) = await Setup(); var stranger = await f.RegisterConfirmed();
+        var (hr, job, template) = await Setup(); var stranger = await f.RegisterOwner();
         Assert.Equal(HttpStatusCode.BadRequest, (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", Template(job.Id, 4))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await Invite(hr, job.Id, template.Id, phone: "123")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await Invite(hr, job.Id, template.Id, interviewType: "unknown")).StatusCode);
@@ -83,7 +83,7 @@ public sealed class PanelWizardTests(ApiFixture f)
     [PostgresFact]
     public async Task Invitation_type_is_independent_of_bank_and_existing_capabilities_are_enforced()
     {
-        var hr = await f.RegisterConfirmed();
+        var hr = await f.RegisterOwner();
         var job = (await (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("مصنوعی", "شرح مصنوعی"))).Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
         var template = (await (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", Template(job.Id) with { InterviewType = "specialized" })).Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!;
         Assert.Equal(HttpStatusCode.Forbidden, (await Invite(hr, job.Id, template.Id)).StatusCode);

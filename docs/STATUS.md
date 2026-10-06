@@ -1,5 +1,20 @@
 # وضعیت جاری
 
+## سؤال‌های پیشرفته مطابق HTML — 2026-10-06: Verified محلی
+
+روی dev: پیشنهاد کل بانک/بازسازی یک موضوع از JD scoped، سه سطح در ۵ تا ۱۰ موضوع، تأیید/ویرایش ویزارد با RowVersion، شمارنده‌های بانک/مصاحبه، snapshot و یک پرسش در هر موضوع اضافه شدند. معمولی و قالب‌های تاریخی محفوظ؛ entitlement در تولید/ذخیره/دعوت/شروع بررسی می‌شود. migration `20261006110718_AddAdvancedTopicQuestions` در مقصد لازم است؛ Angular در ریپو نیست. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). restore و tool restore موفق؛ build صفر warning/error؛ **۱۷۰/۱۷۰ تست موفق، صفر شکست و صفر Skip** روی PostgreSQL 18 محلی، شامل ۶ تست جدید موضوعی و ۴ تست adapter پیشنهاد AI. `tests/HireYar.Tests/TestResults/advanced-questions-final.trx`. مسیر کامل ۱۵ سؤال بانک → ۵ پاسخ/پنج موضوع → Completed، scope، تأیید/ویرایش و stale version، Basic، خروجی خراب/timeout و افت اشتراک پیشرفته به معمولی پیش از start تأیید شدند. EF بدون drift؛ اسکریپت idempotent دو بار روی baseline قبلی با قالب/سؤال/جلسه مصنوعی اجرا شد و legacy/constraint حفظ شدند. دیتابیس تصادفی حذف شد. AI/پرداخت واقعی، push/deploy و DB مقصد تغییر نکرده‌اند.
+
+
+## پاک‌سازی حساب و حذف پنل — 2026-10-06: Verified محلی
+
+روی dev، تغییرات مستندی و اسکریپت تشخیص قبلی حفظ شدند. APIهای ایمیل/رمز و تیم و SMTP/Mailpit حذف شدند؛ حساب فعال فقط Owner با موبایل تأییدشده، حداکثر یک حساب فعال در هر سازمان. DELETE موقعیت/قالب/مصاحبه با حذف منطقی، scope، حفظ تاریخچه، منع دعوت تازه و تسویه مصرف/آزادسازی رزرو اضافه شد. [PANEL_CLEANUP_API](PANEL_CLEANUP_API.md) تحویل فرانت و شرایط انتقال Owner ایمیلی است. Angular/production تغییر نکردند؛ باگ entitlement ویزارد مشاهده‌شده در مرورگر هنوز اصلاح فرانت می‌خواهد و علت API آن این نوبت ادعا نشده است.
+
+restore/tool restore موفق؛ build صفر warning/error؛ **۱۶۰/۱۶۰ تست PostgreSQL 18 محلی موفق و صفر Skip**، شامل ۱۰ تست cleanup و انتقال fixture از ایمیل به OTP. EF بدون drift؛ script idempotent روی baseline قبلی با Owner/Recruiter/refresh/دعوت مصنوعی دو بار موفق و حفظ هویت/ابطال دسترسی تیم تأیید شد. `tests/HireYar.Tests/TestResults/panel-cleanup-final.trx`. migration `20261006071854_SimplifyAccountsAndPanelDeletion` در مقصد لازم است. پیامک/AI/پرداخت واقعی، push/deploy یا تغییر DB مقصد انجام نشد.
+
+## بررسی 500 پنل و داشبورد مقصد — 2026-10-06: در انتظار شواهد سرور
+
+روی `dev` پاک، گزارش `unexpected_error` برای `/api/billing/panel` و `/api/dashboard` بررسی شد. هر دو مسیر وابسته به schema جدیدند: جدول SubscriptionReplacements در مالی و ستون‌های snapshot/ResumeStorageKey در داشبورد. Program/Docker migration خودکار ندارند؛ نبود migration محتمل است ولی بدون لاگ traceId و وضعیت schema مقصد علت قطعی نیست. build صفر warning/error و ۱۷ تست مرتبط PostgreSQL واقعی بدون Skip موفق شدند؛ `tests/HireYar.Tests/TestResults/panel-errors-diagnostic.trx`. اسکریپت فقط‌خواندنی [Check-PanelSchema.sql](../scripts/Check-PanelSchema.sql) روی baseline قبل از دو migration، اشیای missing و پس از migration همه OK را نشان داد؛ DB مصنوعی حذف شد. کد runtime تغییر نکرد؛ production/push/deploy انجام نشد. برای ادامه، ExceptionType/SQLSTATE/StackTrace همان درخواست و نتیجه schema check از همان DB/search_path API لازم است.
+
 ## اشتراک و اعتبار مطابق پنل — 2026-10-05
 
 برنچ `codex/subscription-credit-panel` از `panel-wizard` پاک ساخته شد؛ APIهای چهار تب فایل `subscription_credit.html` آماده‌اند: `/api/billing/panel` وضعیت/صف/انقضا و wallet/rate/زمان تخمینی از اعتبار آزاد؛ quote/checkout با discount، tax تنظیمی پیش‌فرض ۱۰٪، fingerprint کنترل تغییر خلاصه و ارتقای روزشمار؛ financial-history با فیلتر نوع/تاریخ و totals مستقل از page؛ invoice JSON از پرداخت Paid scoped. owner خرید می‌کند، recruiter فقط مشاهده/preview. Swagger فارسی و مسیرهای قدیمی حفظ شدند؛ محاسبه مدت محدود سرور و billing جلسات قبلی تغییر نکرد.

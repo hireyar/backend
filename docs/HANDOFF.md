@@ -1,3 +1,22 @@
+# تحویل پاک‌سازی حساب و حذف پنل — 2026-10-06
+
+## تحویل سؤال‌های پیشرفته — 2026-10-06
+
+تغییر روی dev؛ API مطابق [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). `POST /api/panel-wizard/question-suggestions` و `/topic` خروجی گذرا دارند. تأیید با POST/PUT templates و `topics`؛ معمولی همچنان `questions`. اولین سطح متوسط، سپس نزدیک‌ترین سطح بر مبنای شواهد؛ فقط یک سؤال در هر موضوع. بانک جدید opt-in و legacy محفوظ است. migration `20261006110718_AddAdvancedTopicQuestions` را قبل کد تازه اعمال کنید؛ EF tooling نیاز به ConnectionStrings__Default دارد. source/frontend جداست، نه deploy و نه DB مقصد تغییر کرده. restore/tool restore و build بدون warning/error موفق؛ ۱۷۰ تست بدون شکست/Skip، EF بدون drift و migration دوبار روی baseline قدیمی با حفظ داده مصنوعی تأیید شدند. TRX: `tests/HireYar.Tests/TestResults/advanced-questions-final.trx`. اسکریپت قابل انتشار در artifacts/advanced-questions-migrations.sql تولید شده (ignored). AI واقعی فقط با HTTP handler تست شده، نه تماس واقعی؛ بررسی Angular و provider مقصد هنوز انجام نشده است.
+
+
+درخواست جاری روی dev اجرا شد؛ تغییرات موجود docs/STATUS/BACKLOG/HANDOFF و scripts/Check-PanelSchema.sql حفظ شدند. [PANEL_CLEANUP_API](PANEL_CLEANUP_API.md) را به فرانت بدهید: فقط OTP، بدون email/password/member routes و dashboard counters تیم، سه DELETE جدید. migration تیم تاریخی را غیرفعال و refresh/invitation را باطل می‌کند؛ رکوردهای تاریخی باقی‌اند. Owner بدون موبایل تأییدشده پیش از انتشار باید به شماره معتبر همان حساب متصل شود؛ کاربران واقعی/production تغییر نکردند.
+
+حذف موقعیت قالب‌های خودش را پنهان می‌کند؛ دعوت قبلی همچنان snapshot دارد. حذف جلسه دسترسی/lease را باطل و مصرف پاسخ persistشده را تسویه و باقی رزرو را آزاد می‌کند؛ تاریخچه مالی/فایل فیزیکی حذف نمی‌شود. global filter/Repository جدید نداریم. قفل سازمان برای قالب/دعوت/حذف reuse و ReplaceQuestions با transaction caller سازگار شد. cancel/revoke قدیمی مستقل‌اند.
+
+Migration `20261006071854_SimplifyAccountsAndPanelDeletion` لازم است. restore/tool restore موفق؛ build صفر warning/error؛ ۱۶۰/۱۶۰ تست PostgreSQL 18 loopback:55453 موفق و صفر Skip، شامل ۱۰ تست cleanup (حذف هنگام AI، رزرو/مصرف، scope، مسیرهای حذف‌شده و Owner واحد). TRX: `tests/HireYar.Tests/TestResults/panel-cleanup-final.trx`. EF بدون drift؛ `artifacts/panel-cleanup-migrations.sql` دو بار روی baseline قبلی با کاربر/دعوت مصنوعی موفق بود. DBهای تصادفی حذف و cluster پس از بررسی متوقف شد. API با schema قدیمی اجرا نشود؛ Angular، commit/push/deploy و پیامک/AI/پرداخت واقعی انجام نشدند.
+
+# بررسی خطای مقصد — 2026-10-06
+
+کاربر برای `/api/billing/panel` و `/api/dashboard` پاسخ 500 unexpected_error با traceId `00-60f635095836fd61c807bd42239b424f-3812b4fb9e574f05-00` گزارش کرد. Git شروع `dev` پاک بود. مسیرهای کد بررسی شدند؛ داشبورد snapshot/resume جدید و پنل مالی SubscriptionReplacements را می‌خوانند. migration خودکار در Program/Docker نیست. احتمال schema قدیمی ثبت شده، علت قطعی/رفع production ادعا نشده؛ منتظر لاگ مطابق traceId (ExceptionType، SqlState، StackTrace بدون داده محرمانه) و تأیید migration مقصد هستیم.
+
+اسکریپت جدید [Check-PanelSchema.sql](../scripts/Check-PanelSchema.sql) فقط‌خواندنی است؛ آن را روی همان DB و search_path API اجرا کنید. baseline قبل از دو migration اشیای missing و تاریخچه خالی، بعد از migration همه OK و دو شناسه را نشان داد. این بررسی وجود اشیای ضروری را کنترل می‌کند، نه تمام constraintها یا صحت داده‌ها. build صفر warning/error و ۱۷ تست مرتبط PostgreSQL 18 محلی موفق بدون Skip؛ TRX در `tests/HireYar.Tests/TestResults/panel-errors-diagnostic.trx`. DB مصنوعی حذف و cluster تست پس از بررسی متوقف شد. هیچ تغییر runtime، push/deploy یا تغییر DB مقصد انجام نشد. اگر لاگ SQLSTATE 42P01/42703 داشت، با نتیجه schema check تطبیق دهید؛ در غیر این صورت stack trace را مبنای اصلاح بگذارید.
+
 # تحویل اشتراک و اعتبار — 2026-10-05
 
 برنچ `codex/subscription-credit-panel` از `panel-wizard` طبق درخواست کاربر و Git پاک ساخته شد؛ تغییرات این نوبت commit نشده‌اند. [SUBSCRIPTION_CREDIT_API](SUBSCRIPTION_CREDIT_API.md) را به فرانت بدهید؛ overview یکپارچه تب وضعیت/اعتبار، کاتالوگ موجود، preview quote و سپس checkout با quoteFingerprint، financial-history با totals تمام بازه و invoice JSON پوشش داده می‌شوند. Role/tenant scope و عنوان فارسی Swagger حفظ‌اند. اشتراک پنل قبلی درخواست مستقل تازه دارد؛ متن تاریخی پایین درباره دست‌نخوردن Billing دیگر محدوده نوبت جاری نیست.

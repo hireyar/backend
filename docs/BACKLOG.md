@@ -1,5 +1,20 @@
 # Backlog
 
+## HY-018 — بانک سؤال موضوعی پیشرفته (2026-10-06): Verified محلی
+
+پیاده‌سازی backend پیشنهاد AI از JD، تولید کل/یک موضوع، ذخیره بانک سه‌سطحی کامل ۵ تا ۱۰ موضوع، ویرایش/حذف پیش‌نویس از PUT کامل، snapshot جلسه/کپی قالب و جلوگیری تکرار موضوع انجام شده؛ معمولی محفوظ است. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). باقی تحویل خارج ریپو: Angular لیست/آکاردئون، loading/retry، تأیید و counters؛ اجرای migration و تست AI واقعی در محیط مقصد توسط مالک محیط. این باقی‌مانده مجوز push/deploy یا تماس واقعی provider نیست. build بدون warning/error، ۱۷۰ تست موفق بدون Skip، EF بدون drift و migration idempotent دوباره روی داده legacy مصنوعی تأیید شدند.
+
+
+## HY-017 — حساب تک‌کاربر و حذف پنل (2026-10-06): Verified محلی
+
+ورود فقط OTP، حذف API ایمیل/رمز/تیم، DB constraint Owner فعال واحد، بازنشسته‌کردن دسترسی تیم تاریخی و DELETE موقعیت/قالب/مصاحبه با حفظ history/مالی/lease انجام شد. ۱۶۰ تست PostgreSQL واقعی و build موفق؛ [PANEL_CLEANUP_API](PANEL_CLEANUP_API.md) قرارداد فرانت. حذف سؤال از قالب قبلاً با PUT وجود داشت و حفظ شد. مدل چند Recruiter در یادداشت‌های قدیمی دیگر قرارداد محصول نیست.
+
+باقی مقصد: اتصال Owner ایمیلی فاقد شماره به موبایل معتبر همان حساب، اجرای migration تازه، حذف صفحات ایمیل/تیم و دکمه DELETE در Angular، اصلاح entitlement ویزارد گزارش‌شده در مرورگر. این موارد در مقصد/ریپوی فرانت اجرا نشدند؛ backlog مجوز اجرای خودکار قابلیت دیگر نیست.
+
+## خطای 500 پنل و داشبورد مقصد — 2026-10-06: تشخیص مقصد باز است
+
+build و ۱۷ تست مرتبط PostgreSQL محلی موفق‌اند؛ وابستگی هر دو مسیر به migrationهای AddPanelWizard و AddSubscriptionCreditPanel تأیید شد، ولی اجرای آن‌ها در مقصد معلوم نیست. [Check-PanelSchema.sql](../scripts/Check-PanelSchema.sql) تشخیص فقط‌خواندنی schema است و روی DB قدیمی/جدید مصنوعی بررسی شد. دریافت لاگ traceId گزارش‌شده و نتیجه این اسکریپت از DB واقعی API، سپس اصلاح بر اساس علت تأییدشده باقی است؛ این یادداشت مجوز تغییر production نیست.
+
 ## HY-016 — API اشتراک و اعتبار HTML (2026-10-05): Verified
 
 روی `codex/subscription-credit-panel` از panel-wizard، overview/زمان از اعتبار آزاد، quote/checkout با tax و discount و کنترل stale summary، ارتقای روزشمار با cutover append-only، فیلتر/جمع یکپارچه سوابق و invoice JSON پیاده شدند. Swagger فارسی، scope/Owner و snapshot مالی حفظ‌اند؛ ۱۶۱ تست PostgreSQL واقعی موفق، شش تست جدید و migration/script دوباره با داده قدیمی مصنوعی بررسی شدند. [SUBSCRIPTION_CREDIT_API](SUBSCRIPTION_CREDIT_API.md) قرارداد فرانت است. فرض کاری ارتقا دوره کامل جدید با کسر روزهای کامل مانده است؛ صف آینده یا pending باید پیش از upgrade حل شود. صرف expiry نمایش quote مجوز نادیده‌گرفتن پول احتمالی نیست.

@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
-[ApiController, Authorize(Roles = "Owner,Recruiter")]
+[ApiController, Authorize(Roles = "Owner")]
 public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel) : ControllerBase
 {
     [HttpGet("api/interviews")]
     public Task<Page<PanelInterviewDto>> List([FromQuery] InterviewListQuery query, CancellationToken ct) => panel.ListAsync(query, ct);
+    [HttpDelete("api/interviews/{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct) { await service.DeleteAsync(id, ct); return NoContent(); }
     [HttpPost("api/interviews/{id:guid}/resend")]
     public Task<PanelInvitationResult> Resend(Guid id, ResendInterviewRequest r, CancellationToken ct) => panel.ResendAsync(id, r, ct);
     [HttpPost("api/interviews/{id:guid}/cancel")]

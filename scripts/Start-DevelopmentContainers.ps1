@@ -22,9 +22,9 @@ try {
     Push-Location $projectRoot
     try {
         if ($IncludeApi) {
-            docker compose -f compose.dev.yaml up -d --build postgres mailpit api
+            docker compose -f compose.dev.yaml up -d --build postgres api
         } else {
-            docker compose -f compose.dev.yaml up -d postgres mailpit
+            docker compose -f compose.dev.yaml up -d postgres
         }
         if ($LASTEXITCODE -ne 0) { throw 'Docker Compose failed.' }
     } finally {

@@ -35,7 +35,7 @@ public sealed class BillingPanelTests(ApiFixture f)
     [PostgresFact]
     public async Task Panel_quote_tax_discount_invoice_and_renewal_use_server_snapshots()
     {
-        var a = await f.RegisterConfirmed(); var none = await Overview(a); Assert.Equal("none", none.SubscriptionState); Assert.Null(none.EstimatedAvailableMinutes);
+        var a = await f.RegisterOwner(); var none = await Overview(a); Assert.Equal("none", none.SubscriptionState); Assert.Null(none.EstimatedAvailableMinutes);
         var basic = await Package("basic"); var period = basic.Periods.Single(x => x.Months == 3);
         var quote = await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/quote", new SubscriptionQuoteRequest(period.Id));
         Assert.Equal(HttpStatusCode.OK, quote.StatusCode); var summary = (await quote.Content.ReadFromJsonAsync<CheckoutSummaryDto>(BillingJson.Options))!;
@@ -44,7 +44,7 @@ public sealed class BillingPanelTests(ApiFixture f)
         Assert.Equal(8550000m, summary.SubtotalAmount); Assert.Equal(855000m, summary.TaxAmount); Assert.Equal(9405000m, summary.TotalAmount);
         var checkout = await Checkout(a, period.Id); Assert.Equal(summary.TotalAmount, checkout.Checkout.Payment.Amount);
         Assert.Empty((await History(a)).Transactions.Items);
-        var stranger = await f.RegisterConfirmed();
+        var stranger = await f.RegisterOwner();
         Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, $"/api/billing/payments/{checkout.Checkout.Payment.Id}/invoice")).StatusCode);
         await Verify(a, checkout.Checkout.Payment.Id);
         var invoice = await (await a.Client.Send(HttpMethod.Get, $"/api/billing/payments/{checkout.Checkout.Payment.Id}/invoice")).Content.ReadFromJsonAsync<InvoiceDto>(BillingJson.Options);
@@ -62,7 +62,7 @@ public sealed class BillingPanelTests(ApiFixture f)
     [PostgresFact]
     public async Task Upgrade_prorates_and_replaces_once_without_mutating_original_contract()
     {
-        var a = await f.RegisterConfirmed(); var basic = await Package("basic"); var advanced = await Package("advanced");
+        var a = await f.RegisterOwner(); var basic = await Package("basic"); var advanced = await Package("advanced");
         var oldPurchase = await Checkout(a, basic.Periods.Single(x => x.Months == 1).Id); await Verify(a, oldPurchase.Checkout.Payment.Id);
         var original = (await Overview(a)).Current!;
         f.Clock.Offset = TimeSpan.FromDays(10);
@@ -95,7 +95,7 @@ public sealed class BillingPanelTests(ApiFixture f)
     [PostgresFact]
     public async Task Failed_upgrade_keeps_original_and_scheduled_queue_is_not_lost()
     {
-        var a = await f.RegisterConfirmed(); var basic = await Package("basic"); var advanced = await Package("advanced");
+        var a = await f.RegisterOwner(); var basic = await Package("basic"); var advanced = await Package("advanced");
         var old = await Checkout(a, basic.Periods[0].Id); await Verify(a, old.Checkout.Payment.Id);
         var upgrade = await Checkout(a, advanced.Periods[0].Id, "upgrade");
         f.PaymentGateway.Results[upgrade.Checkout.Payment.Id] = new(false, null, upgrade.Checkout.Payment.Amount, "IRT");
@@ -108,7 +108,7 @@ public sealed class BillingPanelTests(ApiFixture f)
     [PostgresFact]
     public async Task Credit_purchase_history_is_once_and_uses_paid_time_without_changing_subscription()
     {
-        var a = await f.RegisterConfirmed(); var admin = await f.RegisterConfirmed();
+        var a = await f.RegisterOwner(); var admin = await f.RegisterOwner();
         await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == admin.Id); u.IsSystemAdmin = true; await db.SaveChangesAsync(); });
         var product = (await (await admin.Client.Send(HttpMethod.Post, "/api/admin/pricing/ai-credit-packages", new CreditPackageRequest("Synthetic fifty dollars", 50m, 5000000m, "IRT", true, true, 0))).Content.ReadFromJsonAsync<CreditPackageDto>(BillingJson.Options))!;
         var credit = (await (await a.Client.Send(HttpMethod.Post, "/api/billing/ai-credit/purchases", new CreditPurchaseRequest(product.Id))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options))!;
@@ -127,7 +127,7 @@ public sealed class BillingPanelTests(ApiFixture f)
     [PostgresFact]
     public async Task Panel_estimate_excludes_reservations_and_history_contains_billed_duration_and_candidate()
     {
-        f.InterviewAi.Reset(); var a = await f.RegisterConfirmed(); await f.FundInterviewsAsync(a);
+        f.InterviewAi.Reset(); var a = await f.RegisterOwner(); await f.FundInterviewsAsync(a);
         var job = await (await a.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new { title = "Synthetic", description = "Synthetic job" })).Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options);
         var template = await (await a.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", new { jobPositionId = job.GetProperty("id").GetGuid(), title = "Synthetic", interviewType = "general", welcomeMessage = "Welcome", goodbyeMessage = "Goodbye", questions = Enumerable.Range(1, 5).Select(x => "Synthetic question " + x).ToArray() })).Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options);
         using var hr = f.CreateClient(); hr.DefaultRequestHeaders.Authorization = new("Bearer", a.Client.AccessToken);
@@ -158,7 +158,7 @@ public sealed class BillingPanelTests(ApiFixture f)
         var disabled = new ApiFixture { DisabledPayments = true }; await disabled.InitializeAsync();
         try
         {
-            var a = await disabled.RegisterConfirmed(); var basic = await Package("basic");
+            var a = await disabled.RegisterOwner(); var basic = await Package("basic");
             var read = await a.Client.Send(HttpMethod.Get, "/api/billing/panel"); Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             var dto = (await read.Content.ReadFromJsonAsync<BillingPanelDto>(BillingJson.Options))!; Assert.False(dto.CanPurchase); Assert.False(dto.GatewayEnabled);
             Assert.Equal(HttpStatusCode.OK, (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/quote", new SubscriptionQuoteRequest(basic.Periods[0].Id))).StatusCode);

@@ -19,7 +19,7 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
     }
     private void CheckAccess(InterviewSession s)
     {
-        if (s.AccessRevokedAtUtc is not null) throw AppException.Unauthorized();
+        if (s.DeletedAtUtc is not null || s.AccessRevokedAtUtc is not null) throw AppException.Unauthorized();
         if (s.ExpiresAtUtc <= time.GetUtcNow()) throw new AppException(410, "interview_expired", "The interview invitation expired.");
     }
     public async Task<CandidateInterviewDto> StartAsync(Guid id, CancellationToken ct)

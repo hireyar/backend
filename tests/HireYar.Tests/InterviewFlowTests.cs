@@ -74,7 +74,7 @@ public sealed class InterviewFlowTests(ApiFixture f)
     }
     private async Task<(Account Hr, InterviewInvitation Invite)> Invite()
     {
-        f.InterviewAi.Reset(); var hr = await f.RegisterConfirmed();
+        f.InterviewAi.Reset(); var hr = await f.RegisterOwner();
         await f.FundInterviewsAsync(hr);
         var job = await (await hr.Client.Send(HttpMethod.Post, "/api/job-positions", new { title = "Backend", description = "Synthetic description", seniority = "Senior", status = "Active" })).Content.ReadFromJsonAsync<JsonElement>();
         var id = job.GetProperty("id").GetGuid();
@@ -128,7 +128,7 @@ public sealed class InterviewFlowTests(ApiFixture f)
             Assert.NotEqual(invite.Token, s.AccessTokenHash); Assert.True(InterviewTokens.Matches(invite.Token, s.AccessTokenHash));
             Assert.Equal(3, s.Answers.Count); Assert.Equal(3, s.Questions.Count); Assert.Null(s.ProcessingLeaseId);
         });
-        var other = await f.RegisterConfirmed(); Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).StatusCode);
+        var other = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).StatusCode);
         await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{invite.InterviewId}/revoke");
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/candidate/interviews/{invite.InterviewId}/current")).StatusCode);
     }
@@ -227,7 +227,7 @@ public sealed class InterviewFlowTests(ApiFixture f)
         var answerUrl = Assert.Single(report.Answers).AudioUrl;
         Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Get, answerUrl)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(answerUrl)).StatusCode);
-        var otherHr = await f.RegisterConfirmed();
+        var otherHr = await f.RegisterOwner();
         Assert.Equal(HttpStatusCode.NotFound, (await otherHr.Client.Send(HttpMethod.Get, answerUrl)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await otherHr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}/questions/{started.Question.Id}/audio")).StatusCode);
         var spoof = await hr.Client.Send(HttpMethod.Post, $"/api/job-positions/{report.JobPositionId}/applications",

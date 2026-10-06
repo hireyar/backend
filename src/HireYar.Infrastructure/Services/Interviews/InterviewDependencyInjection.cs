@@ -26,6 +26,8 @@ public static class InterviewDependencyInjection
         services.AddOptions<InterviewStorageOptions>().Bind(config.GetSection("InterviewStorage"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.RootPath) && !o.RootPath.Split('/', '\\').Contains("wwwroot", StringComparer.OrdinalIgnoreCase), "InterviewStorage must be private and outside wwwroot.").ValidateOnStart();
         services.AddHttpClient<NetArzClient>(h => h.Timeout = Timeout.InfiniteTimeSpan).RemoveAllLoggers();
+        services.AddScoped<QuestionSuggestionService>();
+        services.AddScoped<IQuestionSuggestionProvider>(s => s.GetRequiredService<NetArzClient>());
         services.AddScoped<ISpeechToTextService>(s => s.GetRequiredService<NetArzClient>());
         services.AddScoped<IInterviewDecisionService>(s => s.GetRequiredService<NetArzClient>());
         services.AddScoped<ITextToSpeechService>(s => s.GetRequiredService<NetArzClient>());

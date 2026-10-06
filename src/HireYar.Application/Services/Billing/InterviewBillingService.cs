@@ -17,7 +17,7 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
         await db.ReloadInterviewAsync(session, ct);
         if (session.Status == InterviewStatus.Created)
         {
-            var subscription = await entitlements.RequireAsync(session.OrganizationId, [session.RequiredCapabilityCode, "ai_interview"], ct);
+            var subscription = await entitlements.RequireAsync(session.OrganizationId, session.AskOneQuestionPerTopic ? [session.RequiredCapabilityCode, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"] : [session.RequiredCapabilityCode, "ai_interview"], ct);
             var maximum = BillingMath.Cost(session.MaxDurationSeconds, subscription.AiRatePerMinuteUsd);
             var w = await wallet.WalletLockedAsync(session.OrganizationId, ct);
             if (w.Balance - await wallet.ReservedAsync(session.OrganizationId, ct) < maximum)
