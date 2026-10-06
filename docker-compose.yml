@@ -27,13 +27,16 @@ services:
 #      Security__AccessMinutes: "60"
 #      Security__RefreshDays: "30"
       Security__DataProtectionPath: "/keys"
+      InterviewStorage__RootPath: "/app/storage/interviews"
 
 
     volumes:
       - protection-keys:/keys
+      - interview-storage:/app/storage/interviews
 
     restart: unless-stopped
 
 volumes:
   protection-keys:
+  interview-storage:
 

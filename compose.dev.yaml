@@ -27,13 +27,16 @@ services:
       Security__FrontendUrl: http://localhost:4200
       Security__AllowedOrigins__0: http://localhost:4200
       Security__DataProtectionPath: /keys
+      InterviewStorage__RootPath: /app/storage/interviews
     ports:
       - "127.0.0.1:5080:8080"
     volumes:
       - protection-keys:/keys
+      - interview-storage:/app/storage/interviews
     depends_on:
       postgres:
         condition: service_healthy
 volumes:
   postgres-data:
   protection-keys:
+  interview-storage:

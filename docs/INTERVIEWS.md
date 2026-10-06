@@ -41,6 +41,8 @@
 
 `AI__Provider=NetArz` و `AI__NetArz__ApiKey` متغیرهای فعال‌سازی اصلی‌اند. همه فیلدهای دیگر نیز با `__` override می‌شوند. root صوت خارج wwwroot و خصوصی است؛ در deployment باید volume پایدار و دسترسی فایل فقط برای حساب سرویس فراهم شود. فایل‌ها binary در PostgreSQL نیستند؛ keyهای نسبی با الگوی محدود، مستقل از physical path ذخیره می‌شوند.
 
+Dockerfile پوشه `/app/storage/interviews` را پیش از `USER $APP_UID` با مالکیت همان کاربر و مجوز 700 می‌سازد. Composeهای production/development مسیر `InterviewStorage__RootPath` را به همین پوشه و volume دائمی `interview-storage` وصل می‌کنند؛ رزومه، پاسخ و صوت سؤال در آن حفظ می‌شوند. volume تازه مالکیت پوشه image را می‌گیرد؛ bind mount یا volume موجود باید جداگانه دسترسی نوشتن حساب سرویس را داشته باشد. پیش از وصل‌کردن volume تازه، اگر فایل قبلی در لایه کانتینر یا مسیر دیگری وجود دارد، آن را با حفظ keyهای نسبی و مالکیت منتقل کنید؛ mount تازه فایل‌های قبلی را خودکار مهاجرت نمی‌دهد.
+
 ## آماده‌سازی HR
 
 تمام درخواست‌های HR با JWT معمول Owner/Recruiter و tenant جاری سرور انجام می‌شوند. OrganizationId ورودی ندارند.

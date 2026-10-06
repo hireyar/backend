@@ -1,5 +1,11 @@
 # تحویل پاک‌سازی حساب و حذف پنل — 2026-10-06
 
+## تحویل رفع خطای ذخیره رزومه — 2026-10-06
+
+روی dev پاک شروع شد. لاگ سرور برای traceId `00-84eab4a04b430563040f0607ad411f60-8e12eee948539082-00` خطای UnauthorizedAccessException در ساخت پوشه LocalInterviewAudioStorage.SaveAsync را نشان داد؛ خطای مورد گزارش از دسترسی filesystem است. Dockerfile قبل USER پوشه /app/storage/interviews را با مالکیت APP_UID و مجوز 700 می‌سازد؛ هر دو Compose RootPath صریح و volume interview-storage دارند. فقط تنظیمات container/storage و مستندات تغییر کردند؛ migration لازم نیست.
+
+build صفر warning/error؛ ۲۱/۲۱ تست مرتبط روی PostgreSQL 18 اختصاصی loopback:55459 موفق و صفر Skip؛ TRX در `tests/HireYar.Tests/TestResults/invitations-storage-fix.trx`. config --quiet هر دو Compose موفق؛ Docker daemon موجود نیست، پس rebuild/run و مالکیت Linux در این نوبت تأیید نشده‌اند. دیتابیس‌های fixture حذف و cluster اختصاصی متوقف شد. push/deploy یا تغییر مقصد انجام نشده‌اند. برای اعمال در سرور باید image از Dockerfile اصلاح‌شده rebuild و کانتینر recreate شود؛ مسیر واقعی overrideشده و مجوز volume موجود را بررسی کنید. پیش از mount تازه، فایل‌های قبلی احتمالی را طبق [INTERVIEWS](INTERVIEWS.md) منتقل کنید تا keyهای DB همچنان resolve شوند؛ سپس writable بودن storage با حساب API و POST واقعی پنل را بررسی کنید.
+
 ## تحویل سؤال‌های پیشرفته — 2026-10-06
 
 تغییر روی dev؛ API مطابق [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). `POST /api/panel-wizard/question-suggestions` و `/topic` خروجی گذرا دارند. تأیید با POST/PUT templates و `topics`؛ معمولی همچنان `questions`. اولین سطح متوسط، سپس نزدیک‌ترین سطح بر مبنای شواهد؛ فقط یک سؤال در هر موضوع. بانک جدید opt-in و legacy محفوظ است. migration `20261006110718_AddAdvancedTopicQuestions` را قبل کد تازه اعمال کنید؛ EF tooling نیاز به ConnectionStrings__Default دارد. source/frontend جداست، نه deploy و نه DB مقصد تغییر کرده. restore/tool restore و build بدون warning/error موفق؛ ۱۷۰ تست بدون شکست/Skip، EF بدون drift و migration دوبار روی baseline قدیمی با حفظ داده مصنوعی تأیید شدند. TRX: `tests/HireYar.Tests/TestResults/advanced-questions-final.trx`. اسکریپت قابل انتشار در artifacts/advanced-questions-migrations.sql تولید شده (ignored). AI واقعی فقط با HTTP handler تست شده، نه تماس واقعی؛ بررسی Angular و provider مقصد هنوز انجام نشده است.
