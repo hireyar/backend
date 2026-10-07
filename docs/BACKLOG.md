@@ -124,3 +124,21 @@ audit پیش از staging 2026-10-01: [INTERVIEW_AUDIT](INTERVIEW_AUDIT.md) مر
 روی برنچ `codex/ai-appsettings` از `dev`، بخش `AI` در `src/HireYar.Api/appsettings.json` اضافه شد: Provider=NetArz، BaseUrl، مدل‌های STT/LLM/TTS، voice، speed و سه timeout. binding موجود `AI:NetArz` و انتخاب `AI:Provider` همین تنظیمات را مصرف می‌کنند؛ override محیطی/local همچنان اولویت دارد. ApiKey در محل فعلی و تمام فایل‌های کلید دست‌نخورده ماند؛ کلید تازه در appsettings اضافه یا کپی نشد. یادداشت‌های تاریخی Disabled برای پیش‌فرض مشترک دیگر وضعیت جاری این برنچ نیستند.
 
 Build موفق با صفر warning/error؛ تست‌های InterviewProviderTests و InterviewAudioTests: ۴۳ موفق، صفر شکست/Skip. تست کلید خالی اکنون مقدار خالی را صریحاً فقط در fixture خود می‌دهد تا وابسته به default فعلی نباشد. تماس واقعی AI، تست PostgreSQL، migration، commit، push و deploy انجام نشدند.
+
+## پیگیری بررسی مرورگر مصاحبه — 2026-10-07
+
+باز: پاسخ صوتی مقصد ثبت شده ولی transcript/ارزیابی آماده نشده؛ UI با صفر پاسخ پردازش‌شده و زمان صفر، بازیابی retry را عرضه نمی‌کند. علت اولیه با شواهد UI قطعی نیست. پیش از تغییر runtime، وضعیت answer/canRetry در current و failureCode/لاگ STT یا lease مقصد بررسی شود؛ سپس اولویت نمایش ProcessingAnswer/retry نسبت به اتمام زمان در فرانت تطبیق داده شود. این پیگیری مجوز deploy یا ارسال مجدد داده واقعی به AI نیست.
+
+شواهد جدید 2026-10-07: لاگ مقصد stt_http_404 و tts_http_404 با provider=NetArz را تأیید کرد؛ علت اولیه اکنون شکست HTTP سرویس صوت است. پیگیری باز: تطبیق provider/BaseUrl/مدل مؤثر سرور با قرارداد همان سرویس‌دهنده و اصلاح نمایش retry در فرانت. دلیل دقیق 404 هنوز بدون response پالایش‌شده provider مشخص نیست؛ انتخاب Liara از این لاگ قابل ادعا نیست.
+
+پیگیری Liara 2026-10-07: provider طبق لاگ Liara است ولی STT/TTS هر دو 403 می‌گیرند. کلید AI و scope همان پروژه، مدل‌های مجاز پلن و BaseUrl دقیق کنسول با /api/v1/{project} بررسی شوند. STT مستند openai/whisper-large-v3 است؛ مدل جاری openai/gpt-transcribe مستند نشده. علت قطعی 403 نیازمند error code/message پالایش‌شده مقصد است؛ تغییر حدسی کلید/پلن یا retry واقعی انجام نشد.
+
+تکمیل محلی دو اصلاح مجاز Liara — 2026-10-07: BaseUrl و STT در appsettings.json اصلاح شدند؛ ApiKey و سایر تنظیمات حفظ شدند. build و 55 تست مرتبط موفق. تأیید رفع 403 در مقصد، scope کلید/پلن و ایراد retry فرانت همچنان باز هستند؛ override مقصد باید با تنظیمات اصلاح‌شده تطبیق داده شود.
+
+بازبینی appsettings — 2026-10-07: JSON فایل‌های موجود معتبر، BaseUrl و STT اصلاح‌شده Liara صحیح، ApiKey نسبت به HEAD یکسان و قیود timeout/speed/lease (پیش‌فرض 300 ثانیه) معتبرند. نکته باقی‌مانده: AI:Provider فایل مشترک هنوز NetArz است؛ local override توسعه و AI__Provider در محیط این بررسی وجود ندارند. انتخاب Liara سرور از لاگ قبلی تأیید شده ولی تنظیمات مؤثر مقصد این نوبت خوانده نشد. درخواست صرفاً بررسی بود؛ تنظیمات تغییر نکردند و build/test تکرار نشد (55 تست و build نوبت اصلاح موفق بودند).
+
+## تنظیمات Liara مطابق curl موفق کاربر — 2026-10-07
+
+شواهد مستقیم کاربر، STT موفق با BaseUrl دارای الگوی /api/{project}/v1 و model=openai/gpt-transcribe را نشان داد. بنابراین توصیه قبلی برای جابه‌جایی مسیر و تغییر مدل بر اساس فهرست مستندات، برای این پروژه نادرست بود و این یادداشت جایگزین نتیجه آن توصیه است. در appsettings.json آدرس دقیق ارائه‌شده کاربر بدون تغییر شناسه پروژه و مدل openai/gpt-transcribe اعمال و AI:Provider=Liara شد. ApiKey و همه مقادیر دیگر عیناً حفظ و به‌صورت بدون نمایش مقدار بررسی شدند. transcript واقعی کاربر یا کلید در مستندات ثبت نشد.
+
+build صفر warning/error و 55/55 تست provider/selection/audio موفق، صفر شکست/Skip. STT واقعی طبق curl کاربر موفق است؛ تماس تازه AI توسط agent انجام نشد و موفقیت TTS یا مسیر کامل مصاحبه هنوز تأیید نشده. Overrideهای سرور ممکن است تنظیمات فایل را جایگزین کنند. مجوز کلید/پلن و علت 403 قبلی از این curl به‌تنهایی قابل تعیین نیست. push/deploy یا تغییر DB انجام نشد.
