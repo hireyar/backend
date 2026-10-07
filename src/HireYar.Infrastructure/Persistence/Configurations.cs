@@ -56,6 +56,12 @@ public sealed class TemplateConfiguration : IEntityTypeConfiguration<InterviewTe
         b.Property(x => x.InterviewType).HasMaxLength(20).IsRequired();
         b.Property(x => x.WelcomeMessage).HasMaxLength(2000).IsRequired();
         b.Property(x => x.GoodbyeMessage).HasMaxLength(2000).IsRequired();
+        b.Property(x => x.CandidateIntroductionMessage).HasMaxLength(2000).IsRequired();
+        b.Property(x => x.CompanyIntroductionMessage).HasMaxLength(2000).IsRequired();
+        b.ToTable(t => {
+            t.HasCheckConstraint("CK_Template_CandidateIntroduction", "NOT \"CandidateIntroductionEnabled\" OR length(btrim(\"CandidateIntroductionMessage\")) > 0");
+            t.HasCheckConstraint("CK_Template_CompanyIntroduction", "NOT \"CompanyIntroductionEnabled\" OR length(btrim(\"CompanyIntroductionMessage\")) > 0");
+        });
         b.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever(); b.HasIndex(x => new { x.OrganizationId, x.JobPositionId, x.CreatedAtUtc, x.Id });
         b.HasOne<JobPosition>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.JobPositionId }).HasPrincipalKey(x => new { x.OrganizationId, x.Id });
         b.ToTable(t =>

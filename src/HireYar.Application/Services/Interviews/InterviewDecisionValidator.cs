@@ -31,6 +31,15 @@ public sealed class InterviewDecisionValidator(InterviewPolicy policy)
                 x.Delta is < -1 or > 1 || string.IsNullOrWhiteSpace(x.Evidence) || x.Evidence.Length > 2000) ||
             decision.CoveredTopics.Any(x => x is null || x.Topic != question.Topic || !Unit(x.Coverage))) return fallback;
         if (decision.NextQuestionId is { } next && allowed.All(x => x.QuestionId != next)) return fallback;
+        if (decision.Action is not ("advance" or "clarify" or "followUp" or "redirect")) return fallback;
+        if (decision.Action != "advance")
+        {
+            if (session.RemainingInteractions == 0 || session.RemainingSeconds(now) < 15 ||
+                string.IsNullOrWhiteSpace(decision.CandidateMessage) || decision.CandidateMessage.Length > 2000 ||
+                decision.NextQuestionId is not null || decision.ShouldComplete || decision.SkillUpdates.Count > 0 || decision.CoveredTopics.Count > 0) return fallback;
+            return new([], [], null, false, null, decision.Action, decision.CandidateMessage);
+        }
+        if (decision.CandidateMessage is not null) return fallback;
         if (completion is null && decision.NextQuestionId is null) return fallback;
         return new(decision.SkillUpdates.Select(x => new SkillAssessment(x.SkillId, x.Delta, x.Confidence, x.Evidence)).ToArray(),
             decision.CoveredTopics.Select(x => new TopicAssessment(question.SkillId, x.Topic, x.Coverage)).ToArray(),

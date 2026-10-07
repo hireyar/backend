@@ -12,6 +12,8 @@ public sealed record InterviewDecision
     public required Guid? NextQuestionId { get; init; }
     public required bool ShouldComplete { get; init; }
     public required string Reason { get; init; }
+    public string Action { get; init; } = "advance";
+    public string? CandidateMessage { get; init; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -40,4 +42,4 @@ public sealed record TopicDecision
 
 public sealed record ValidatedInterviewDecision(IReadOnlyList<SkillAssessment> SkillUpdates,
     IReadOnlyList<TopicAssessment> CoveredTopics, Guid? NextQuestionId, bool UsedFallback,
-    InterviewCompletionReason? CompletionReason);
+    InterviewCompletionReason? CompletionReason, string Action = "advance", string? CandidateMessage = null);

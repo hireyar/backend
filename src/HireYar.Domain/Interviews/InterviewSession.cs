@@ -40,6 +40,57 @@ public sealed class InterviewSession
     public string? TemplateTitleSnapshot { get; private set; }
     public string? WelcomeMessage { get; private set; }
     public string? GoodbyeMessage { get; private set; }
+    public string? CandidateIntroductionMessage { get; private set; }
+    public bool CandidateIntroductionEnabled { get; private set; }
+    public string? CompanyIntroductionMessage { get; private set; }
+    public bool CompanyIntroductionEnabled { get; private set; }
+    public string Language { get; private set; } = "fa-IR";
+    public string? MasterPromptSnapshot { get; private set; }
+    public string? MasterPromptVersion { get; private set; }
+    public string? ResumeTextSnapshot { get; private set; }
+    public string? CandidateIntroductionTranscript { get; private set; }
+    public InterviewStage Stage { get; private set; } = InterviewStage.Questions;
+    public DateTimeOffset? StageChangedAtUtc { get; private set; }
+    public int RecoveryAttempts { get; private set; }
+    public int MaxInteractionsPerQuestion { get; private set; } = 2;
+    public string? CurrentInteractionMessage { get; private set; }
+    public int RemainingInteractions => Math.Max(0, MaxInteractionsPerQuestion - answers.Count(a => a.QuestionId == CurrentQuestionId && a.IsInteraction));
+    public void SetInteractionLimit(int limit)
+    { InterviewRules.Require(Status == InterviewStatus.Created && limit is >= 0 and <= 3, "invalid_interaction_limit"); MaxInteractionsPerQuestion = limit; }
+    public DateTimeOffset? NextRecoveryAtUtc { get; private set; }
+    public void SetAiSnapshot(string prompt, string version, string? resumeText, string language,
+        bool candidateEnabled, string candidateMessage, bool companyEnabled, string companyMessage)
+    {
+        InterviewRules.Require(Status == InterviewStatus.Created, "interview_already_started");
+        MasterPromptSnapshot = InterviewRules.Text(prompt, 16000); MasterPromptVersion = InterviewRules.Text(version, 100);
+        ResumeTextSnapshot = string.IsNullOrWhiteSpace(resumeText) ? null : InterviewRules.Text(resumeText, 32000);
+        Language = InterviewRules.Text(language, 20);
+        CandidateIntroductionEnabled = candidateEnabled; CompanyIntroductionEnabled = companyEnabled;
+        CandidateIntroductionMessage = candidateEnabled ? InterviewRules.Text(candidateMessage, 2000) : candidateMessage;
+        CompanyIntroductionMessage = companyEnabled ? InterviewRules.Text(companyMessage, 2000) : companyMessage;
+    }
+    public void AdvanceStage(InterviewStage expected, string? introduction, DateTimeOffset now)
+    {
+        CheckTime(now);
+        // A repeated acknowledgement is safe; a stale client cannot skip a stage.
+        if (Stage != expected) return;
+        var safeIntroduction = expected == InterviewStage.CandidateIntroduction ? InterviewRules.Text(introduction ?? "", 32000) : null;
+        Stage = Stage switch {
+            InterviewStage.Welcome => CandidateIntroductionEnabled ? InterviewStage.CandidateIntroduction : InterviewStage.Questions,
+            InterviewStage.CandidateIntroduction => InterviewStage.Questions,
+            InterviewStage.CompanyIntroduction => InterviewStage.Goodbye,
+            InterviewStage.Goodbye => InterviewStage.Finished,
+            _ => throw new InterviewRuleException("invalid_interview_stage")
+        };
+        if (expected == InterviewStage.CandidateIntroduction)
+            CandidateIntroductionTranscript = safeIntroduction;
+        StageChangedAtUtc = now;
+        if (Stage == InterviewStage.Questions && CurrentQuestionId is { } id) questions.Single(q => q.QuestionId == id).MarkAsked(now);
+    }
+    public void ScheduleRecovery(DateTimeOffset now, int delaySeconds)
+    { CheckTime(now); NextRecoveryAtUtc = now.AddSeconds(delaySeconds); }
+    public void BeginRecoveryAttempt(DateTimeOffset now)
+    { CheckTime(now); RecoveryAttempts++; NextRecoveryAtUtc = now.AddSeconds(30 * (1 << Math.Min(RecoveryAttempts, 5))); }
     public void SetPanelSnapshot(string title, string description, string templateTitle, string welcome, string goodbye)
     {
         InterviewRules.Require(Status == InterviewStatus.Created, "interview_already_started");
@@ -69,7 +120,7 @@ public sealed class InterviewSession
     public InterviewCompletionReason? CompletionReason { get; private set; }
     public int MaxQuestionCount { get; private set; }
     public int MaxDurationSeconds { get; private set; }
-    public int AnsweredQuestionCount => answers.Count(x => x.Status == AnswerStatus.Processed);
+    public int AnsweredQuestionCount => answers.Count(x => x.Status == AnswerStatus.Processed && !x.IsInteraction);
     public IReadOnlyList<InterviewQuestionSnapshot> Questions => questions.AsReadOnly();
     public IReadOnlyList<InterviewSkill> Skills => skills.AsReadOnly();
     public byte[] RowVersion { get; private set; } = [];
@@ -144,7 +195,9 @@ public sealed class InterviewSession
         InterviewRules.Require(Status == InterviewStatus.Created, "interview_already_started");
         InterviewRules.Require(now < ExpiresAtUtc, "interview_expired");
         CheckQuestion(questionId); StartedAtUtc = now; CurrentQuestionId = questionId;
-        questions.Single(q => q.QuestionId == questionId).MarkAsked(now);
+        Stage = CandidateIntroductionEnabled || CompanyIntroductionEnabled ? InterviewStage.Welcome : InterviewStage.Questions;
+        StageChangedAtUtc = now;
+        if (Stage == InterviewStage.Questions) questions.Single(q => q.QuestionId == questionId).MarkAsked(now);
         Status = InterviewStatus.WaitingForAnswer;
     }
 
@@ -152,15 +205,16 @@ public sealed class InterviewSession
     {
         CheckTime(now);
         InterviewRules.Require(Status == InterviewStatus.WaitingForAnswer, "interview_not_waiting");
+        InterviewRules.Require(Stage == InterviewStage.Questions, "invalid_interview_stage");
         InterviewRules.Require(RemainingSeconds(now) > 0, "interview_expired");
         InterviewRules.Require(CurrentQuestionId == questionId, "wrong_question");
-        InterviewRules.Require(answers.All(x => x.QuestionId != questionId), "duplicate_answer");
+        InterviewRules.Require(answers.All(x => x.QuestionId != questionId || x.IsInteraction), "duplicate_answer");
         var answer = new InterviewAnswer(Id, questionId, storageKey, contentType, size, now);
         // Bounded server response window. Time beyond the first 120 seconds is idle and excluded.
         // This is server-observed engagement, not decoded audio length or browser page-open duration.
         var elapsed = QuestionReadyAtUtc is { } ready ? (int)Math.Max(0, Math.Floor((now - ready).TotalSeconds)) : 0;
         answer.SetBillableSeconds(Math.Min(120, Math.Min(elapsed, RemainingSeconds(QuestionReadyAtUtc ?? now))));
-        answers.Add(answer); Status = InterviewStatus.ProcessingAnswer; return answer;
+        answers.Add(answer); Status = InterviewStatus.ProcessingAnswer; RecoveryAttempts = 0; NextRecoveryAtUtc = now; return answer;
     }
 
     public void BeginTranscription(Guid answerId) => Processing(answerId).BeginTranscription();
@@ -169,6 +223,13 @@ public sealed class InterviewSession
     public void BeginEvaluation(Guid answerId) => Processing(answerId).BeginEvaluation();
     public void FailAnswer(Guid answerId) => Processing(answerId).Fail();
     public void RetryAnswer(Guid answerId) => Processing(answerId).Retry();
+    public void ContinueQuestion(Guid answerId, string message, string model, string version, DateTimeOffset now)
+    {
+        CheckTime(now); var answer = Processing(answerId);
+        InterviewRules.Require(answer.Status == AnswerStatus.Evaluating && RemainingInteractions > 0 && RemainingSeconds(now) > 0, "interaction_limit");
+        answer.FinishInteraction(message, model, version, now); CurrentInteractionMessage = message;
+        Status = InterviewStatus.WaitingForAnswer; QuestionReadyAtUtc = null;
+    }
 
     public void FinishAnswer(Guid answerId, IReadOnlyList<SkillAssessment> updates,
         IReadOnlyList<TopicAssessment> topics, string model, string promptVersion, DateTimeOffset now)
@@ -207,7 +268,7 @@ public sealed class InterviewSession
     {
         CheckTime(now); RequireProcessed();
         InterviewRules.Require(AnsweredQuestionCount < MaxQuestionCount && RemainingSeconds(now) > 0, "interview_limit");
-        CheckQuestion(questionId); CurrentQuestionId = questionId; QuestionReadyAtUtc = null; Status = InterviewStatus.WaitingForAnswer;
+        CheckQuestion(questionId); CurrentQuestionId = questionId; CurrentInteractionMessage = null; QuestionReadyAtUtc = null; Status = InterviewStatus.WaitingForAnswer;
         questions.Single(q => q.QuestionId == questionId).MarkAsked(now);
     }
 
@@ -222,6 +283,8 @@ public sealed class InterviewSession
         if (reason == InterviewCompletionReason.DurationLimit)
             InterviewRules.Require(RemainingSeconds(now) == 0, "duration_limit_not_reached");
         CompletionReason = reason; CompletedAtUtc = now; CurrentQuestionId = null; Status = InterviewStatus.Completed;
+        Stage = CompanyIntroductionEnabled ? InterviewStage.CompanyIntroduction : InterviewStage.Goodbye;
+        StageChangedAtUtc = now; NextRecoveryAtUtc = null;
     }
 
     public void Cancel(DateTimeOffset now)
@@ -229,10 +292,11 @@ public sealed class InterviewSession
         CheckTime(now);
         InterviewRules.Require(Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled), "invalid_interview_state");
         CurrentQuestionId = null; CompletedAtUtc = now; Status = InterviewStatus.Cancelled;
+        Stage = InterviewStage.Finished; NextRecoveryAtUtc = null;
     }
 
     private void RequireProcessed() => InterviewRules.Require(Status == InterviewStatus.ProcessingAnswer &&
-        answers.Any(x => x.QuestionId == CurrentQuestionId && x.Status == AnswerStatus.Processed), "answer_not_processed");
+        answers.Any(x => x.QuestionId == CurrentQuestionId && x.Status == AnswerStatus.Processed && !x.IsInteraction), "answer_not_processed");
 
     private InterviewAnswer Processing(Guid answerId)
     {
@@ -253,3 +317,5 @@ public sealed class InterviewSession
             (x.ProcessedAtUtc is null || now >= x.ProcessedAtUtc)), "invalid_timestamp");
     }
 }
+
+public enum InterviewStage { Welcome, CandidateIntroduction, Questions, CompanyIntroduction, Goodbye, Finished }

@@ -87,6 +87,11 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         var session = new InterviewSession(user.OrganizationId, jobId, applicationId, template.Id, questions, skills,
             r.MaxQuestionCount, template.DurationMinutes * 60, now, now.AddHours(r.ExpiresInHours));
         session.SetRequiredCapability(r.RequiredCapabilityCode);
+        session.SetInteractionLimit(template.MaxFollowUpQuestionsPerQuestion);
+        var job = await db.JobPositions.AsNoTracking().SingleAsync(x => x.Id == jobId && x.OrganizationId == user.OrganizationId, ct);
+        session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
+        session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, null, template.Language,
+            template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
         session.SetAccessTokenHash(InterviewTokens.Hash(token)); db.InterviewSessions.Add(session);
         await db.SaveChangesAsync(ct);
         return new(session.Id, token, session.ExpiresAtUtc, $"/api/candidate/interviews/{session.Id}");
@@ -98,7 +103,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
             s.Questions.Select(q => new HrQuestionDto(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty)).ToArray(),
             s.Answers.Select(a => new HrAnswerDto(a.Id, a.QuestionId, a.Status.ToString(), a.Transcript, a.SelectionSource, a.FailureStage, a.FailureCode,
                 $"/api/interviews/{s.Id}/answers/{a.Id}/audio", a.VideoStorageKey is null ? null : $"/api/interviews/{s.Id}/answers/{a.Id}/video",
-                a.ClientTurnId, a.LastSpeechEndUtc, a.DurationSeconds)).ToArray(),
+                a.ClientTurnId, a.LastSpeechEndUtc, a.DurationSeconds, a.IsInteraction, a.AssistantMessage)).ToArray(),
             s.SkillStates.Select(x => new HrSkillStateDto(x.SkillId, x.CurrentScore, x.EvidenceCount, x.Confidence)).ToArray(),
             s.Evidence.Select(x => new HrEvidenceDto(x.InterviewAnswerId, x.QuestionId, x.SkillId, x.ScoreBefore, x.ScoreAfter, x.Delta, x.Confidence, x.Evidence, x.CreatedAtUtc)).ToArray(),
             s.CoveredTopics.Select(x => new HrTopicDto(x.SkillId, x.Topic, x.Coverage, x.EvidenceCount)).ToArray());

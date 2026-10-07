@@ -37,6 +37,13 @@ public sealed class InterviewAnswer
     public string? TranscriptModel { get; private set; }
     public string? DecisionModel { get; private set; }
     public string? PromptVersion { get; private set; }
+    public bool IsInteraction { get; private set; }
+    public string? AssistantMessage { get; private set; }
+    internal void FinishInteraction(string message, string model, string promptVersion, DateTimeOffset now)
+    {
+        AssistantMessage = InterviewRules.Text(message, 2000); IsInteraction = true;
+        Finish(model, promptVersion, now);
+    }
     public AnswerStatus Status { get; private set; } = AnswerStatus.Uploaded;
     public string? FailureStage { get; private set; }
     public string? FailureCode { get; private set; }

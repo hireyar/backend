@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using System.Text;
 using HireYar.Application.Interviews;
 using HireYar.Domain.Interviews;
@@ -113,10 +114,33 @@ public sealed class InterviewProviderTests
     {
         var handler = new Handler(async (request, ct) => {
             Assert.EndsWith("/chat/completions", request.RequestUri!.AbsolutePath);
-            var text = await request.Content!.ReadAsStringAsync(ct); Assert.Contains("availableQuestions", text); Assert.Contains("Never generate", text);
+            var text = await request.Content!.ReadAsStringAsync(ct); Assert.Contains("availableQuestions", text); Assert.Contains("Never invent main questions", text);
             return new(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"{}\"}}]}") };
         });
         Assert.Equal("{}", (await Client(handler).EvaluateAsync(Context(), default)).Json);
+    }
+    [Fact]
+    public async Task Llm_sends_invitation_prompt_as_system_and_resume_job_bank_and_dialogue_as_untrusted_context()
+    {
+        var context = Context() with { MasterPrompt = "Synthetic immutable invitation master", PositionDescription = "Synthetic job description",
+            ResumeText = "Synthetic resume projects", CandidateIntroduction = "Synthetic introduction", InterviewType = "general", Language = "fa-IR",
+            QuestionBank = [Context().Question], PreviousAnswers = [new(Context().CurrentQuestionId, "Synthetic previous question", "Synthetic corrected answer", "Synthetic clarification")] };
+        var handler = new Handler(async (request, ct) => {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+            var messages = body.RootElement.GetProperty("messages");
+            Assert.Equal("system", messages[0].GetProperty("role").GetString());
+            Assert.StartsWith(context.MasterPrompt, messages[0].GetProperty("content").GetString());
+            using var user = JsonDocument.Parse(messages[1].GetProperty("content").GetString()!);
+            Assert.Equal(context.PositionDescription, user.RootElement.GetProperty("positionDescription").GetString());
+            Assert.Equal(context.ResumeText, user.RootElement.GetProperty("resumeText").GetString());
+            Assert.Equal(context.CandidateIntroduction, user.RootElement.GetProperty("candidateIntroduction").GetString());
+            Assert.Equal("general", user.RootElement.GetProperty("interviewType").GetString());
+            Assert.Equal(1, user.RootElement.GetProperty("questionBank").GetArrayLength());
+            Assert.Equal(1, user.RootElement.GetProperty("previousAnswers").GetArrayLength());
+            Assert.Equal(JsonValueKind.Null, user.RootElement.GetProperty("masterPrompt").ValueKind);
+            return new(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"{}\"}}]}") };
+        });
+        await Client(handler).EvaluateAsync(context, default);
     }
     [Theory] [InlineData("{}")] [InlineData("{\"choices\":[]}")] [InlineData("not-json")]
     public async Task Llm_invalid_envelope_is_rejected(string json)

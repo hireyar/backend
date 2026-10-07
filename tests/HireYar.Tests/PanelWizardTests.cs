@@ -32,8 +32,58 @@ public sealed class PanelWizardTests(ApiFixture f)
         foreach (var field in new Dictionary<string, string> { ["jobPositionId"] = job.ToString(), ["templateId"] = template.ToString(),
             ["firstName"] = "Synthetic", ["lastName"] = "Candidate", ["email"] = "candidate@example.test", ["phone"] = phone, ["deadlineDays"] = "3", ["interviewType"] = interviewType })
             form.Add(new StringContent(field.Value), field.Key);
+        form.Add(new StringContent("Synthetic candidate work history and projects"), "resumeText");
         form.Add(new ByteArrayContent(bytes ?? "%PDF-1.7\nSynthetic test document"u8.ToArray()), "resume", filename);
         return await client.PostAsync("/api/panel-wizard/invitations", form);
+    }
+    [PostgresFact]
+    public async Task Introductions_context_and_clarification_persist_and_company_is_only_exposed_after_questions()
+    {
+        var (hr, job, original) = await Setup(); f.InterviewAi.Reset();
+        var changed = Template(job.Id) with { CandidateIntroductionEnabled = true, CompanyIntroductionEnabled = true, CompanyIntroductionMessage = "Synthetic company introduction" };
+        var saved = await hr.Client.Send(HttpMethod.Put, $"/api/panel-wizard/templates/{original.Id}", new UpdateWizardTemplateRequest(changed, original.RowVersion));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var invite = (await (await Invite(hr, job.Id, original.Id)).Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        using var c = f.CreateClient(); c.DefaultRequestHeaders.Authorization = new("Bearer", invite.Token);
+        var route = $"/api/candidate/interviews/{invite.InterviewId}";
+        var start = (await (await c.PostAsync(route + "/start", null)).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        Assert.Equal("Welcome", start.Stage); Assert.Null(start.Question); Assert.False(start.CanRecord); Assert.Null(start.GoodbyeMessage);
+        var intro = (await (await c.PostAsJsonAsync(route + "/stage/advance", new AdvanceInterviewStageRequest("Welcome"))).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        Assert.Equal("CandidateIntroduction", intro.Stage); Assert.Equal(changed.CandidateIntroductionMessage, intro.StageMessage);
+        var repeated = (await (await c.PostAsJsonAsync(route + "/stage/advance", new AdvanceInterviewStageRequest("Welcome"))).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        Assert.Equal("CandidateIntroduction", repeated.Stage);
+        var current = (await (await c.PostAsJsonAsync(route + "/stage/advance", new AdvanceInterviewStageRequest("CandidateIntroduction", "Synthetic introduction history"))).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        Assert.Equal("Questions", current.Stage);
+        async Task<CandidateInterviewDto> Submit(CandidateInterviewDto state)
+        {
+            using var form = new MultipartFormDataContent();
+            form.Add(new StringContent(state.Question!.Id.ToString()), "questionId");
+            form.Add(new StringContent(Guid.NewGuid().ToString("N")), "clientTurnId");
+            var audio = new ByteArrayContent("ID3-synthetic-answer"u8.ToArray()); audio.Headers.ContentType = new("audio/mpeg"); form.Add(audio, "audio", "answer.mp3");
+            var response = await c.PostAsync(route + "/answers", form); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return (await response.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        }
+        try
+        {
+            f.InterviewAi.InteractionAction = "clarify";
+            var clarified = await Submit(current);
+            Assert.Equal(current.Question!.Id, clarified.Question!.Id); Assert.NotNull(clarified.Question.InteractionMessage); Assert.Equal(0, clarified.Progress.AnsweredQuestions);
+            f.InterviewAi.InteractionAction = null; current = await Submit(clarified);
+            var context = f.InterviewAi.LastContext!;
+            Assert.Equal(job.Description, context.PositionDescription); Assert.Contains("work history", context.ResumeText);
+            Assert.Equal("Synthetic introduction history", context.CandidateIntroduction); Assert.Equal("general", context.InterviewType);
+            Assert.Equal(InterviewDecisionPrompt.Master, context.MasterPrompt); Assert.Equal(5, context.QuestionBank!.Count);
+            Assert.Single(context.PreviousAnswers!); Assert.NotNull(context.PreviousAnswers![0].AssistantReply);
+            Assert.Equal("سؤال مصنوعی 2", current.Question!.Text);
+            for (var i = 1; i < 5; i++) current = await Submit(current);
+            Assert.Equal("Completed", current.Status); Assert.Equal("CompanyIntroduction", current.Stage); Assert.Equal(changed.CompanyIntroductionMessage, current.StageMessage);
+            var goodbye = (await (await c.PostAsJsonAsync(route + "/stage/advance", new AdvanceInterviewStageRequest("CompanyIntroduction"))).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+            Assert.Equal("Goodbye", goodbye.Stage); Assert.Equal(changed.GoodbyeMessage, goodbye.StageMessage);
+            await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == invite.InterviewId);
+                Assert.Equal(5, s.AnsweredQuestionCount); Assert.Equal(6, s.Answers.Count); Assert.Single(s.Answers, a => a.IsInteraction);
+                Assert.Equal(InterviewDecisionPrompt.Master, s.MasterPromptSnapshot); Assert.Equal("v2", s.MasterPromptVersion); Assert.False(db.Database.HasPendingModelChanges()); });
+        }
+        finally { f.InterviewAi.Reset(); }
     }
     [PostgresFact]
     public async Task Wizard_uses_template_questions_snapshots_resume_and_dashboard_without_skill_setup()

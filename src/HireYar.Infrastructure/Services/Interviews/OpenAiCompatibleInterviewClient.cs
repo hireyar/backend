@@ -29,9 +29,9 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
     }
     public async Task<InterviewDecisionResult> EvaluateAsync(InterviewDecisionContext context, CancellationToken ct)
     {
-        using var body = JsonContent.Create(new { model = config.LlmModel, messages = new[] {
-            new { role = "system", content = InterviewDecisionPrompt.System },
-            new { role = "user", content = JsonSerializer.Serialize(context, new JsonSerializerOptions(JsonSerializerDefaults.Web)) }
+        using var body = JsonContent.Create(new { model = config.LlmModel, response_format = new { type = "json_object" }, messages = new[] {
+            new { role = "system", content = (context.MasterPrompt ?? InterviewDecisionPrompt.Master) + "\n\n" + InterviewDecisionPrompt.System },
+            new { role = "user", content = JsonSerializer.Serialize(context with { MasterPrompt = null }, new JsonSerializerOptions(JsonSerializerDefaults.Web)) }
         } });
         var bytes = await SendAsync("chat/completions", body, "llm", config.LlmModel, config.LlmTimeoutSeconds, 128000, ct);
         try

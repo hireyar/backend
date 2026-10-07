@@ -22,6 +22,7 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
 {
     [HttpPost("start")] public Task<CandidateInterviewDto> Start(Guid interviewId, CancellationToken ct) => service.StartAsync(interviewId, ct);
     [HttpGet("current")] public Task<CandidateInterviewDto> Current(Guid interviewId, CancellationToken ct) => service.CurrentAsync(interviewId, ct);
+    [HttpPost("stage/advance")] public Task<CandidateInterviewDto> AdvanceStage(Guid interviewId, AdvanceInterviewStageRequest r, CancellationToken ct) => service.AdvanceStageAsync(interviewId, r, ct);
     [HttpGet("messages")] public Task<IReadOnlyList<CandidateMessageDto>> Messages(Guid interviewId, CancellationToken ct) => service.MessagesAsync(interviewId, ct);
     [HttpPost("answers"), Consumes("multipart/form-data"), RequestSizeLimit(92 * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 92 * 1024 * 1024)]
     public async Task<CandidateInterviewDto> Answer(Guid interviewId, [FromForm] AnswerUpload upload, CancellationToken ct)

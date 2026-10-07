@@ -1,3 +1,15 @@
+## معرفی‌ها، context AI و بازیابی خودکار — 2026-10-07: Verified محلی
+
+روی dev پاک شروع شد: معرفی کارجو با متن پیش‌فرض درخواست‌شده و معرفی شرکت با فعال‌سازی مستقل، DTO/validation/کپی قالب/snapshot و مرحله persistشده اضافه شدند. مستر پرامپت v2 در دعوت ذخیره و هنگام Questions به LLM عرضه می‌شود؛ JD، رزومه متنی، زبان/نوع، بانک snapshot و shortlist مجاز، وضعیت/زمان و سابقه پاسخ/تعامل context واقعی‌اند. عمومی ترتیب را حفظ و از sufficient evidence زود تمام نمی‌شود؛ clarification/follow-up/redirect همان سؤال را با answer مستقل نگه می‌دارند و فقط پاسخ نهایی نمره دارد. [INTERVIEW_CONTEXT_API](INTERVIEW_CONTEXT_API.md) قرارداد فرانت است.
+
+PDF متنی/DOCX محلی استخراج می‌شوند؛ DOC قدیمی/PDF اسکن‌شده یا غیرقابل استخراج متن صریح resumeText لازم دارند و دعوت بدون context رزومه معتبر 400 می‌دهد. مسیر legacy بدون فایل برای سازگاری resume=null دارد؛ backfill تاریخی یا OCR انجام نشده. معرفی کارجو در stage/advance متن دریافت می‌کند؛ STT/آپلود صوت اختصاصی معرفی اضافه نشده است. پیام شرکت پیش از پایان Questions به داوطلب عرضه نمی‌شود.
+
+worker داخلی با state PostgreSQL و قفل/lease/RowVersion، پاسخ پذیرفته‌شده پس از قطع درخواست/restart را بازیابی می‌کند: سه تلاش پیش‌فرض با backoff persistشده؛ STT آماده تکرار نمی‌شود. STT پس از سقف تلاش Failed و retry دستی می‌ماند؛ LLM پس از سقف با fallback بدون شواهد ساختگی ادامه می‌یابد. polling پانزده ثانیه و گزینه خاموش‌کردن دارد. پاسخ بی‌پاسخ کارجو خودکار ساخته نمی‌شود. Network خارج transaction، scope/ابطال/expiry/billing بررسی و سقف مالی حفظ‌اند.
+
+tool restore و restore منبع رسمی NuGet موفق (feed خصوصی 401 داد)، build موفق؛ **۱۹۲/۱۹۲ تست PostgreSQL 18 محلی اختصاصی موفق، صفر شکست/Skip**؛ ۹ تست تازه context/rules/extraction/provider wire/معرفی و interaction/worker واقعی/retry bounded/رقابت claim. tests/HireYar.Tests/TestResults/interview-context-final.trx. EF بدون drift از آزمون PostgreSQL؛ migration `20261007105803_AddInterviewContextAndRecovery` و script idempotent در artifacts/interview-context-migrations.sql دو بار روی baseline قبلی با داده legacy مصنوعی موفق، transcript/مالی/مرحله نهایی محفوظ و constraintهای معرفی/تعامل نامعتبر رد شدند. downgrade در حضور تعامل ثبت‌شده تاریخچه را حذف نمی‌کند و صریحاً رد می‌شود.
+
+Angular، AI واقعی، migration مقصد، commit/push/deploy و تنظیمات/کلیدهای موجود تغییر نکردند. اتصال واقعی provider از تست mocked نتیجه‌گیری نشده است. جزئیات rollout و محدودیت‌های ورودی در قرارداد ثبت شده‌اند؛ نتیجه حاضر جایگزین یادداشت تاریخی «رزومه به AI نمی‌رسد / retry فقط کلاینت» برای دعوت جدید ویزارد است.
+
 ## انتخاب پیاده‌سازی مستقل providerهای AI — 2026-10-07
 
 روی dev، DI براساس AI:Provider یکی از NetArzClient، LiaraClient یا DisabledInterviewProvider را برای STT/LLM/TTS/پیشنهاد سؤال انتخاب می‌کند؛ مقدار ناشناخته در startup رد می‌شود. NetArzOptions و LiaraOptions مستقل‌اند، فقط تنظیمات provider انتخاب‌شده اعتبارسنجی می‌شود و lease از timeoutهای همان provider محاسبه می‌شود. Disabled هیچ HttpClient یا کلید provider نمی‌خواهد. جزئیات مشترک قرارداد HTTP در OpenAiCompatibleInterviewClient داخل Infrastructure باقی‌اند؛ نام provider در نتیجه/metrics/log از کلاس انتخاب‌شده می‌آید و property قدیمی NetArzOptions.Provider authoritative نیست.

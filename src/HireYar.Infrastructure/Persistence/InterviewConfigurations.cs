@@ -77,6 +77,17 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.Property(x => x.TemplateTitleSnapshot).HasMaxLength(200);
         b.Property(x => x.WelcomeMessage).HasMaxLength(2000);
         b.Property(x => x.GoodbyeMessage).HasMaxLength(2000);
+        b.Property(x => x.CandidateIntroductionMessage).HasMaxLength(2000);
+        b.Property(x => x.CompanyIntroductionMessage).HasMaxLength(2000);
+        b.Property(x => x.Language).HasMaxLength(20);
+        b.Property(x => x.MasterPromptSnapshot).HasMaxLength(16000);
+        b.Property(x => x.MasterPromptVersion).HasMaxLength(100);
+        b.Property(x => x.ResumeTextSnapshot).HasMaxLength(32000);
+        b.Property(x => x.CandidateIntroductionTranscript).HasMaxLength(32000);
+        b.Property(x => x.Stage).HasConversion<string>().HasMaxLength(30);
+        b.Property(x => x.CurrentInteractionMessage).HasMaxLength(2000);
+        b.Ignore(x => x.RemainingInteractions);
+        b.HasIndex(x => new { x.Status, x.NextRecoveryAtUtc, x.ProcessingLeaseExpiresAtUtc });
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         b.Property(x => x.CompletionReason).HasConversion<string>().HasMaxLength(30);
         b.Ignore(x => x.AnsweredQuestionCount);
@@ -87,6 +98,9 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.HasIndex(x => new { x.OrganizationId, x.JobPositionId, x.Status });
         b.HasIndex(x => x.CandidateApplicationId);
         b.ToTable(t => {
+            t.HasCheckConstraint("CK_Interview_Stage", "\"Stage\" IN ('Welcome','CandidateIntroduction','Questions','CompanyIntroduction','Goodbye','Finished')");
+            t.HasCheckConstraint("CK_Interview_Recovery", "\"RecoveryAttempts\" >= 0");
+            t.HasCheckConstraint("CK_Interview_Interactions", "\"MaxInteractionsPerQuestion\" BETWEEN 0 AND 3");
             t.HasCheckConstraint("CK_Interview_Status", "\"Status\" IN ('Created','WaitingForAnswer','ProcessingAnswer','Completed','Cancelled')");
             t.HasCheckConstraint("CK_Interview_Limits", "\"MaxQuestionCount\" BETWEEN 1 AND 30 AND \"MaxDurationSeconds\" BETWEEN 300 AND 3600");
             t.HasCheckConstraint("CK_Interview_Capability", "\"RequiredCapabilityCode\" IN ('hr_interview','technical_interview')");
@@ -111,7 +125,8 @@ public sealed class InterviewAnswerConfiguration : IEntityTypeConfiguration<Inte
     {
         b.Property(x => x.Id).ValueGeneratedNever();
         b.HasKey(x => x.Id); b.HasAlternateKey(x => new { x.InterviewSessionId, x.Id });
-        b.HasIndex(x => new { x.InterviewSessionId, x.QuestionId }).IsUnique();
+        b.HasIndex(x => new { x.InterviewSessionId, x.QuestionId }).IsUnique().HasFilter("NOT \"IsInteraction\"");
+        b.Property(x => x.AssistantMessage).HasMaxLength(2000);
         b.Property(x => x.ClientTurnId).HasMaxLength(128);
         b.HasIndex(x => new { x.InterviewSessionId, x.ClientTurnId }).IsUnique().HasFilter("\"ClientTurnId\" IS NOT NULL");
         b.Property(x => x.VideoStorageKey).HasMaxLength(512); b.Property(x => x.VideoContentType).HasMaxLength(100);
@@ -124,6 +139,7 @@ public sealed class InterviewAnswerConfiguration : IEntityTypeConfiguration<Inte
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         b.ToTable(t => {
             t.HasCheckConstraint("CK_Answer_Status", "\"Status\" IN ('Uploaded','Transcribing','Transcribed','Evaluating','Processed','Failed')");
+            t.HasCheckConstraint("CK_Answer_Interaction", "(NOT \"IsInteraction\" AND \"AssistantMessage\" IS NULL) OR (\"IsInteraction\" AND \"Status\" = 'Processed' AND \"AssistantMessage\" IS NOT NULL AND length(btrim(\"AssistantMessage\")) > 0)");
             t.HasCheckConstraint("CK_Answer_Size", "\"AudioSizeBytes\" > 0");
             t.HasCheckConstraint("CK_Answer_Video", "(\"VideoStorageKey\" IS NULL AND \"VideoContentType\" IS NULL AND \"VideoSizeBytes\" IS NULL) OR (\"VideoStorageKey\" IS NOT NULL AND \"VideoContentType\" IS NOT NULL AND \"VideoSizeBytes\" IS NOT NULL AND \"VideoSizeBytes\" > 0)");
             t.HasCheckConstraint("CK_Answer_BillableSeconds", "\"BillableSeconds\" BETWEEN 0 AND 120");

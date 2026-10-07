@@ -62,6 +62,7 @@ internal static class OpenApiText
         ("Interviews", "QuestionAudio") => "دریافت خصوصی صوت سؤال مصاحبه",
         ("CandidateInterviews", "Start") => "شروع مصاحبه با توکن داوطلب",
         ("CandidateInterviews", "Current") => "وضعیت جاری مصاحبه داوطلب",
+        ("CandidateInterviews", "AdvanceStage") => "ادامه مرحله مصاحبه و ثبت معرفی کارجو؛ با حفظ ترتیب سرور",
         ("CandidateInterviews", "Messages") => "بازیابی تاریخچه گفت‌وگوی همان داوطلب",
         ("CandidateInterviews", "Answer") => "ثبت پاسخ صوتی و ویدیوی اختیاری با شناسه یکتای نوبت",
         ("CandidateInterviews", "Retry") => "پردازش دوباره همان پاسخ",

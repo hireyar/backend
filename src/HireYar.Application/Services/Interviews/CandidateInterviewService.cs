@@ -41,6 +41,17 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         return await Map(s, true, ct);
     }
     public async Task<CandidateInterviewDto> CurrentAsync(Guid id, CancellationToken ct) => await Map(await Load(id, ct), false, ct);
+    public async Task<CandidateInterviewDto> AdvanceStageAsync(Guid id, AdvanceInterviewStageRequest r, CancellationToken ct)
+    {
+        if (!Enum.TryParse<InterviewStage>(r.Stage, false, out var stage) || !Enum.IsDefined(stage)) throw AppException.Invalid("invalid_interview_stage");
+        var s = await Load(id, ct);
+        await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+            await db.ReloadInterviewAsync(s, ct); CheckAccess(s);
+            if (s.Status is InterviewStatus.Created or InterviewStatus.Cancelled) throw AppException.Conflict();
+            s.AdvanceStage(stage, r.Introduction, time.GetUtcNow()); return true;
+        }, ct);
+        return await Map(s, true, ct);
+    }
     public async Task<CandidateInterviewDto> SubmitAsync(Guid id, Guid questionId, Stream stream, string fileName,
         string contentType, long length, int? durationSeconds, CancellationToken ct, AnswerCapture? capture = null)
     {
@@ -55,8 +66,9 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         }
         await billing.EnsureProcessingAllowedAsync(s, ct);
         if (s.Status != InterviewStatus.WaitingForAnswer) throw AppException.Conflict();
+        if (s.Stage != InterviewStage.Questions) throw AppException.Conflict();
         if (s.CurrentQuestionId != questionId) throw AppException.Invalid("wrong_question");
-        if (s.Answers.Any(x => x.QuestionId == questionId)) throw AppException.Conflict();
+        if (s.Answers.Any(x => x.QuestionId == questionId && !x.IsInteraction)) throw AppException.Conflict();
         if (s.RemainingSeconds(time.GetUtcNow()) == 0) throw new AppException(409, "interview_expired", "The interview time limit was reached.");
         var receivedAt = time.GetUtcNow();
         if (capture?.LastSpeechEndUtc is { } ended && (ended.Offset != TimeSpan.Zero || ended > receivedAt.AddSeconds(30) || ended < s.StartedAtUtc?.AddSeconds(-30)))
@@ -107,10 +119,32 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
     {
         var s = await Load(id, ct); var answer = s.Answers.SingleOrDefault(x => x.Id == answerId) ?? throw AppException.NotFound();
         if (answer.Status == AnswerStatus.Processed) return await Map(s, false, ct);
-        await billing.EnsureProcessingAllowedAsync(s, ct);
-        var lease = s.AcquireLease(answer.Id, time.GetUtcNow(), options.LeaseSeconds);
-        answer.SetDiagnostics(null, null, null); await db.SaveChangesAsync(ct);
+        Guid lease = default;
+        await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+            await db.ReloadInterviewAsync(s, ct); CheckAccess(s);
+            await billing.EnsureProcessingAllowedAsync(s, ct);
+            lease = s.AcquireLease(answer.Id, time.GetUtcNow(), options.LeaseSeconds);
+            answer.SetDiagnostics(null, null, null); return true;
+        }, ct);
         return await Process(s, answer, lease, ct);
+    }
+    // Called only by the internal worker with an organization/session pair read from persisted state.
+    public async Task RecoverAsync(Guid organizationId, Guid id, CancellationToken ct)
+    {
+        var s = await db.InterviewSessions.Include(x => x.Answers).SingleOrDefaultAsync(x => x.OrganizationId == organizationId && x.Id == id, ct);
+        if (s is null) return;
+        InterviewAnswer? answer = null; Guid lease = default;
+        await db.WithOrganizationBillingLockAsync(organizationId, async () => {
+            await db.ReloadInterviewAsync(s, ct);
+            var now = time.GetUtcNow();
+            if (s.Status != InterviewStatus.ProcessingAnswer || s.DeletedAtUtc is not null || s.AccessRevokedAtUtc is not null || s.ExpiresAtUtc <= now ||
+                s.RecoveryAttempts >= options.MaxRecoveryAttempts || s.NextRecoveryAtUtc > now || s.ProcessingLeaseExpiresAtUtc > now) return false;
+            await billing.EnsureProcessingAllowedAsync(s, ct);
+            answer = s.Answers.SingleOrDefault(a => a.QuestionId == s.CurrentQuestionId && a.Status != AnswerStatus.Processed);
+            if (answer is null) return false;
+            lease = s.AcquireLease(answer.Id, now, options.LeaseSeconds); s.BeginRecoveryAttempt(now); return true;
+        }, ct);
+        if (answer is not null) await Process(s, answer, lease, ct);
     }
     private async Task<CandidateInterviewDto> Process(InterviewSession s, InterviewAnswer answer, Guid lease, CancellationToken ct)
     {
@@ -132,6 +166,7 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
                 {
                     await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
                     s.FailAnswer(answer.Id); answer.SetDiagnostics("Transcribing", e is InterviewProviderException p ? p.Code : "audio_unavailable", null);
+                    s.ScheduleRecovery(time.GetUtcNow(), 30 * (1 << Math.Min(s.RecoveryAttempts, 5)));
                     s.ReleaseLease(lease, time.GetUtcNow()); await db.SaveChangesAsync(ct);
                     logger.LogWarning("Interview answer retry available interviewId={InterviewId} answerId={AnswerId} failureCode={FailureCode}", s.Id, answer.Id, answer.FailureCode);
                     return await Map(s, false, ct);
@@ -149,13 +184,34 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
                 if (capabilities.Contains("answer_analysis") || capabilities.Contains("adaptive_questions"))
                   decision = await decisions.EvaluateAsync(new(s.PositionTitleSnapshot ?? position.Title, question.QuestionId, s.Status.ToString(), s.AnsweredQuestionCount,
                     s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow()), question, answer.Transcript!, s.Skills, s.SkillStates, s.CoveredTopics, shortlist,
-                    s.PositionDescriptionSnapshot ?? position.Description), ct);
+                    s.PositionDescriptionSnapshot ?? position.Description, s.ResumeTextSnapshot, s.CandidateIntroductionTranscript,
+                    s.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized", s.Language, s.Questions,
+                    s.Answers.Where(a => a.Status == AnswerStatus.Processed).OrderBy(a => a.SubmittedAtUtc)
+                        .Select(a => new InterviewDialogueTurn(a.QuestionId, s.Questions.Single(q => q.QuestionId == a.QuestionId).Text, a.Transcript, a.AssistantMessage)).ToArray(),
+                    s.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, s.RemainingInteractions), ct);
             }
-            catch (InterviewProviderException e) { failureCode = e.Code; }
+            catch (InterviewProviderException e)
+            {
+                failureCode = e.Code;
+                if (options.BackgroundRecoveryEnabled && s.RecoveryAttempts < options.MaxRecoveryAttempts)
+                {
+                    await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
+                    s.FailAnswer(answer.Id); answer.SetDiagnostics("Evaluating", e.Code, null);
+                    s.ScheduleRecovery(time.GetUtcNow(), 30 * (1 << Math.Min(s.RecoveryAttempts, 5)));
+                    s.ReleaseLease(lease, time.GetUtcNow()); await db.SaveChangesAsync(ct);
+                    return await Map(s, false, ct);
+                }
+            }
             await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
             var result = validator.ValidateOrFallback(decision?.Json, s, shortlist.Select(x => x.QuestionId).ToArray(), time.GetUtcNow());
+            if (result.Action != "advance")
+            {
+                s.ContinueQuestion(answer.Id, result.CandidateMessage!, decision!.Model, s.MasterPromptVersion ?? InterviewDecisionPrompt.Version, time.GetUtcNow());
+                s.ReleaseLease(lease, time.GetUtcNow()); await db.SaveChangesAsync(ct);
+                return await Map(s, true, ct);
+            }
             s.FinishAnswer(answer.Id, capabilities.Contains("answer_analysis") ? result.SkillUpdates : [],
-                capabilities.Contains("avoid_repeated_topics") ? result.CoveredTopics : [], decision?.Model ?? "backend-fallback", InterviewDecisionPrompt.Version, time.GetUtcNow());
+                capabilities.Contains("avoid_repeated_topics") ? result.CoveredTopics : [], decision?.Model ?? "backend-fallback", s.MasterPromptVersion ?? InterviewDecisionPrompt.Version, time.GetUtcNow());
             var sourceName = result.UsedFallback ? "Fallback" : "AI";
             answer.SetDiagnostics(result.UsedFallback ? "Evaluating" : null, result.UsedFallback ? failureCode ?? "decision_invalid" : null, sourceName);
             var completion = policy.GetCompletionReason(s, time.GetUtcNow());
@@ -195,6 +251,7 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
             await db.ReloadInterviewAsync(s, ct);
             if (s.Status == InterviewStatus.Completed) return true;
             if (s.Status != InterviewStatus.WaitingForAnswer) throw AppException.Conflict();
+            if (s.Stage != InterviewStage.Questions) throw AppException.Conflict();
             s.Complete(InterviewCompletionReason.Manual, time.GetUtcNow());
             var application = await db.CandidateApplications.SingleAsync(x => x.Id == s.CandidateApplicationId && x.OrganizationId == s.OrganizationId, ct);
             application.Status = CandidateApplicationStatus.InterviewCompleted; application.UpdatedAtUtc = time.GetUtcNow(); return true;
@@ -207,7 +264,7 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         await billing.RequireMediaRetentionAsync(s, ct);
         if (s.CurrentQuestionId != questionId && !s.Answers.Any(x => x.QuestionId == questionId)) throw AppException.NotFound();
         var q = s.Questions.SingleOrDefault(x => x.QuestionId == questionId) ?? throw AppException.NotFound();
-        var cached = await audio.ResolveAsync(s.OrganizationId, q.Text, false, ct) ?? throw AppException.NotFound();
+        var cached = await audio.ResolveAsync(s.OrganizationId, s.CurrentQuestionId == questionId ? s.CurrentInteractionMessage ?? q.Text : q.Text, false, ct) ?? throw AppException.NotFound();
         return await storage.OpenReadAsync(cached.AudioStorageKey, ct);
     }
     public async Task<IReadOnlyList<CandidateMessageDto>> MessagesAsync(Guid id, CancellationToken ct)
@@ -217,35 +274,43 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         foreach (var q in s.Questions.Where(q => q.AskedAtUtc is not null || s.Answers.Any(a => a.QuestionId == q.QuestionId) || s.CurrentQuestionId == q.QuestionId))
         {
             // Legacy sessions have no persisted question timestamp; expose a server-time fallback.
-            var submitted = s.Answers.SingleOrDefault(a => a.QuestionId == q.QuestionId);
+            var submitted = s.Answers.Where(a => a.QuestionId == q.QuestionId).OrderBy(a => a.SubmittedAtUtc).FirstOrDefault();
             var askedAt = q.AskedAtUtc ?? submitted?.SubmittedAtUtc ?? s.StartedAtUtc ?? s.CreatedAtUtc;
             messages.Add(new($"question:{q.QuestionId}", q.QuestionId, null, "assistant", q.Text, askedAt));
-            if (submitted is { } a)
+            foreach (var a in s.Answers.Where(a => a.QuestionId == q.QuestionId))
+            {
                 messages.Add(new($"answer:{a.Id}", q.QuestionId, a.Id, "candidate", a.Transcript, a.SubmittedAtUtc, a.Status.ToString()));
+                if (a.AssistantMessage is { } reply)
+                    messages.Add(new($"interaction:{a.Id}", q.QuestionId, a.Id, "assistant", reply, a.ProcessedAtUtc!.Value));
+            }
         }
         return messages.OrderBy(m => m.CreatedAtUtc).ThenBy(m => m.Role == "assistant" ? 0 : 1).ThenBy(m => m.Id).ToArray();
     }
     private async Task<CandidateInterviewDto> Map(InterviewSession s, bool generateAudio, CancellationToken ct, InterviewAnswer? resultAnswer = null)
     {
         CandidateQuestionDto? q = null;
-        if (s.CurrentQuestionId is { } id)
+        if (s.Stage == InterviewStage.Questions && s.CurrentQuestionId is { } id)
         {
             var snapshot = s.Questions.Single(x => x.QuestionId == id);
-            var sound = await audio.ResolveAsync(s.OrganizationId, snapshot.Text, generateAudio, ct);
+            var sound = await audio.ResolveAsync(s.OrganizationId, s.CurrentInteractionMessage ?? snapshot.Text, generateAudio, ct);
             if (generateAudio && s.Status == InterviewStatus.WaitingForAnswer && s.QuestionReadyAtUtc is null)
             { s.MarkQuestionReady(time.GetUtcNow()); await db.SaveChangesAsync(ct); }
-            q = new(id, snapshot.Text, sound is null ? null : $"/api/candidate/interviews/{s.Id}/questions/{id}/audio", sound is not null);
+            q = new(id, snapshot.Text, sound is null ? null : $"/api/candidate/interviews/{s.Id}/questions/{id}/audio", sound is not null, s.CurrentInteractionMessage);
         }
-        var a = resultAnswer ?? s.Answers.SingleOrDefault(x => x.QuestionId == s.CurrentQuestionId)
+        var a = resultAnswer ?? s.Answers.Where(x => x.QuestionId == s.CurrentQuestionId).OrderByDescending(x => x.SubmittedAtUtc).ThenByDescending(x => x.Id).FirstOrDefault()
             ?? s.Answers.OrderByDescending(x => x.SubmittedAtUtc).FirstOrDefault();
         var canRetry = a is not null && a.Status != AnswerStatus.Processed && a.QuestionId == s.CurrentQuestionId && s.Status == InterviewStatus.ProcessingAnswer &&
             (s.ProcessingLeaseId is null || s.ProcessingLeaseExpiresAtUtc <= time.GetUtcNow());
-        return new(s.Id, s.Status.ToString(), s.Status == InterviewStatus.WaitingForAnswer && s.RemainingSeconds(time.GetUtcNow()) > 0,
+        return new(s.Id, s.Status.ToString(), s.Stage == InterviewStage.Questions && s.Status == InterviewStatus.WaitingForAnswer && s.RemainingSeconds(time.GetUtcNow()) > 0,
             s.Status == InterviewStatus.ProcessingAnswer && !canRetry, q,
             new(s.AnsweredQuestionCount, s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow())),
             a is null ? null : new(a.Id, a.QuestionId, a.Status.ToString(), canRetry, a.Status == AnswerStatus.Failed ? "answer_retry_available" : null,
                 a.Transcript, a.ClientTurnId, a.SubmittedAtUtc, a.LastSpeechEndUtc, a.DurationSeconds, a.VideoStorageKey is not null),
-            s.CompletionReason?.ToString(), s.WelcomeMessage, s.GoodbyeMessage,
-            new(true, options.MaxUploadBytes, options.MaxVideoUploadBytes, options.MaxAnswerSeconds));
+            s.CompletionReason?.ToString(), s.WelcomeMessage, s.Status == InterviewStatus.Completed ? s.GoodbyeMessage : null,
+            new(true, options.MaxUploadBytes, options.MaxVideoUploadBytes, options.MaxAnswerSeconds), s.Stage.ToString(),
+            s.Stage switch { InterviewStage.Welcome => s.WelcomeMessage, InterviewStage.CandidateIntroduction => s.CandidateIntroductionMessage,
+                InterviewStage.CompanyIntroduction => s.CompanyIntroductionMessage, InterviewStage.Goodbye => s.GoodbyeMessage, _ => null },
+            s.CandidateIntroductionEnabled, s.CompanyIntroductionEnabled, s.RecoveryAttempts,
+            canRetry && options.BackgroundRecoveryEnabled && s.RecoveryAttempts < options.MaxRecoveryAttempts);
     }
 }
