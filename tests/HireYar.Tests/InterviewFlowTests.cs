@@ -18,13 +18,16 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
     public int LlmCalls;
     public InterviewDecisionContext? LastContext;
     public string? InteractionAction;
+    public string? SttText;
+    public TaskCompletionSource? SttEntered; public TaskCompletionSource? SttRelease;
     public TaskCompletionSource? Entered; public TaskCompletionSource? Release;
     public SpeechProfile Profile => new("fake-tts", "fake-voice", 1m);
-    public Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct)
+    public async Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct)
     {
         Interlocked.Increment(ref SttCalls);
+        SttEntered?.TrySetResult(); if (SttRelease is { } waiting) await waiting.Task.WaitAsync(ct);
         if (FailStt) throw new InterviewProviderException("stt_http_500");
-        return Task.FromResult(new SpeechTranscriptionResult("Synthetic job-related answer", "Test", "fake-stt"));
+        return new SpeechTranscriptionResult(SttText ?? "Synthetic job-related answer", "Test", "fake-stt");
     }
     public async Task<InterviewDecisionResult> EvaluateAsync(InterviewDecisionContext context, CancellationToken ct)
     {
@@ -51,7 +54,7 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
         Interlocked.Increment(ref TtsCalls); if (FailTts) throw new InterviewProviderException("tts_http_500");
         return Task.FromResult(new TextToSpeechResult("ID3-synthetic-audio"u8.ToArray(), "audio/mpeg"));
     }
-    public void Reset() { FailStt = FailLlm = InvalidLlm = FailTts = false; Entered = Release = null; LastContext = null; InteractionAction = null; }
+    public void Reset() { FailStt = FailLlm = InvalidLlm = FailTts = false; Entered = Release = SttEntered = SttRelease = null; LastContext = null; InteractionAction = SttText = null; }
 }
 [Collection("Postgres")]
 public sealed class InterviewFlowTests(ApiFixture f)

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 public sealed class InterviewManagementService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
-    ISubscriptionEntitlementService entitlements, InterviewBillingService billing)
+    ISubscriptionEntitlementService entitlements, InterviewBillingService billing, IInterviewAudioStorage storage)
 {
     private async Task CheckJob(Guid id, CancellationToken ct)
     { if (!await db.JobPositions.AnyAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)) throw AppException.NotFound(); }
@@ -99,6 +99,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
     public async Task<HrInterviewDto> GetAsync(Guid id, CancellationToken ct)
     {
         var s = await Scoped(id, ct);
+        var introduction = await db.InterviewIntroductions.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == id, ct);
         return new(s.Id, s.CandidateApplicationId, s.JobPositionId, s.Status.ToString(), s.CompletionReason?.ToString(), s.StartedAtUtc, s.CompletedAtUtc,
             s.Questions.Select(q => new HrQuestionDto(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty)).ToArray(),
             s.Answers.Select(a => new HrAnswerDto(a.Id, a.QuestionId, a.Status.ToString(), a.Transcript, a.SelectionSource, a.FailureStage, a.FailureCode,
@@ -106,7 +107,19 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
                 a.ClientTurnId, a.LastSpeechEndUtc, a.DurationSeconds, a.IsInteraction, a.AssistantMessage)).ToArray(),
             s.SkillStates.Select(x => new HrSkillStateDto(x.SkillId, x.CurrentScore, x.EvidenceCount, x.Confidence)).ToArray(),
             s.Evidence.Select(x => new HrEvidenceDto(x.InterviewAnswerId, x.QuestionId, x.SkillId, x.ScoreBefore, x.ScoreAfter, x.Delta, x.Confidence, x.Evidence, x.CreatedAtUtc)).ToArray(),
-            s.CoveredTopics.Select(x => new HrTopicDto(x.SkillId, x.Topic, x.Coverage, x.EvidenceCount)).ToArray());
+            s.CoveredTopics.Select(x => new HrTopicDto(x.SkillId, x.Topic, x.Coverage, x.EvidenceCount)).ToArray(),
+            s.CandidateIntroductionTranscript,
+            introduction is null ? null : new(introduction.Id, introduction.Status.ToString(), introduction.Transcript, introduction.SubmittedAtUtc,
+                $"/api/interviews/{s.Id}/introduction/audio", introduction.VideoStorageKey is null ? null : $"/api/interviews/{s.Id}/introduction/video"));
+    }
+    public async Task<(Stream Content, string ContentType)> OpenIntroductionMediaAsync(Guid id, bool video, CancellationToken ct)
+    {
+        var s = await MediaScopedAsync(id, ct);
+        var introduction = await db.InterviewIntroductions.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == id, ct)
+            ?? throw AppException.NotFound();
+        var key = video ? introduction.VideoStorageKey : introduction.AudioStorageKey;
+        if (key is null) throw AppException.NotFound();
+        return (await storage.OpenReadAsync(key, ct), video ? introduction.VideoContentType! : introduction.AudioContentType);
     }
     public async Task RevokeAsync(Guid id, CancellationToken ct)
     {

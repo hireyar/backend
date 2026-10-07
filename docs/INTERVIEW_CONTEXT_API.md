@@ -1,5 +1,7 @@
 # معرفی‌ها، context هوش مصنوعی و بازیابی مصاحبه — 2026-10-07
 
+تکمیل صوتی همین روز: [VOICE_INTRODUCTION_API](VOICE_INTRODUCTION_API.md) قرارداد upload/retry معرفی، وضعیت پردازش و صوت پیام‌های ثابت است؛ مسیر متنی پایین برای سازگاری باقی است.
+
 این قرارداد بک‌اند روی `dev` است؛ Angular در این ریپو نیست. migration `20261007105803_AddInterviewContextAndRecovery` پیش از اجرای نسخه جدید لازم است. داده و فایل‌های تاریخی بازنویسی نمی‌شوند.
 
 ## قالب
@@ -33,7 +35,7 @@ POST/PUT قالب ویزارد و قالب معمولی این فیلدها را
 
 `Welcome → CandidateIntroduction (اختیاری) → Questions → CompanyIntroduction (اختیاری) → Goodbye → Finished`
 
-در Welcome و CandidateIntroduction سؤال و `canRecord` سؤال عرضه نمی‌شوند. معرفی شرکت فقط بعد از Completed در `stageMessage` همان مرحله عرضه می‌شود. پیام‌های ثابت توسط AI تولید یا تغییر نمی‌شوند. بدون معرفی فعال، شروع قبلی با welcomeMessage و سؤال نخست حفظ شده است؛ جلسه تاریخی مرحله جدیدی به ابتدا اضافه نمی‌کند.
+در Welcome سؤال و canRecord عرضه نمی‌شوند؛ در CandidateIntroduction بدون معرفی پذیرفته‌شده، canRecord برای ضبط معرفی true است و سؤال ندارد. معرفی شرکت فقط بعد از Completed در stageMessage همان مرحله عرضه می‌شود. پیام ثابت از snapshot خوانده می‌شود؛ TTS متن را تغییر نمی‌دهد. stageAudioUrl صوت احرازشده مرحله جاری را می‌دهد. بدون معرفی فعال، شروع قبلی با welcomeMessage و سؤال نخست حفظ شده است؛ جلسه تاریخی مرحله جدیدی به ابتدا اضافه نمی‌کند.
 
 برای تأیید نمایش پیام یا ثبت معرفی کارجو:
 

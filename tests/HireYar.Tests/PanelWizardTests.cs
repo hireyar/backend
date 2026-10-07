@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Tests;
 
 [Collection("Postgres")]
-public sealed class PanelWizardTests(ApiFixture f)
+public sealed partial class PanelWizardTests(ApiFixture f)
 {
     private static WizardTemplateRequest Template(Guid jobId, int count = 5) => new(jobId, "قالب آزمایشی", "general",
         Enumerable.Range(1, count).Select(x => $"سؤال مصنوعی {x}").ToList(), "شروع آزمایشی", "پایان آزمایشی");

@@ -35,6 +35,8 @@ public interface IApplicationDbContext
     DbSet<QuestionAudio> QuestionAudios { get; }
     DbSet<InterviewSession> InterviewSessions { get; }
     DbSet<InterviewAnswer> InterviewAnswers { get; }
+    DbSet<InterviewIntroduction> InterviewIntroductions { get; }
+    Task ReloadIntroductionAsync(InterviewIntroduction introduction, CancellationToken ct);
     Task ReloadInterviewAsync(InterviewSession session, CancellationToken ct);
     void DetachEntity(object entity);
     Task<int> SaveChangesAsync(CancellationToken ct = default);

@@ -1223,6 +1223,123 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewIntroduction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AudioContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<long>("AudioSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("AudioStorageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("ClientTurnId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastSpeechEndUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("NextRecoveryAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ProcessingLeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ProcessingLeaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RecoveryAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset>("SubmittedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Transcript")
+                        .HasMaxLength(32000)
+                        .HasColumnType("character varying(32000)");
+
+                    b.Property<string>("TranscriptModel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TranscriptProvider")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("VideoContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<long?>("VideoSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("VideoStorageKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InterviewSessionId")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId");
+
+                    b.HasIndex("Status", "NextRecoveryAtUtc", "ProcessingLeaseExpiresAtUtc");
+
+                    b.ToTable("InterviewIntroductions", t =>
+                        {
+                            t.HasCheckConstraint("CK_Introduction_Lease", "(\"ProcessingLeaseId\" IS NULL AND \"ProcessingLeaseExpiresAtUtc\" IS NULL) OR (\"ProcessingLeaseId\" IS NOT NULL AND \"ProcessingLeaseExpiresAtUtc\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Introduction_Recovery", "\"RecoveryAttempts\" >= 0");
+
+                            t.HasCheckConstraint("CK_Introduction_Size", "\"AudioSizeBytes\" > 0 AND (\"DurationSeconds\" IS NULL OR \"DurationSeconds\" > 0)");
+
+                            t.HasCheckConstraint("CK_Introduction_Status", "\"Status\" IN ('Uploaded','Transcribing','Processed','Failed')");
+
+                            t.HasCheckConstraint("CK_Introduction_Transcript", "\"Status\" <> 'Processed' OR (\"Transcript\" IS NOT NULL AND length(btrim(\"Transcript\")) > 0 AND \"ProcessedAtUtc\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Introduction_Turn", "length(btrim(\"ClientTurnId\")) > 0");
+
+                            t.HasCheckConstraint("CK_Introduction_Video", "(\"VideoStorageKey\" IS NULL AND \"VideoContentType\" IS NULL AND \"VideoSizeBytes\" IS NULL) OR (\"VideoStorageKey\" IS NOT NULL AND \"VideoContentType\" IS NOT NULL AND \"VideoSizeBytes\" IS NOT NULL AND \"VideoSizeBytes\" > 0)");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Domain.Interviews.InterviewQuestionSnapshot", b =>
                 {
                     b.Property<Guid>("InterviewSessionId")
@@ -2350,6 +2467,16 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Interviews.InterviewSkill", null)
                         .WithMany()
                         .HasForeignKey("InterviewSessionId", "SkillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewIntroduction", b =>
+                {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

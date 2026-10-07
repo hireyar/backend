@@ -37,6 +37,25 @@ public sealed class InterviewRecoveryWorker(IServiceScopeFactory scopes, Intervi
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
                     catch (Exception e) { logger.LogWarning("Interview recovery deferred interviewId={InterviewId} exceptionType={ExceptionType}", item.Id, e.GetType().Name); }
                 }
+                var introductions = await (from introduction in db.InterviewIntroductions.AsNoTracking()
+                    join session in db.InterviewSessions.IgnoreAutoIncludes().AsNoTracking() on introduction.InterviewSessionId equals session.Id
+                    where introduction.OrganizationId == session.OrganizationId && session.Stage == InterviewStage.CandidateIntroduction &&
+                        session.Status == InterviewStatus.WaitingForAnswer && session.DeletedAtUtc == null && session.AccessRevokedAtUtc == null && session.ExpiresAtUtc > now &&
+                        introduction.Status != IntroductionStatus.Processed && introduction.RecoveryAttempts < options.MaxRecoveryAttempts &&
+                        (introduction.NextRecoveryAtUtc == null || introduction.NextRecoveryAtUtc <= now) &&
+                        (introduction.ProcessingLeaseExpiresAtUtc == null || introduction.ProcessingLeaseExpiresAtUtc <= now)
+                    orderby introduction.NextRecoveryAtUtc, introduction.Id
+                    select new { session.OrganizationId, session.Id }).Take(20).ToListAsync(stoppingToken);
+                foreach (var item in introductions)
+                {
+                    try
+                    {
+                        await using var work = scopes.CreateAsyncScope();
+                        await work.ServiceProvider.GetRequiredService<CandidateInterviewService>().RecoverIntroductionAsync(item.OrganizationId, item.Id, stoppingToken);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
+                    catch (Exception e) { logger.LogWarning("Introduction recovery deferred interviewId={InterviewId} exceptionType={ExceptionType}", item.Id, e.GetType().Name); }
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
             catch (Exception e) { logger.LogWarning("Interview recovery poll failed exceptionType={ExceptionType}", e.GetType().Name); }
