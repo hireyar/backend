@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 namespace HireYar.Application.Interviews;
 
-public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrentInterviewAccess access, TimeProvider time,
+public sealed partial class CandidateInterviewService(IApplicationDbContext db, ICurrentInterviewAccess access, TimeProvider time,
     InterviewOptions options, InterviewPolicy policy, InterviewDecisionValidator validator, IInterviewAudioStorage storage,
     ISpeechToTextService stt, IInterviewDecisionService decisions, QuestionAudioService audio, ILogger<CandidateInterviewService> logger,
     InterviewBillingService billing)
@@ -48,6 +48,9 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
             await db.ReloadInterviewAsync(s, ct); CheckAccess(s);
             if (s.Status is InterviewStatus.Created or InterviewStatus.Cancelled) throw AppException.Conflict();
+            if (stage == InterviewStage.CandidateIntroduction && s.Stage == stage &&
+                await db.InterviewIntroductions.AnyAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == s.Id, ct))
+                throw new AppException(409, "introduction_audio_pending", "Use the introduction audio retry endpoint.");
             s.AdvanceStage(stage, r.Introduction, time.GetUtcNow()); return true;
         }, ct);
         return await Map(s, true, ct);
@@ -59,6 +62,8 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
         var turnId = capture?.ClientTurnId;
         if (turnId is not null && (string.IsNullOrWhiteSpace(turnId) || turnId.Length > 128 || turnId != turnId.Trim()))
             throw AppException.Invalid("client_turn_id_invalid");
+        if (turnId is not null && await db.InterviewIntroductions.AnyAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == s.Id && x.ClientTurnId == turnId, ct))
+            throw new AppException(409, "client_turn_id_conflict", "The turn identifier belongs to the introduction.");
         if (turnId is not null && s.Answers.SingleOrDefault(a => a.ClientTurnId == turnId) is { } existing)
         {
             if (existing.QuestionId != questionId) throw new AppException(409, "client_turn_id_conflict", "The turn identifier belongs to another question.");
@@ -271,7 +276,15 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
     {
         var s = await Load(id, ct);
         var messages = new List<CandidateMessageDto>();
-        foreach (var q in s.Questions.Where(q => q.AskedAtUtc is not null || s.Answers.Any(a => a.QuestionId == q.QuestionId) || s.CurrentQuestionId == q.QuestionId))
+        var introduction = await db.InterviewIntroductions.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == id, ct);
+        if (introduction is not null)
+        {
+            messages.Add(new($"introduction-prompt:{s.Id}", null, null, "assistant", s.CandidateIntroductionMessage, introduction.SubmittedAtUtc, Stage: "CandidateIntroduction"));
+            messages.Add(new($"introduction:{introduction.Id}", null, null, "candidate", introduction.Transcript, introduction.SubmittedAtUtc, introduction.Status.ToString(), "CandidateIntroduction"));
+        }
+        else if (s.CandidateIntroductionTranscript is { } legacyIntroduction)
+            messages.Add(new($"introduction:{s.Id}", null, null, "candidate", legacyIntroduction, s.StageChangedAtUtc ?? s.StartedAtUtc ?? s.CreatedAtUtc, "Processed", "CandidateIntroduction"));
+        foreach (var q in s.Questions.Where(q => q.AskedAtUtc is not null || s.Answers.Any(a => a.QuestionId == q.QuestionId) || s.Stage == InterviewStage.Questions && s.CurrentQuestionId == q.QuestionId))
         {
             // Legacy sessions have no persisted question timestamp; expose a server-time fallback.
             var submitted = s.Answers.Where(a => a.QuestionId == q.QuestionId).OrderBy(a => a.SubmittedAtUtc).FirstOrDefault();
@@ -288,6 +301,11 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
     }
     private async Task<CandidateInterviewDto> Map(InterviewSession s, bool generateAudio, CancellationToken ct, InterviewAnswer? resultAnswer = null)
     {
+        var introduction = await db.InterviewIntroductions.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == s.Id, ct);
+        var introPending = IntroductionRecoveryPending(s, introduction);
+        var introCanRetry = introduction is not null && s.Stage == InterviewStage.CandidateIntroduction && s.RemainingSeconds(time.GetUtcNow()) > 0 &&
+            introduction.Status != IntroductionStatus.Processed && !introPending &&
+            (introduction.ProcessingLeaseExpiresAtUtc is null || introduction.ProcessingLeaseExpiresAtUtc <= time.GetUtcNow());
         CandidateQuestionDto? q = null;
         if (s.Stage == InterviewStage.Questions && s.CurrentQuestionId is { } id)
         {
@@ -301,16 +319,23 @@ public sealed class CandidateInterviewService(IApplicationDbContext db, ICurrent
             ?? s.Answers.OrderByDescending(x => x.SubmittedAtUtc).FirstOrDefault();
         var canRetry = a is not null && a.Status != AnswerStatus.Processed && a.QuestionId == s.CurrentQuestionId && s.Status == InterviewStatus.ProcessingAnswer &&
             (s.ProcessingLeaseId is null || s.ProcessingLeaseExpiresAtUtc <= time.GetUtcNow());
-        return new(s.Id, s.Status.ToString(), s.Stage == InterviewStage.Questions && s.Status == InterviewStatus.WaitingForAnswer && s.RemainingSeconds(time.GetUtcNow()) > 0,
-            s.Status == InterviewStatus.ProcessingAnswer && !canRetry, q,
+        var answerPending = s.Status == InterviewStatus.ProcessingAnswer && options.BackgroundRecoveryEnabled &&
+            (s.RecoveryAttempts < options.MaxRecoveryAttempts || s.ProcessingLeaseExpiresAtUtc > time.GetUtcNow());
+        var stageMessage = StageText(s);
+        return new(s.Id, s.Status.ToString(), (s.Stage == InterviewStage.Questions || s.Stage == InterviewStage.CandidateIntroduction && introduction is null) && s.Status == InterviewStatus.WaitingForAnswer && s.RemainingSeconds(time.GetUtcNow()) > 0,
+            s.Status == InterviewStatus.ProcessingAnswer && (!canRetry || answerPending) || s.Stage == InterviewStage.CandidateIntroduction &&
+                (introPending || introduction?.ProcessingLeaseExpiresAtUtc > time.GetUtcNow()), q,
             new(s.AnsweredQuestionCount, s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow())),
             a is null ? null : new(a.Id, a.QuestionId, a.Status.ToString(), canRetry, a.Status == AnswerStatus.Failed ? "answer_retry_available" : null,
                 a.Transcript, a.ClientTurnId, a.SubmittedAtUtc, a.LastSpeechEndUtc, a.DurationSeconds, a.VideoStorageKey is not null),
             s.CompletionReason?.ToString(), s.WelcomeMessage, s.Status == InterviewStatus.Completed ? s.GoodbyeMessage : null,
             new(true, options.MaxUploadBytes, options.MaxVideoUploadBytes, options.MaxAnswerSeconds), s.Stage.ToString(),
-            s.Stage switch { InterviewStage.Welcome => s.WelcomeMessage, InterviewStage.CandidateIntroduction => s.CandidateIntroductionMessage,
-                InterviewStage.CompanyIntroduction => s.CompanyIntroductionMessage, InterviewStage.Goodbye => s.GoodbyeMessage, _ => null },
-            s.CandidateIntroductionEnabled, s.CompanyIntroductionEnabled, s.RecoveryAttempts,
-            canRetry && options.BackgroundRecoveryEnabled && s.RecoveryAttempts < options.MaxRecoveryAttempts);
+            stageMessage,
+            s.CandidateIntroductionEnabled, s.CompanyIntroductionEnabled, s.Stage == InterviewStage.CandidateIntroduction ? introduction?.RecoveryAttempts ?? 0 : s.RecoveryAttempts,
+            introPending || answerPending,
+            s.Status is not (InterviewStatus.Created or InterviewStatus.Cancelled) && !string.IsNullOrWhiteSpace(stageMessage) ? $"/api/candidate/interviews/{s.Id}/stages/{s.Stage}/audio" : null,
+            introduction is null ? null : new(introduction.Id, introduction.ClientTurnId, introduction.Status.ToString(), introduction.Transcript,
+                introCanRetry, introduction.FailureCode, introduction.RecoveryAttempts, introPending, introduction.SubmittedAtUtc,
+                introduction.LastSpeechEndUtc, introduction.DurationSeconds, introduction.VideoStorageKey is not null));
     }
 }

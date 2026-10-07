@@ -1,3 +1,11 @@
+## ADR-025 — معرفی صوتی مستقل و رسانه مرحله جاری (2026-10-07)
+
+براساس قرارداد فرانت، معرفی صوتی موجودیت InterviewIntroduction مستقل از پاسخ سؤال دارد: unique جلسه، clientTurnId الزامی، فایل صوت/ویدیو خصوصی و transcript/status، RowVersion و lease/recovery مستقل. FK مرکب سازمان/جلسه مانع رابطه بین سازمان‌ها است؛ Application فقط EF abstraction و provider/storage موجود را مصرف می‌کند. فایل/network بیرون transaction، پذیرش/claim/ثبت نتیجه زیر قفل کوتاه سازمان با reload و recheck دسترسی/billing است. replay همان نوبت STT تازه ندارد؛ فایل بازنده رقابت پاک می‌شود. worker موجود معرفی را هم با state DB بازیابی می‌کند؛ زیرساخت توزیع‌شده یا Repository جدید نیست.
+
+معرفی نمره/progress/answer یا زمان مالی سؤال نمی‌سازد؛ transcript معتبر در context جلسه persist و سپس Questions آغاز می‌شود. متن خالی/STT ناموفق fallback ساختگی ندارد. مسیر JSON قدیمی محفوظ است ولی پس از پذیرش صوت اجازه bypass پردازش نمی‌دهد. history داوطلب و HR معرفی را مستقل از سؤال نشان می‌دهند؛ رسانه HR scoped/retention دارد. downgrade با داده معرفی موجود رد می‌شود.
+
+stageAudioUrl فقط مرحله ثابت جاری را با Bearer همان دعوت عرضه می‌کند؛ شرکت پیش از پایان Questions یا مرحله آینده/گذشته 404 است. صوت lazy در GET با cache scoped موجود تولید می‌شود؛ state منتظر صوت ثابت نیست، شکست TTS=503 و متن/مرحله محفوظ. پایان پخش توسط فرانت و stage/advance تأیید می‌شود؛ server رویداد playback را نمی‌بیند. پرچم backgroundRetryPending پاسخ/معرفی در lease فعال و backoff true می‌ماند و پس از موفقیت/آخرین شکست false است. [VOICE_INTRODUCTION_API](VOICE_INTRODUCTION_API.md) قرارداد جاری این تکمیل است؛ Angular و rollout مقصد خارج این تغییرند.
+
 ## ADR-024 — معرفی‌ها، context دعوت و recovery پایدار (2026-10-07)
 
 طبق درخواست مستقل کاربر، پیام معرفی کارجو با متن پیش‌فرض و معرفی شرکت با پرچم‌های مستقل در قالب و snapshot دعوت افزوده شدند. Stage مستقل از InterviewStatus مالی/پردازش، ترتیب معرفی‌ها را persist می‌کند؛ معرفی شرکت فقط پس از پایان سؤال‌ها عرضه می‌شود. مرحله‌های ثابت با تأیید کلاینت جلو می‌روند؛ متن معرفی کارجو بدون امتیاز مهارتی به context می‌رسد. مسیر بدون معرفی و جلسات تاریخی آغاز قبلی را حفظ می‌کنند. [INTERVIEW_CONTEXT_API](INTERVIEW_CONTEXT_API.md) قرارداد فرانت است.

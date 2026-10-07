@@ -99,7 +99,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
     routeValues.TryGetValue("controller", out var controller);
     routeValues.TryGetValue("action", out var action);
     operation.Summary = OpenApiText.Summary(controller, action);
-    if (controller == "CandidateInterviews" && action == "Answer")
+    if (controller == "CandidateInterviews" && action is "Answer" or "Introduction")
     {
         operation.RequestBody = new OpenApiRequestBody
         {
@@ -110,7 +110,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                 {
                     Schema = new OpenApiSchema
                     {
-                        Type = JsonSchemaType.Object, Required = new HashSet<string> { "questionId", "audio" },
+                        Type = JsonSchemaType.Object, Required = action == "Introduction" ? new HashSet<string> { "audio", "clientTurnId" } : new HashSet<string> { "questionId", "audio" },
                         Properties = new Dictionary<string, IOpenApiSchema>
                         {
                             ["questionId"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" },
@@ -124,6 +124,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                 }
             }
         };
+        if (action == "Introduction") operation.RequestBody.Content!["multipart/form-data"].Schema!.Properties!.Remove("questionId");
     }
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
         operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : "Bearer", context.Document)] = [] }];
@@ -134,7 +135,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
     }
     var schema = await context.GetOrCreateSchemaAsync(typeof(ProblemDetails), null, ct);
     operation.Responses ??= new();
-    foreach (var status in new[] { "400", "401", "403", "404", "409", "429", "500" })
+    foreach (var status in new[] { "400", "401", "403", "404", "409", "413", "429", "500", "503" })
         operation.Responses.TryAdd(status, new OpenApiResponse { Description = "ProblemDetails with code and traceId; validation errors include errors.", Content = new Dictionary<string, OpenApiMediaType> { ["application/problem+json"] = new() { Schema = schema } } });
 }));
 var app = builder.Build();

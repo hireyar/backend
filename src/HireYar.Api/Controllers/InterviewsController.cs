@@ -38,6 +38,18 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
     public Task<InterviewInvitation> Invite(Guid positionId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct) => service.InviteAsync(positionId, applicationId, r, ct);
     [HttpGet("api/interviews/{id:guid}")]
     public Task<HrInterviewDto> Get(Guid id, CancellationToken ct) => service.GetAsync(id, ct);
+    [HttpGet("api/interviews/{id:guid}/introduction/audio")]
+    public async Task<IActionResult> IntroductionAudio(Guid id, CancellationToken ct)
+    {
+        var media = await service.OpenIntroductionMediaAsync(id, false, ct);
+        return File(media.Content, media.ContentType, enableRangeProcessing: true);
+    }
+    [HttpGet("api/interviews/{id:guid}/introduction/video")]
+    public async Task<IActionResult> IntroductionVideo(Guid id, CancellationToken ct)
+    {
+        var media = await service.OpenIntroductionMediaAsync(id, true, ct);
+        return File(media.Content, media.ContentType, enableRangeProcessing: true);
+    }
     [HttpPost("api/interviews/{id:guid}/revoke")]
     public async Task<IActionResult> Revoke(Guid id, CancellationToken ct) { await service.RevokeAsync(id, ct); return NoContent(); }
     [HttpGet("api/interviews/{id:guid}/answers/{answerId:guid}/audio")]

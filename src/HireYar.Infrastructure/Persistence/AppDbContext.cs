@@ -27,6 +27,8 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<QuestionAudio> QuestionAudios => Set<QuestionAudio>();
     public DbSet<InterviewSession> InterviewSessions => Set<InterviewSession>();
     public DbSet<InterviewAnswer> InterviewAnswers => Set<InterviewAnswer>();
+    public DbSet<InterviewIntroduction> InterviewIntroductions => Set<InterviewIntroduction>();
+    public Task ReloadIntroductionAsync(InterviewIntroduction introduction, CancellationToken ct) => Entry(introduction).ReloadAsync(ct);
     public Task ReloadInterviewAsync(InterviewSession session, CancellationToken ct) => Entry(session).ReloadAsync(ct);
     public void DetachEntity(object entity) => Entry(entity).State = EntityState.Detached;
     public DbSet<PricingPackage> PricingPackages => Set<PricingPackage>();
@@ -58,7 +60,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
         // and rotate a 128-bit application-managed concurrency token on every write.
         foreach (var entry in ChangeTracker.Entries().Where(e =>
             e.State is EntityState.Added or EntityState.Modified &&
-            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is BankQuestion || e.Entity is PricingPackage || e.Entity is AiCreditPackage)))
+            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is InterviewIntroduction || e.Entity is BankQuestion || e.Entity is PricingPackage || e.Entity is AiCreditPackage)))
             entry.Property("RowVersion").CurrentValue = Guid.NewGuid().ToByteArray();
         return base.SaveChangesAsync(ct);
     }
