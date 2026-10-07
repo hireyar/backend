@@ -1,3 +1,19 @@
+## انتخاب پیاده‌سازی مستقل providerهای AI — 2026-10-07
+
+روی dev، DI براساس AI:Provider یکی از NetArzClient، LiaraClient یا DisabledInterviewProvider را برای STT/LLM/TTS/پیشنهاد سؤال انتخاب می‌کند؛ مقدار ناشناخته در startup رد می‌شود. NetArzOptions و LiaraOptions مستقل‌اند، فقط تنظیمات provider انتخاب‌شده اعتبارسنجی می‌شود و lease از timeoutهای همان provider محاسبه می‌شود. Disabled هیچ HttpClient یا کلید provider نمی‌خواهد. جزئیات مشترک قرارداد HTTP در OpenAiCompatibleInterviewClient داخل Infrastructure باقی‌اند؛ نام provider در نتیجه/metrics/log از کلاس انتخاب‌شده می‌آید و property قدیمی NetArzOptions.Provider authoritative نیست.
+
+تمام appsettingsها و مقادیر کلید موجود دست‌نخورده‌اند؛ انتخاب پیش‌فرض هنوز NetArz است. برای انتخاب Liara مقدار AI:Provider=Liara یا override محیطی AI__Provider=Liara لازم است. آدرس و مدل STT تنظیم‌شده طبق بررسی قبلی همچنان نیاز به تطبیق کنسول/تأیید واقعی دارند؛ تغییر حدسی انجام نشد. افزودن provider دیگری نیازمند options، client و شاخه ثبت DI مستقل است؛ انتخاب نام دلخواه پشتیبانی خودکار ایجاد نمی‌کند.
+
+build صفر warning/error؛ 88/88 تست مرتبط provider/audio/selection/rules موفق، صفر شکست/Skip؛ tests/HireYar.Tests/TestResults/provider-selection.trx. هشت case تازه انتخاب چهار interface، عدم دخالت تنظیمات provider دیگر، کلید مستقل، lease، نام ناشناخته، Disabled و درخواست‌های مصنوعی Liara با آدرس/کلید/مدل/نتیجه مخصوص را بررسی می‌کنند. تماس واقعی AI، PostgreSQL/migration، commit/push/deploy انجام نشد؛ schema و قرارداد Application/API تغییر نکرده‌اند. تغییرات مستندی نوبت قبلی حفظ شدند.
+
+## بررسی قابلیت استفاده از Liara — 2026-10-07
+
+بررسی روی dev پاک انجام شد؛ کد runtime و تمام appsettingsها/توکن‌ها دست‌نخورده‌اند. AI:Provider فعلی NetArz است؛ AddInterviews فقط NetArz/Disabled را می‌پذیرد و AI:Liara را bind نمی‌کند. تغییر Provider به Liara در وضع فعلی startup را رد می‌کند. NetArzClient نام provider را در نتیجه/metrics/log ثابت دارد و اعتبارسنجی lease فقط timeoutهای NetArz را می‌خواند؛ پشتیبانی انتخاب Liara باید این موارد را نیز اصلاح کند.
+
+مستند رسمی https://docs.liara.ir/ai/openai/ سازگاری chat/completions، audio/transcriptions و audio/speech، مدل openai/gpt-5.6-luna و openai/tts-1-hd و voice=nova را مستند کرده است. مدل تنظیم‌شده openai/gpt-transcribe در فهرست آن صفحه نیست؛ openai/whisper-large-v3 مستند است، اما نبود در فهرست اثبات عدم پشتیبانی نیست. نمونه BaseUrl در https://docs.liara.ir/ai/quick-start/ ترتیب /api/v1/{workspace} دارد؛ ترتیب تنظیم فعلی /api/{workspace}/v1 است و باید با آدرس واقعی کنسول تطبیق شود، نه تغییر حدسی.
+
+درخواست GET models با کلید موجود فقط برای بررسی خواندنی انجام شد، اما HttpRequestException شبکه بدون پاسخ HTTP رخ داد؛ صحت کلید، پلن، آدرس و اجرای واقعی AI تأیید نشده‌اند. هیچ درخواست تولید متن/صوت یا ارسال داده کاربر انجام نشد و مقدار کلید/شناسه workspace در یادداشت ذخیره نشد. build صفر warning/error؛ 47/47 تست InterviewProviderTests و InterviewAudioTests موفق، صفر Skip؛ tests/HireYar.Tests/TestResults/liara-review.trx. PostgreSQL/migration، commit/push/deploy انجام نشد. نتیجه: Liara از نظر قرارداد API قابل اتصال است، اما هنوز provider قابل انتخاب پروژه نیست؛ اتصال واقعی و مدل STT باز هستند.
+
 # وضعیت جاری
 
 ## گفت‌وگوی خودکار نوبتی داوطلب — 2026-10-06: Verified محلی

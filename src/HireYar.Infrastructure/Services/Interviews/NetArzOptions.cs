@@ -1,6 +1,6 @@
 namespace HireYar.Infrastructure.Interviews;
 
-public sealed class NetArzOptions
+public sealed class NetArzOptions : IOpenAiInterviewOptions
 {
     public bool Enabled { get; set; } = true;
     public string BaseUrl { get; set; } = "https://netarz.ir/api/ai/v1";
