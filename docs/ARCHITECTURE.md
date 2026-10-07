@@ -1,3 +1,6 @@
+## تکمیل ADR-017 — انتخاب provider AI (2026-10-07)
+
+انتخاب AI:Provider در composition Infrastructure به client مستقل NetArz/Liara/Disabled وصل می‌شود؛ هر provider options مستقل دارد. به دلیل قرارداد wire یکسان OpenAI-compatible، پردازش HTTP، محدودیت پاسخ، cancellation و logging امن در base داخلی مشترک‌اند و کلاس concrete هویت provider را تعیین می‌کند. فقط تنظیمات provider فعال و lease متناسب با timeoutهای آن اعتبارسنجی می‌شوند؛ Disabled کلید یا HttpClient ندارد. Application و API همچنان فقط interfaceهای موجود را مصرف می‌کنند. provider ناشناخته startup error است؛ fallback به provider دیگر یا retry خودکار تماس خارجی اضافه نشده. تنظیمات و کلیدهای موجود دست‌نخورده‌اند و اتصال واقعی Liara هنوز تأیید نشده است.
 # معماری و تصمیم‌ها
 
 ## ADR-023 — پاسخ نوبتی با ویدیو و شناسه کلاینت (2026-10-06)
