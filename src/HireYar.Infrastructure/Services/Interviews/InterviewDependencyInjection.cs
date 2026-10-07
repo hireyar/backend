@@ -32,12 +32,15 @@ public static class InterviewDependencyInjection
         services.AddOptions<InterviewOptions>().Bind(config.GetSection("InterviewAudio"))
             .Validate(o => o.MaxUploadBytes is >= 1024 and <= 52428800 && o.MaxVideoUploadBytes is >= 1024 and <= 41943040 && o.MaxAnswerSeconds is >= 1 and <= 900 && o.ShortlistLimit is >= 5 and <= 20 && o.LeaseSeconds is >= 60 and <= 900,
                 "Invalid interview limits.")
+            .Validate(o => o.MaxRecoveryAttempts is >= 1 and <= 10 && o.RecoveryPollSeconds is >= 1 and <= 300, "Invalid recovery limits.")
             .Validate(o => provider == "Disabled" || o.LeaseSeconds > timeoutSection.GetValue("SttTimeoutSeconds", 60) + timeoutSection.GetValue("LlmTimeoutSeconds", 30) + 30,
                 "InterviewAudio:LeaseSeconds must exceed STT + LLM timeouts plus 30 seconds.").ValidateOnStart();
         services.AddSingleton(s => s.GetRequiredService<IOptions<InterviewOptions>>().Value);
         services.AddOptions<InterviewStorageOptions>().Bind(config.GetSection("InterviewStorage"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.RootPath) && !o.RootPath.Split('/', '\\').Contains("wwwroot", StringComparer.OrdinalIgnoreCase), "InterviewStorage must be private and outside wwwroot.").ValidateOnStart();
         services.AddScoped<QuestionSuggestionService>();
+        services.AddSingleton<IResumeTextExtractor, ResumeTextExtractor>();
+        services.AddHostedService<InterviewRecoveryWorker>();
         services.AddSingleton<IInterviewAudioStorage, LocalInterviewAudioStorage>();
         services.AddSingleton<InterviewPolicy>(); services.AddSingleton<InterviewDecisionValidator>();
         services.AddScoped<QuestionAudioService>(); services.AddScoped<CandidateInterviewService>(); services.AddScoped<InterviewManagementService>();

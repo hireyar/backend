@@ -14,10 +14,18 @@ public sealed record WizardTemplateRequest(
     [Required, StringLength(2000)] string WelcomeMessage,
     [Required, StringLength(2000)] string GoodbyeMessage,
     [Range(5, 60)] int DurationMinutes = 60,
-    [MinLength(5), MaxLength(10)] List<QuestionTopicRequest>? Topics = null) : IValidatableObject
+    [MinLength(5), MaxLength(10)] List<QuestionTopicRequest>? Topics = null,
+    bool CandidateIntroductionEnabled = false,
+    [StringLength(2000)] string CandidateIntroductionMessage = HireYar.Domain.InterviewTemplates.InterviewTemplate.DefaultCandidateIntroduction,
+    bool CompanyIntroductionEnabled = false,
+    [StringLength(2000)] string CompanyIntroductionMessage = "") : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
     {
+        if (CandidateIntroductionEnabled && string.IsNullOrWhiteSpace(CandidateIntroductionMessage))
+            yield return new("متن معرفی کارجو الزامی است.", [nameof(CandidateIntroductionMessage)]);
+        if (CompanyIntroductionEnabled && string.IsNullOrWhiteSpace(CompanyIntroductionMessage))
+            yield return new("متن معرفی شرکت الزامی است.", [nameof(CompanyIntroductionMessage)]);
         if ((Questions is null) == (Topics is null))
             yield return new("فقط یکی از سؤال‌های معمولی یا موضوع‌های پیشرفته را ارسال کنید.");
         if (Topics is not null && !QuestionTopicRules.IsValid(Topics))
@@ -34,7 +42,8 @@ public sealed record WizardInvitationRequest(Guid JobPositionId, Guid TemplateId
     [Required, EmailAddress, StringLength(256)] string Email,
     [Required, RegularExpression("^09[0-9]{9}$")] string Phone,
     [Range(1, 14)] int DeadlineDays = 3,
-    [Required, RegularExpression("^(general|specialized)$")] string InterviewType = "general");
+    [Required, RegularExpression("^(general|specialized)$")] string InterviewType = "general",
+    [StringLength(32000)] string? ResumeText = null);
 public sealed record PanelInvitationResult(InterviewInvitation Invitation, string EmailDelivery, string SmsDelivery);
 public sealed record ResendInterviewRequest([Range(1, 14)] int DeadlineDays = 3);
 public sealed class InterviewListQuery

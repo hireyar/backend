@@ -133,6 +133,7 @@ public sealed class BillingPanelTests(ApiFixture f)
         using var hr = f.CreateClient(); hr.DefaultRequestHeaders.Authorization = new("Bearer", a.Client.AccessToken);
         using var form = new MultipartFormDataContent();
         foreach (var field in new Dictionary<string, string> { ["jobPositionId"] = job.GetProperty("id").GetString()!, ["templateId"] = template.GetProperty("id").GetString()!, ["firstName"] = "Synthetic", ["lastName"] = "Candidate", ["email"] = "synthetic@example.test", ["phone"] = "09123456789" }) form.Add(new StringContent(field.Value), field.Key);
+        form.Add(new StringContent("Synthetic candidate work history"), "resumeText");
         form.Add(new ByteArrayContent("%PDF-1.7\nSynthetic resume"u8.ToArray()), "resume", "resume.pdf");
         var invitation = (await (await hr.PostAsync("/api/panel-wizard/invitations", form)).Content.ReadFromJsonAsync<PanelInvitationResult>(BillingJson.Options))!;
         using var candidate = f.CreateClient(); candidate.DefaultRequestHeaders.Authorization = new("Bearer", invitation.Invitation.Token);

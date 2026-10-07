@@ -12,7 +12,8 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         x.Questions.OrderBy(q => q.Order).Select(q => new QuestionDto(q.Id, q.Text, q.Order, q.Competency, q.EvaluationGuidance)).ToArray(), x.InterviewType, x.WelcomeMessage, x.GoodbyeMessage, x.UseTopicQuestions,
         x.UseTopicQuestions ? x.Questions.GroupBy(q => q.TopicOrder).OrderBy(g => g.Key).Select(g => new QuestionTopicRequest(g.First().TopicName!,
             g.OrderBy(q => q.Difficulty).Select(q => new TopicQuestionRequest(QuestionTopicRules.Level(q.Difficulty), q.Text)).ToList())).ToArray() : null,
-        x.UseTopicQuestions ? x.Questions.Select(q => q.TopicOrder).Distinct().Count() : x.Questions.Count);
+        x.UseTopicQuestions ? x.Questions.Select(q => q.TopicOrder).Distinct().Count() : x.Questions.Count,
+        x.CandidateIntroductionEnabled, x.CandidateIntroductionMessage, x.CompanyIntroductionEnabled, x.CompanyIntroductionMessage);
     public async Task<Page<TemplateListDto>> ListAsync(PageQuery page, Guid? jobPositionId, CancellationToken ct)
     {
         var query = Scoped.AsNoTracking(); if (jobPositionId.HasValue) query = query.Where(x => x.JobPositionId == jobPositionId);
@@ -48,6 +49,8 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         var request = new TemplateRequest(r.JobPositionId, r.Title, r.DurationMinutes, 0,
             (r.Questions ?? r.Topics!.SelectMany(t => t.Questions.OrderBy(q => QuestionTopicRules.Difficulty(q.Level)).Select(q => q.Text)).ToList()).Select((text, index) => new QuestionRequest(null, text, index + 1, "ارزیابی شغلی", "شواهد مرتبط با شرح شغل را بررسی کنید.")).ToList());
         Apply(row, request);
+        row.CandidateIntroductionEnabled = r.CandidateIntroductionEnabled; row.CandidateIntroductionMessage = r.CandidateIntroductionMessage?.Trim() ?? "";
+        row.CompanyIntroductionEnabled = r.CompanyIntroductionEnabled; row.CompanyIntroductionMessage = r.CompanyIntroductionMessage?.Trim() ?? "";
         var questions = Questions(row.Id, request);
         if (r.Topics is not null)
             for (var i = 0; i < r.Topics.Count; i++)
@@ -88,5 +91,7 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
     {
         row.JobPositionId = r.JobPositionId; row.Title = r.Title.Trim(); row.Language = r.Language.Trim(); row.DurationMinutes = r.DurationMinutes;
         row.MaxFollowUpQuestionsPerQuestion = r.MaxFollowUpQuestionsPerQuestion; row.IsArchived = r.IsArchived; row.UpdatedAtUtc = time.GetUtcNow();
+        row.CandidateIntroductionEnabled = r.CandidateIntroductionEnabled; row.CandidateIntroductionMessage = r.CandidateIntroductionMessage?.Trim() ?? "";
+        row.CompanyIntroductionEnabled = r.CompanyIntroductionEnabled; row.CompanyIntroductionMessage = r.CompanyIntroductionMessage?.Trim() ?? "";
     }
 }

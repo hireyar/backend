@@ -1,3 +1,9 @@
+# معرفی‌ها، context AI و recovery — 2026-10-07: Verified محلی
+
+درخواست مستقل ساختار بک‌اند اجرا شد: دو معرفی با فعال‌سازی/snapshot و مرحله persistشده، مستر پرامپت v2، استخراج محلی PDF متنی/DOCX یا resumeText صریح، ارسال context کامل ویزارد، ترتیب عمومی، تعامل محدود همان سؤال و worker بازیابی پاسخ پذیرفته‌شده. **۱۹۲ تست PostgreSQL واقعی موفق و صفر Skip**، ۹ تست تازه؛ migration روی legacy مصنوعی با script idempotent دوبار بررسی شد و EF drift ندارد. [INTERVIEW_CONTEXT_API](INTERVIEW_CONTEXT_API.md) مرجع قرارداد است.
+
+باقی‌مانده اتصال/عملیات: مصرف stage/advance و interactionMessage و خطای resume_text_required در Angular ریپوی جدا، اعمال migration مقصد با مجوز مستقل و آزمون provider واقعی/کیفیت فارسی. OCR/DOC parsing، STT اختصاصی معرفی و backfill رزومه جلسات تاریخی اجرا نشده‌اند؛ معرفی کارجو ورودی متنی و مسیر legacy بدون فایل resume=null دارد. پس از سه شکست STT، retry دستی حفظ می‌شود؛ متن/evidence ساختگی برای جلو رفتن ساخته نمی‌شود. این موارد مجوز توسعه خودکار یا push/deploy نیستند.
+
 ## انتخاب پیاده‌سازی مستقل providerهای AI — 2026-10-07
 
 روی dev، DI براساس AI:Provider یکی از NetArzClient، LiaraClient یا DisabledInterviewProvider را برای STT/LLM/TTS/پیشنهاد سؤال انتخاب می‌کند؛ مقدار ناشناخته در startup رد می‌شود. NetArzOptions و LiaraOptions مستقل‌اند، فقط تنظیمات provider انتخاب‌شده اعتبارسنجی می‌شود و lease از timeoutهای همان provider محاسبه می‌شود. Disabled هیچ HttpClient یا کلید provider نمی‌خواهد. جزئیات مشترک قرارداد HTTP در OpenAiCompatibleInterviewClient داخل Infrastructure باقی‌اند؛ نام provider در نتیجه/metrics/log از کلاس انتخاب‌شده می‌آید و property قدیمی NetArzOptions.Provider authoritative نیست.

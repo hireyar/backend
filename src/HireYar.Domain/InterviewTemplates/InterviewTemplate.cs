@@ -10,6 +10,11 @@ public sealed class InterviewTemplate
     public string InterviewType { get; set; } = "general";
     public string WelcomeMessage { get; set; } = "به مصاحبه خوش آمدید.";
     public string GoodbyeMessage { get; set; } = "از وقتی که گذاشتید متشکریم.";
+    public const string DefaultCandidateIntroduction = "قبل از شروع سؤال‌ها، لطفاً خودتون رو معرفی کنید و درباره سوابق کاری و پروژه‌هایی که روی آن‌ها کار کردین برای ما توضیح بدین";
+    public string CandidateIntroductionMessage { get; set; } = DefaultCandidateIntroduction;
+    public bool CandidateIntroductionEnabled { get; set; }
+    public string CompanyIntroductionMessage { get; set; } = "";
+    public bool CompanyIntroductionEnabled { get; set; }
     public int DurationMinutes { get; set; }
     public int MaxFollowUpQuestionsPerQuestion { get; set; }
     public bool UseTopicQuestions { get; set; }

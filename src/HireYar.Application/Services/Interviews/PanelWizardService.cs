@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
-    ISubscriptionEntitlementService entitlements, IInterviewAudioStorage storage)
+    ISubscriptionEntitlementService entitlements, IInterviewAudioStorage storage, IResumeTextExtractor resumeText)
 {
     public async Task<PanelInvitationResult> InviteAsync(WizardInvitationRequest r, Stream resume, string filename, CancellationToken ct)
     {
@@ -22,6 +22,8 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         await entitlements.RequireAsync(user.OrganizationId, template.UseTopicQuestions ? [capability, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"] : [capability, "ai_interview"], ct);
         var sourceTemplateId = template.Id;
         var file = await ResumeUploadValidator.ReadAsync(resume, filename, ct);
+        var extracted = string.IsNullOrWhiteSpace(r.ResumeText) ? await resumeText.ExtractAsync(file.Bytes, file.Extension, ct) : r.ResumeText.Trim();
+        if (string.IsNullOrWhiteSpace(extracted)) throw AppException.Invalid("resume_text_required");
         var now = time.GetUtcNow();
         // Keep the agreed position/template FK and reuse an organization's template by copying it to the selected position.
         if (template.JobPositionId != job.Id)
@@ -29,6 +31,8 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             template = new InterviewTemplate { OrganizationId = user.OrganizationId, JobPositionId = job.Id,
                 UseTopicQuestions = template.UseTopicQuestions, Title = template.Title, InterviewType = template.InterviewType, Language = template.Language,
                 WelcomeMessage = template.WelcomeMessage, GoodbyeMessage = template.GoodbyeMessage,
+                CandidateIntroductionEnabled = template.CandidateIntroductionEnabled, CandidateIntroductionMessage = template.CandidateIntroductionMessage,
+                CompanyIntroductionEnabled = template.CompanyIntroductionEnabled, CompanyIntroductionMessage = template.CompanyIntroductionMessage,
                 DurationMinutes = template.DurationMinutes, MaxFollowUpQuestionsPerQuestion = 0, CreatedAtUtc = now, UpdatedAtUtc = now,
                 Questions = template.Questions.OrderBy(x => x.Order).Select(x => new InterviewQuestion {
                     TopicName = x.TopicName, TopicOrder = x.TopicOrder, Difficulty = x.Difficulty, Text = x.Text, Order = x.Order, Competency = x.Competency, EvaluationGuidance = x.EvaluationGuidance }).ToList() };
@@ -51,7 +55,10 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             template.DurationMinutes * 60, now, now.AddDays(r.DeadlineDays));
         if (template.UseTopicQuestions) session.EnableTopicQuestions();
         session.SetRequiredCapability(capability);
+        session.SetInteractionLimit(2);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
+        session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, extracted, template.Language,
+            template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
         var token = InterviewTokens.Create(); session.SetAccessTokenHash(InterviewTokens.Hash(token));
         var saved = await storage.SaveAsync(new MemoryStream(file.Bytes), "resumes", application.Id, ResumeUploadValidator.MaxBytes, ct);
         try

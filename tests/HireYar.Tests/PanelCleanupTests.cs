@@ -40,6 +40,7 @@ public sealed class PanelCleanupTests(ApiFixture f)
         foreach (var field in new Dictionary<string, string> { ["jobPositionId"] = job.ToString(), ["templateId"] = template.ToString(),
             ["firstName"] = "Synthetic", ["lastName"] = "Candidate", ["email"] = "synthetic@example.test", ["phone"] = "09123456789" })
             form.Add(new StringContent(field.Value), field.Key);
+        form.Add(new StringContent("Synthetic candidate work history"), "resumeText");
         form.Add(new ByteArrayContent("%PDF-1.7\nSynthetic resume"u8.ToArray()), "resume", "resume.pdf");
         return await hr.PostAsync("/api/panel-wizard/invitations", form);
     }

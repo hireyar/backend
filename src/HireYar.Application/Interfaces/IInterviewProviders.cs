@@ -10,7 +10,16 @@ public sealed record InterviewDecisionContext(string PositionTitle, Guid Current
     InterviewQuestionSnapshot Question, string CandidateTranscript,
     IReadOnlyList<InterviewSkill> Skills, IReadOnlyList<CandidateSkillState> SkillStates,
     IReadOnlyList<InterviewCoveredTopic> CoveredTopics, IReadOnlyList<InterviewQuestionSnapshot> AvailableQuestions,
-    string? PositionDescription = null);
+    string? PositionDescription = null, string? ResumeText = null, string? CandidateIntroduction = null,
+    string InterviewType = "specialized", string Language = "fa-IR",
+    IReadOnlyList<InterviewQuestionSnapshot>? QuestionBank = null,
+    IReadOnlyList<InterviewDialogueTurn>? PreviousAnswers = null,
+    string? MasterPrompt = null, int RemainingInteractions = 0);
+public sealed record InterviewDialogueTurn(Guid QuestionId, string Question, string? Answer, string? AssistantReply = null);
+public interface IResumeTextExtractor
+{
+    Task<string?> ExtractAsync(byte[] file, string extension, CancellationToken ct);
+}
 public interface ISpeechToTextService
 {
     Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct);
@@ -42,4 +51,7 @@ public sealed class InterviewOptions
     public int MaxAnswerSeconds { get; set; } = 600;
     public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
     public long MaxVideoUploadBytes { get; set; } = 40 * 1024 * 1024;
+    public bool BackgroundRecoveryEnabled { get; set; } = true;
+    public int MaxRecoveryAttempts { get; set; } = 3;
+    public int RecoveryPollSeconds { get; set; } = 15;
 }

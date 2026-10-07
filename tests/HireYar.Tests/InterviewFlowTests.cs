@@ -16,6 +16,8 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
 {
     public int SttCalls; public int TtsCalls; public bool FailStt; public bool FailLlm; public bool InvalidLlm; public bool FailTts;
     public int LlmCalls;
+    public InterviewDecisionContext? LastContext;
+    public string? InteractionAction;
     public TaskCompletionSource? Entered; public TaskCompletionSource? Release;
     public SpeechProfile Profile => new("fake-tts", "fake-voice", 1m);
     public Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct)
@@ -27,10 +29,17 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
     public async Task<InterviewDecisionResult> EvaluateAsync(InterviewDecisionContext context, CancellationToken ct)
     {
         Interlocked.Increment(ref LlmCalls);
+        LastContext = context;
         var release = Release;
         Entered?.TrySetResult(); if (release is not null) await release.Task.WaitAsync(ct);
         if (FailLlm) throw new InterviewProviderException("llm_timeout");
         if (InvalidLlm) return new("not-json", "Test", "fake-llm");
+        if (InteractionAction is { } action && context.RemainingInteractions > 0)
+            return new(JsonSerializer.Serialize(new InterviewDecision {
+                AnswerAssessment = new() { Relevance = 0, Clarity = 0, EvidenceQuality = 0 },
+                SkillUpdates = [], CoveredTopics = [], NextQuestionId = null, ShouldComplete = false,
+                Reason = "Clarification needed", Action = action, CandidateMessage = "لطفاً درباره همان موضوع بیشتر توضیح بدین."
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web)), "Test", "fake-llm");
         var result = new InterviewDecision { AnswerAssessment = new() { Relevance = 0.8m, Clarity = 0.8m, EvidenceQuality = 0.8m },
             SkillUpdates = [new() { SkillId = context.Question.SkillId, Delta = 0.1m, Confidence = 0.6m, Evidence = "Synthetic observable evidence" }],
             CoveredTopics = [], NextQuestionId = context.AvailableQuestions.FirstOrDefault()?.QuestionId,
@@ -42,7 +51,7 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
         Interlocked.Increment(ref TtsCalls); if (FailTts) throw new InterviewProviderException("tts_http_500");
         return Task.FromResult(new TextToSpeechResult("ID3-synthetic-audio"u8.ToArray(), "audio/mpeg"));
     }
-    public void Reset() { FailStt = FailLlm = InvalidLlm = FailTts = false; Entered = Release = null; }
+    public void Reset() { FailStt = FailLlm = InvalidLlm = FailTts = false; Entered = Release = null; LastContext = null; InteractionAction = null; }
 }
 [Collection("Postgres")]
 public sealed class InterviewFlowTests(ApiFixture f)
@@ -369,6 +378,84 @@ public sealed class InterviewFlowTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, (await c.GetAsync(started.Question.AudioUrl)).StatusCode);
     }
 
+    [PostgresFact]
+    public async Task Background_worker_recovers_uploaded_answer_after_abandoned_request_without_client_retry()
+    {
+        f.InterviewAi.Reset(); var (_, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);
+        string key;
+        await using (var scope = f.Services.CreateAsyncScope())
+            key = (await scope.ServiceProvider.GetRequiredService<IInterviewAudioStorage>().SaveAsync(new MemoryStream("ID3-synthetic"u8.ToArray()), "answers", invite.InterviewId, 1024, default)).Key;
+        await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == invite.InterviewId);
+            var a = s.SubmitAnswer(start.Question!.Id, key, "audio/mpeg", 13, f.Clock.GetUtcNow());
+            s.AcquireLease(a.Id, f.Clock.GetUtcNow(), 300); s.BeginTranscription(a.Id); await db.SaveChangesAsync(); });
+        f.Clock.Offset = TimeSpan.FromMinutes(6);
+        using var worker = new HireYar.Infrastructure.Interviews.InterviewRecoveryWorker(f.Services.GetRequiredService<IServiceScopeFactory>(),
+            new InterviewOptions { BackgroundRecoveryEnabled = true, RecoveryPollSeconds = 1 }, f.Clock,
+            NullLogger<HireYar.Infrastructure.Interviews.InterviewRecoveryWorker>.Instance);
+        try
+        {
+            await worker.StartAsync(default);
+            var recovered = false;
+            for (var i = 0; i < 100 && !recovered; i++)
+            {
+                await Task.Delay(100);
+                await f.Db(async db => { recovered = await db.InterviewAnswers.AnyAsync(a => a.InterviewSessionId == invite.InterviewId && a.Status == AnswerStatus.Processed); });
+            }
+            Assert.True(recovered);
+            await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == invite.InterviewId);
+                Assert.Equal(1, s.RecoveryAttempts); Assert.Equal(1, s.AnsweredQuestionCount); Assert.Null(s.ProcessingLeaseId); Assert.Single(s.Evidence); });
+        }
+        finally { await worker.StopAsync(default); f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
+    }
+    [PostgresFact]
+    public async Task Automatic_recovery_is_bounded_and_does_not_process_other_organizations()
+    {
+        f.InterviewAi.Reset(); var (_, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);
+        f.InterviewAi.FailStt = true;
+        try
+        {
+            Assert.Equal(HttpStatusCode.OK, (await Submit(c, invite.InterviewId, start.Question!.Id)).StatusCode);
+            Guid org = default;
+            await f.Db(async db => { org = await db.InterviewSessions.Where(s => s.Id == invite.InterviewId).Select(s => s.OrganizationId).SingleAsync(); });
+            for (var i = 1; i <= 3; i++)
+            {
+                f.Clock.Offset = TimeSpan.FromMinutes(i * 5);
+                await using var scope = f.Services.CreateAsyncScope();
+                var service = scope.ServiceProvider.GetRequiredService<CandidateInterviewService>();
+                await service.RecoverAsync(Guid.NewGuid(), invite.InterviewId, default);
+                await service.RecoverAsync(org, invite.InterviewId, default);
+            }
+            var calls = f.InterviewAi.SttCalls;
+            f.Clock.Offset = TimeSpan.FromMinutes(20);
+            await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<CandidateInterviewService>().RecoverAsync(org, invite.InterviewId, default);
+            Assert.Equal(calls, f.InterviewAi.SttCalls);
+            var current = (await c.GetFromJsonAsync<CandidateInterviewDto>($"/api/candidate/interviews/{invite.InterviewId}/current"))!;
+            Assert.Equal(3, current.RecoveryAttempts); Assert.True(current.Answer!.CanRetry); Assert.False(current.BackgroundRetryPending);
+            Assert.Equal("Failed", current.Answer.Status); Assert.Equal(0, current.Progress.AnsweredQuestions);
+        }
+        finally { f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
+    }
+    [PostgresFact]
+    public async Task Llm_recovery_reuses_saved_transcript_and_concurrent_claims_apply_evidence_once()
+    {
+        f.InterviewAi.Reset(); var (_, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);
+        var options = f.Services.GetRequiredService<InterviewOptions>(); var previous = options.BackgroundRecoveryEnabled;
+        options.BackgroundRecoveryEnabled = true; f.InterviewAi.FailLlm = true;
+        try
+        {
+            var failed = (await (await Submit(c, invite.InterviewId, start.Question!.Id)).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+            Assert.True(failed.BackgroundRetryPending); Assert.Equal("Failed", failed.Answer!.Status); Assert.NotNull(failed.Answer.Transcript);
+            var calls = f.InterviewAi.SttCalls; var llm = f.InterviewAi.LlmCalls;
+            f.InterviewAi.FailLlm = false; f.Clock.Offset = TimeSpan.FromMinutes(2); Guid org = default;
+            await f.Db(async db => { org = await db.InterviewSessions.Where(s => s.Id == invite.InterviewId).Select(s => s.OrganizationId).SingleAsync(); });
+            async Task Recover() { await using var scope = f.Services.CreateAsyncScope(); await scope.ServiceProvider.GetRequiredService<CandidateInterviewService>().RecoverAsync(org, invite.InterviewId, default); }
+            await Task.WhenAll(Recover(), Recover());
+            Assert.Equal(calls, f.InterviewAi.SttCalls); Assert.Equal(llm + 1, f.InterviewAi.LlmCalls);
+            await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == invite.InterviewId);
+                Assert.Equal(1, s.AnsweredQuestionCount); Assert.Single(s.Evidence); Assert.Equal(1, s.RecoveryAttempts); Assert.Null(s.ProcessingLeaseId); });
+        }
+        finally { options.BackgroundRecoveryEnabled = previous; f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
+    }
     private async Task VerifyRecovery(AnswerStatus stage)
     {
         var (_, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);

@@ -55,6 +55,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         using var form = new MultipartFormDataContent();
         foreach (var item in new Dictionary<string,string> { ["jobPositionId"] = job.ToString(), ["templateId"] = template.ToString(), ["firstName"] = "Synthetic", ["lastName"] = "Candidate", ["email"] = "candidate@example.test", ["phone"] = "09123456789", ["interviewType"] = type })
             form.Add(new StringContent(item.Value), item.Key);
+        form.Add(new StringContent("Synthetic candidate work history"), "resumeText");
         form.Add(new ByteArrayContent("%PDF-1.4 synthetic"u8.ToArray()), "resume", "resume.pdf");
         var response = await client.PostAsync("/api/panel-wizard/invitations", form);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

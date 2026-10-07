@@ -16,7 +16,7 @@ public sealed record CreateInterviewRequest(Guid TemplateId, [Range(1, 30)] int 
     [RegularExpression("^(hr_interview|technical_interview)$")] string RequiredCapabilityCode = "technical_interview");
 public sealed record InterviewInvitation(Guid InterviewId, string Token, DateTimeOffset ExpiresAtUtc, string CandidateRoute);
 public sealed record InterviewProgress(int AnsweredQuestions, int MaxQuestions, int RemainingSeconds);
-public sealed record CandidateQuestionDto(Guid Id, string Text, string? AudioUrl, bool AudioAvailable);
+public sealed record CandidateQuestionDto(Guid Id, string Text, string? AudioUrl, bool AudioAvailable, string? InteractionMessage = null);
 public sealed record CandidateAnswerDto(Guid Id, Guid QuestionId, string Status, bool CanRetry, string? ErrorCode,
     string? Transcript = null, string? ClientTurnId = null, DateTimeOffset? SubmittedAtUtc = null,
     DateTimeOffset? LastSpeechEndUtc = null, int? DurationSeconds = null, bool VideoAvailable = false);
@@ -25,10 +25,14 @@ public sealed record CandidateMessageDto(string Id, Guid QuestionId, Guid? Answe
     DateTimeOffset CreatedAtUtc, string? Status = null);
 public sealed record CandidateInterviewDto(Guid InterviewId, string Status, bool CanRecord, bool IsProcessing,
     CandidateQuestionDto? Question, InterviewProgress Progress, CandidateAnswerDto? Answer, string? CompletionReason,
-    string? WelcomeMessage = null, string? GoodbyeMessage = null, InterviewMediaCapabilities? MediaCapabilities = null);
+    string? WelcomeMessage = null, string? GoodbyeMessage = null, InterviewMediaCapabilities? MediaCapabilities = null,
+    string Stage = "Questions", string? StageMessage = null, bool CandidateIntroductionEnabled = false,
+    bool CompanyIntroductionEnabled = false, int RecoveryAttempts = 0, bool BackgroundRetryPending = false);
+public sealed record AdvanceInterviewStageRequest([Required] string Stage, [StringLength(32000)] string? Introduction = null);
 public sealed record HrAnswerDto(Guid Id, Guid QuestionId, string Status, string? Transcript, string? SelectionSource,
     string? FailureStage, string? FailureCode, string AudioUrl, string? VideoUrl = null,
-    string? ClientTurnId = null, DateTimeOffset? LastSpeechEndUtc = null, int? DurationSeconds = null);
+    string? ClientTurnId = null, DateTimeOffset? LastSpeechEndUtc = null, int? DurationSeconds = null,
+    bool IsInteraction = false, string? AssistantMessage = null);
 public sealed record HrQuestionDto(Guid Id, Guid SkillId, string Text, string Topic, int Difficulty);
 public sealed record HrSkillStateDto(Guid SkillId, decimal CurrentScore, int EvidenceCount, decimal Confidence);
 public sealed record HrEvidenceDto(Guid AnswerId, Guid QuestionId, Guid SkillId, decimal ScoreBefore, decimal ScoreAfter,

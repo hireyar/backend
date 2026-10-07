@@ -56,6 +56,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("Security:DataProtectionPath", Path.Combine(Path.GetTempPath(), database));
         b.UseSetting("AuthRateLimit:PermitLimit", "1000");
         b.UseSetting("AI:Provider", "Disabled");
+        b.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
         b.UseSetting("AI:NetArz:ApiKey", "");
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
