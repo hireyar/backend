@@ -6,6 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 namespace HireYar.Api.Controllers;
 
+public sealed class AudioCheckUpload
+{
+    [Required] public IFormFile Audio { get; set; } = null!;
+    [Range(1, 30)] public int? DurationSeconds { get; set; }
+}
 public sealed class AnswerUpload
 {
     public Guid QuestionId { get; set; }
@@ -32,6 +37,14 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<InterviewAccessStatus> AccessStatus(Guid interviewId, CancellationToken ct) => accessStatus.GetAsync(interviewId, ct);
     [HttpPost("start")] public Task<CandidateInterviewDto> Start(Guid interviewId, CancellationToken ct) => service.StartAsync(interviewId, ct);
+    [HttpPost("audio-check"), Consumes("multipart/form-data"), RequestSizeLimit(3 * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 3 * 1024 * 1024)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<InterviewAudioCheckDto> CheckAudio(Guid interviewId, [FromForm] AudioCheckUpload upload, CancellationToken ct)
+    {
+        await using var stream = upload.Audio.OpenReadStream();
+        return await service.CheckAudioAsync(interviewId, stream, upload.Audio.FileName, upload.Audio.ContentType,
+            upload.Audio.Length, upload.DurationSeconds, ct);
+    }
     [HttpGet("current")] public Task<CandidateInterviewDto> Current(Guid interviewId, CancellationToken ct) => service.CurrentAsync(interviewId, ct);
     [HttpPost("stage/advance")] public Task<CandidateInterviewDto> AdvanceStage(Guid interviewId, AdvanceInterviewStageRequest r, CancellationToken ct) => service.AdvanceStageAsync(interviewId, r, ct);
     [HttpGet("messages")] public Task<IReadOnlyList<CandidateMessageDto>> Messages(Guid interviewId, CancellationToken ct) => service.MessagesAsync(interviewId, ct);

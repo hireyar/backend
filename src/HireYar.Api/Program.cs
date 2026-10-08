@@ -126,6 +126,14 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
         };
         if (action == "Introduction") operation.RequestBody.Content!["multipart/form-data"].Schema!.Properties!.Remove("questionId");
     }
+    if (controller == "CandidateInterviews" && action == "CheckAudio")
+        operation.RequestBody = new OpenApiRequestBody { Required = true, Content = new Dictionary<string, OpenApiMediaType> {
+            ["multipart/form-data"] = new() { Schema = new OpenApiSchema { Type = JsonSchemaType.Object, Required = new HashSet<string> { "audio" },
+                Properties = new Dictionary<string, IOpenApiSchema> {
+                    ["audio"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary", Description = "Microphone sample, maximum 2 MiB or the configured upload limit if lower; never stored." },
+                    ["durationSeconds"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "Optional client-observed duration, 1–30 seconds; not verified from the encoded audio." }
+                } } }
+        } };
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
         operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : "Bearer", context.Document)] = [] }];
     if (context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true && context.Description.HttpMethod != "GET")

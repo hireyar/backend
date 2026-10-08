@@ -117,6 +117,62 @@ public sealed class InterviewFlowTests(ApiFixture f)
     {
         var client = f.CreateClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", invitation.Token); return client;
     }
+    private static async Task<HttpResponseMessage> CheckAudio(HttpClient client, Guid id, bool valid = true)
+    {
+        using var form = new MultipartFormDataContent();
+        var data = new ByteArrayContent(valid ? Convert.FromHexString("1A45DFA3000000000000000000000000") : new byte[16]);
+        data.Headers.ContentType = new("audio/webm"); form.Add(data, "audio", "test.webm");
+        form.Add(new StringContent("5"), "durationSeconds");
+        return await client.PostAsync($"/api/candidate/interviews/{id}/audio-check", form);
+    }
+    [PostgresFact]
+    public async Task Microphone_check_is_scoped_transient_and_does_not_start_interview()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite);
+        using var anonymous = f.CreateClient();
+        var sttBefore = f.InterviewAi.SttCalls; var llmBefore = f.InterviewAi.LlmCalls; var ttsBefore = f.InterviewAi.TtsCalls;
+        Assert.Equal(HttpStatusCode.Unauthorized, (await CheckAudio(anonymous, invite.InterviewId)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await CheckAudio(c, Guid.NewGuid())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await CheckAudio(c, invite.InterviewId, false)).StatusCode);
+        Assert.Equal(sttBefore, f.InterviewAi.SttCalls);
+        var response = await CheckAudio(c, invite.InterviewId);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = (await response.Content.ReadFromJsonAsync<InterviewAudioCheckDto>())!;
+        Assert.True(result.AudioReceived); Assert.True(result.SpeechRecognized); Assert.False(result.ClarityVerified);
+        Assert.Equal(16, result.ReceivedBytes); Assert.Equal("Synthetic job-related answer", result.Transcript);
+        Assert.Equal(sttBefore + 1, f.InterviewAi.SttCalls); Assert.Equal(llmBefore, f.InterviewAi.LlmCalls); Assert.Equal(ttsBefore, f.InterviewAi.TtsCalls);
+        await f.Db(async db => {
+            var session = await db.InterviewSessions.Include(x => x.Answers).SingleAsync(x => x.Id == invite.InterviewId);
+            Assert.Equal(InterviewStatus.Created, session.Status); Assert.Null(session.StartedAtUtc); Assert.Empty(session.Answers);
+            Assert.False(await db.InterviewIntroductions.AnyAsync(x => x.InterviewSessionId == invite.InterviewId));
+        });
+        f.InterviewAi.SttText = " ";
+        var empty = (await (await CheckAudio(c, invite.InterviewId)).Content.ReadFromJsonAsync<InterviewAudioCheckDto>())!;
+        Assert.False(empty.SpeechRecognized); Assert.Empty(empty.Transcript);
+        f.InterviewAi.FailStt = true;
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await CheckAudio(c, invite.InterviewId)).StatusCode);
+        f.InterviewAi.FailStt = false;
+        await Start(c, invite.InterviewId);
+        Assert.Equal(HttpStatusCode.Conflict, (await CheckAudio(c, invite.InterviewId)).StatusCode);
+    }
+    [PostgresFact]
+    public async Task Microphone_check_rechecks_revoked_access_after_transcription()
+    {
+        var (_, invite) = await Invite(); using var c = Candidate(invite);
+        f.InterviewAi.SttEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.InterviewAi.SttRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = CheckAudio(c, invite.InterviewId);
+        try
+        {
+            await f.InterviewAi.SttEntered.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await f.Db(async db => {
+                var session = await db.InterviewSessions.SingleAsync(x => x.Id == invite.InterviewId);
+                session.RevokeAccess(f.Clock.GetUtcNow()); await db.SaveChangesAsync();
+            });
+        }
+        finally { f.InterviewAi.SttRelease.TrySetResult(); }
+        Assert.Equal(HttpStatusCode.Unauthorized, (await pending).StatusCode);
+    }
     private static async Task<HttpResponseMessage> Submit(HttpClient c, Guid id, Guid question)
     {
         using var form = new MultipartFormDataContent(); form.Add(new StringContent(question.ToString()), "questionId");

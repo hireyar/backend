@@ -1,3 +1,7 @@
+## ADR-028 — تست گذرای میکروفون پیش از مصاحبه (2026-10-08)
+
+POST audio-check در Controller داوطلب، با scheme دعوت موجود و فقط Created، اعتبارسنجی صوت و STT موجود را مصرف می‌کند؛ حداکثر فایل ۲ MiB (یا حد تنظیمی پایین‌تر)، مدت اعلامی کلاینت ۱ تا ۳۰ ثانیه. Application دسترسی و وضعیت را پیش از تماس و پس از reload بررسی می‌کند. فایل/متن در storage/DB/لاگ برنامه ثبت نمی‌شوند؛ state، billing، Answer/Introduction، LLM و TTS تغییر نمی‌کنند. هر ارسال تماس مستقل STT است؛ retry خودکار/cache/idempotency یا migration ندارد. DTO تفکیک دریافت فایل، تشخیص گفتار و clarityVerified=false دارد؛ STT فعلی معیار کیفیت صوت یا قطع‌نشدن جمله نیست. تطبیق متن با جمله آزمایشی و تأیید کاربر در Angular ریپوی جدا انجام می‌شود؛ API شرط اجباری start نیست. [INTERVIEW_AUDIO_CHECK_API](INTERVIEW_AUDIO_CHECK_API.md).
+
 ## ADR-027 — دعوت شش‌رقمی و جایگزینی جلسه (2026-10-08)
 
 دعوت تازه کد شش‌رقمی CSPRNG دارد؛ بررسی به Guid مسیر وابسته است. Data Protection وابسته به جلسه برای نمایش مجدد کد استفاده می‌شود و AccessTokenHash fingerprint ciphertext است تا enumeration آفلاین hash شش‌رقمی ممکن نباشد. دعوت قدیمی hash-only بدون backfill پشتیبانی می‌شود؛ پنل کد قدیمی را بازیابی نمی‌کند. پنج شکست در پانزده دقیقه قفل پانزده‌دقیقه‌ای می‌دهد و limiter IP قبل از authentication است. کلیدهای DP موجود باید پایدار بمانند.

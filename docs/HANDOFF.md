@@ -1,3 +1,9 @@
+## تحویل تست میکروفون ویزارد داوطلب — 2026-10-08
+
+روی dev و بدون commit/push/deploy، API POST audio-check و DTO/OpenAPI/قرارداد [INTERVIEW_AUDIO_CHECK_API](INTERVIEW_AUDIO_CHECK_API.md) اضافه شد. فقط پیش از start و با Bearer دعوت همان جلسه؛ فرم audio تا ۲ MiB و durationSeconds اختیاری ۱–۳۰. بدون persist صدا/متن یا شروع زمان/پاسخ/معرفی؛ STT provider فعال موجود و recheck دسترسی بعد از network. دریافت کامل فایل uploadشده با تشخیص گفتار از اثبات شفافیت/کامل‌بودن جمله جداست؛ clarityVerified=false و تأیید متن توسط کاربر لازم است. Angular در ریپو نیست و تماس واقعی AI این نوبت انجام نشد.
+
+build صفر warning/error؛ suite نهایی **۲۲۲ موفق و صفر شکست/Skip** روی PostgreSQL 18.3 آزمایشی اختصاصی با provider جعلی، tests/HireYar.Tests/TestResults/audio-check-verified.trx؛ سرور آزمایشی متوقف شد. شکست transport اجرای اول suite و assertion شمارنده تجمعی fixture در اجرای بعدی بررسی شدند؛ assertion به delta اصلاح و suite کامل موفق بازاجرا شد. تست‌های تازه رفتار scoped/transient/failure/Created و ابطال دسترسی حین STT را پوشش می‌دهند. migration لازم ندارد، secret/appsettings دست‌نخورده‌اند. ادامه فرانت/کیفیت واقعی صوت و انتشار نیاز به درخواست مربوط خود دارد.
+
 ## تحویل دعوت شش‌رقمی و بررسی توقف صوت — 2026-10-08
 
 تغییرات روی dev و بدون commit/push/deploy هستند. قبل از کار در این نوبت Git clean بود. دعوت کوتاه با DP و fingerprint ciphertext، route-scoped authentication، قفل تلاش‌ها، نمایش کد/لینک Owner و reinvite جلسه جدید تحت قفل مالی سازمان اضافه شد. رابطه replacement مرکب سازمانی/unique و migration `20261008135241_AddShortInterviewInvitations` دارد؛ downgrade با کد/جایگزینی/شکست ورود موجود guard می‌شود. دعوت قدیمی hash-only معتبر باقی می‌ماند ولی کد قابل نمایش ندارد. کلیدهای /keys را حفظ کنید. لینک پیش‌فرض FrontendUrl + `/interview/{id}` است.
