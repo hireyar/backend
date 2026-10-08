@@ -2,6 +2,8 @@ namespace HireYar.Infrastructure.Interviews;
 
 public sealed class LiaraOptions : IOpenAiInterviewOptions
 {
+    public string EvaluationModel { get; set; } = "openai/gpt-6-luna";
+    public int EvaluationTimeoutSeconds { get; set; } = 90;
     public bool Enabled { get; set; } = true;
     public string BaseUrl { get; set; } = "";
     public string ApiKey { get; set; } = "";

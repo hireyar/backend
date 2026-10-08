@@ -14,7 +14,9 @@ public sealed record InterviewDecisionContext(string PositionTitle, Guid Current
     string InterviewType = "specialized", string Language = "fa-IR",
     IReadOnlyList<InterviewQuestionSnapshot>? QuestionBank = null,
     IReadOnlyList<InterviewDialogueTurn>? PreviousAnswers = null,
-    string? MasterPrompt = null, int RemainingInteractions = 0);
+    string? MasterPrompt = null, int RemainingInteractions = 0,
+    int TotalPreviousAnswers = 0, bool HistoryIsPartial = false,
+    IReadOnlyList<HrEvidenceDto>? PreviousEvidence = null);
 public sealed record InterviewDialogueTurn(Guid QuestionId, string Question, string? Answer, string? AssistantReply = null);
 public interface IResumeTextExtractor
 {
@@ -54,4 +56,6 @@ public sealed class InterviewOptions
     public bool BackgroundRecoveryEnabled { get; set; } = true;
     public int MaxRecoveryAttempts { get; set; } = 3;
     public int RecoveryPollSeconds { get; set; } = 15;
+    public bool SelectiveHistoryEnabled { get; set; } = true;
+    public int HistoryCharacterBudget { get; set; } = 12000;
 }

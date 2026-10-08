@@ -183,6 +183,9 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
             var shortlist = policy.GetAllowedQuestions(s, time.GetUtcNow(), options.ShortlistLimit, adaptDifficulty: capabilities.Contains("adaptive_difficulty"));
             var position = await db.JobPositions.AsNoTracking().SingleAsync(x => x.Id == s.JobPositionId && x.OrganizationId == s.OrganizationId, ct);
             var question = s.Questions.Single(x => x.QuestionId == answer.QuestionId);
+            var history = InterviewHistorySelector.Select(s, answer, options);
+            InterviewMetrics.HistoryTotalTurns.Record(history.TotalTurns);
+            InterviewMetrics.HistorySelectedTurns.Record(history.Turns.Count);
             InterviewDecisionResult? decision = null; string? failureCode = null;
             try
             {
@@ -190,10 +193,11 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                   decision = await decisions.EvaluateAsync(new(s.PositionTitleSnapshot ?? position.Title, question.QuestionId, s.Status.ToString(), s.AnsweredQuestionCount,
                     s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow()), question, answer.Transcript!, s.Skills, s.SkillStates, s.CoveredTopics, shortlist,
                     s.PositionDescriptionSnapshot ?? position.Description, s.ResumeTextSnapshot, s.CandidateIntroductionTranscript,
-                    s.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized", s.Language, s.Questions,
-                    s.Answers.Where(a => a.Status == AnswerStatus.Processed).OrderBy(a => a.SubmittedAtUtc)
-                        .Select(a => new InterviewDialogueTurn(a.QuestionId, s.Questions.Single(q => q.QuestionId == a.QuestionId).Text, a.Transcript, a.AssistantMessage)).ToArray(),
-                    s.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, s.RemainingInteractions), ct);
+                    s.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized", s.Language,
+                    shortlist.Append(question).DistinctBy(q => q.QuestionId).ToArray(), history.Turns,
+                    s.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, s.RemainingInteractions, history.TotalTurns, history.IsPartial,
+                    s.Evidence.Select(e => new HrEvidenceDto(e.InterviewAnswerId, e.QuestionId, e.SkillId, e.ScoreBefore, e.ScoreAfter,
+                        e.Delta, e.Confidence, e.Evidence, e.CreatedAtUtc)).ToArray()), ct);
             }
             catch (InterviewProviderException e)
             {

@@ -1,0 +1,77 @@
+# مدل مستقل گزارش و تاریخچه منتخب — 2026-10-08
+
+درخواست روی `dev` است؛ مصاحبه جاری همان HTTP نوبتی است. Realtime، Angular یا provider جدید اضافه نشده‌اند.
+
+## تنظیمات
+
+در provider منتخب (`AI:Liara` یا `AI:NetArz`):
+
+```json
+{
+  "LlmModel": "مدل فعلی گفتگوی زنده",
+  "EvaluationModel": "openai/gpt-6-luna",
+  "EvaluationTimeoutSeconds": 90
+}
+```
+
+`LlmModel` همچنان تصمیم نوبتی/تعامل و پیشنهاد بانک سؤال را انجام می‌دهد؛ `EvaluationModel` فقط گزارش نهایی را با پرامپت `report-v1` تولید می‌کند. timeout گزارش مستقل و در محدوده ۱ تا ۱۲۰ ثانیه است. فقط provider منتخب اعتبارسنجی می‌شود. URL، کلیدها، STT/TTS و مدل زنده موجود عیناً حفظ شدند؛ متغیرهای محیطی/local اولویت بالاتر دارند. نمونه بالا placeholder مستند است، نه تنظیم قابل کپی برای مدل زنده.
+
+override نمونه: `AI__Liara__EvaluationModel=openai/gpt-6-luna`.
+
+```json
+{
+  "InterviewAudio": {
+    "SelectiveHistoryEnabled": true,
+    "HistoryCharacterBudget": 12000
+  }
+}
+```
+
+بودجه تاریخچه ۲۰۰۰ تا ۱۲۸۰۰۰ کاراکتر است، **سقف سخت توکن نیست**. پاسخ جاری، تمام تعامل‌های همان سؤال و تمام نوبت‌های سؤال‌های مربوط به دو نوبت اخیر بدون بریدن متن حفظ می‌شوند، حتی اگر بودجه بیشتر شود. سؤال‌های قدیمی با موضوع/مهارت مشابه یا همپوشانی واژگان سؤال/پاسخ رتبه‌بندی و به‌صورت گروه کامل سؤال انتخاب می‌شوند. اشاره صریح فارسی/انگلیسی به گذشته، اصلاح یا تناقض، و تاریخچه کوچک، مسیر کامل دارند. خاموش‌کردن `SelectiveHistoryEnabled` تاریخچه کامل را برمی‌گرداند.
+
+معرفی، رزومه، JD، پاسخ جاری، skill state/coverage تجمعی و تمام شواهد ثبت‌شده قبلی محفوظ‌اند. بانک ارسال‌شده به نوبت زنده فقط سؤال جاری و shortlist مجاز backend است. prompt فهرست منتخب را با `historyIsPartial` و `totalPreviousAnswers` مشخص می‌کند؛ حذف از prompt به معنی نبود پاسخ یا ناآگاهی نیست. ارجاع نامشخص باید با clarification کوتاه حل شود، نه حدس درباره گذشته. انتخاب محلی و قطعی است و تماس AI/transaction/query اضافی برای خلاصه‌سازی ندارد.
+
+این انتخاب بازیابی معنایی کامل نیست؛ مترادف‌ها یا اشاره ضمنی ممکن است تطبیق واژگانی نداشته باشند. نگه‌داشتن زمینه ضروری و شواهد تجمعی و مسیر کامل برای ارجاع صریح، محافظ کیفیت‌اند؛ برابری کیفیت/تأخیر provider واقعی بدون آزمون مقایسه‌ای ادعا نمی‌شود. معیارهای `hireyar.interview.history.total_turns` و `selected_turns` شمارش را بدون متن/شناسه حساس عرضه می‌کنند. مدت/شکست گزارش از LLM زنده metric جدا دارند.
+
+## تاریخچه در دیتابیس
+
+`InterviewAnswers` از قبل transcript، متن interaction، questionId، clientTurnId، زمان‌ها و وضعیت را نگه می‌دارد؛ snapshot سؤال و `AskedAtUtc` در جلسه، و معرفی صوتی در `InterviewIntroductions` موجودند. این درخواست تاریخچه را دوباره در جدول موازی کپی یا حذف نمی‌کند. endpointهای `messages` داوطلب و جزئیات HR همچنان کل تاریخچه مجاز خود را دارند؛ انتخاب فقط برای ورودی مدل زنده است. جلسات تاریخی از همان داده persistشده قابل استفاده‌اند و backfill حدسی انجام نمی‌شود.
+
+## گزارش نهایی برای HR
+
+`POST /api/interviews/{id}/evaluation-report` برای Owner همان سازمان، فقط پس از `Completed` و با قابلیت `interview_report` در قرارداد immutable همان مصاحبه. تولید **به درخواست پنل** انجام می‌شود؛ completion و پاسخ زنده منتظر گزارش نیستند و خودکار گزارش تولید نمی‌کنند. Angular باید این POST را هنگام درخواست گزارش مصرف کند.
+
+`GET /api/interviews/{id}/evaluation-report` فقط نتیجه ذخیره‌شده را می‌خواند و AI را صدا نمی‌زند. POST تکراری پس از موفقیت همان گزارش ذخیره‌شده و همان زمان را می‌دهد؛ تغییر مدل در تنظیمات گزارش قبلی را بازنویسی نمی‌کند. بازتولید/refresh گزارش در این درخواست وجود ندارد.
+
+خروجی:
+
+```json
+{
+  "interviewId": "UUID",
+  "model": "openai/gpt-6-luna",
+  "provider": "Liara",
+  "promptVersion": "report-v1",
+  "createdAtUtc": "UTC timestamp",
+  "content": {
+    "summary": "جمع‌بندی شواهد مرتبط با شغل برای بررسی انسانی",
+    "findings": [
+      { "answerId": "UUID پاسخ نهایی", "quote": "بخش عیناً موجود در transcript", "observation": "مشاهده کوتاه", "kind": "strength" }
+    ],
+    "limitations": ["محدودیت شواهد و نیاز به بررسی انسانی"]
+  }
+}
+```
+
+گزارش کل پاسخ‌ها و تعامل‌های پردازش‌شده، رزومه/JD/معرفی، سؤال‌های snapshot و شواهد backend را می‌بیند؛ تاریخچه منتخب زنده در گزارش اعمال نمی‌شود. یافته‌ها فقط با `answerId` پاسخ نهایی همان جلسه و نقل‌قول دقیق از transcript آن پذیرفته می‌شوند؛ ID ساختگی، نقل‌قول ساختگی، citation تعامل صرف، JSON/schema نامعتبر یا kind غیر strength/gap رد می‌شوند. score/evidence/coverage/زمان و مالی جلسه تغییر نمی‌کنند. محدودیت‌ها الزامی‌اند؛ بدون پاسخ نهایی یافته‌ای پذیرفته نمی‌شود. schema validation به‌تنهایی اثبات درستی معنایی جمع‌بندی نیست؛ تصمیم استخدام با انسان است.
+
+خطاها: سازمان دیگر/جلسه حذف‌شده `404`؛ قبل پایان `409 interview_not_completed`؛ claim فعال `409 report_processing`؛ نبود قابلیت `403 feature_unavailable`؛ provider Disabled، timeout/network یا خروجی نامعتبر `503 evaluation_report_unavailable`. GET پیش از ثبت موفق گزارش `404` است. این کدها state مصاحبه تکمیل‌شده را تغییر نمی‌دهند؛ POST بعدی retry است.
+
+نتیجه JSONB، مدل/provider/نسخه/زمان در `InterviewEvaluationReports` ذخیره می‌شود؛ یک رکورد برای هر جلسه و FK مرکب سازمان/جلسه دارد. claim زیر قفل کوتاه سازمان ثبت، transaction پیش از network بسته، نتیجه زیر همان قفل با کنترل lease و حذف جلسه commit می‌شود. claim ۱۵۰ثانیه‌ای و انقضا امکان retry پس از مرگ فرایند دارد؛ درخواست همزمان claim فعال تماس دوباره ندارد و generator قدیمی پس از reclaim نمی‌تواند نتیجه را overwrite کند. worker گزارش اضافه نشده است. cancellation/شکست تلاش می‌کند claim خودش را پاک کند؛ در شکست cleanup انقضا راه بازیابی است. مصاحبه/صورتحساب settled باز نمی‌شود و هزینه مدت مصاحبه دوباره ثبت نمی‌شود.
+
+## انتشار و بررسی
+
+migration `20261008120416_AddInterviewEvaluationReports` پیش از API جدید در مقصد لازم است؛ فقط جدول گزارش اضافه می‌شود، تاریخچه قبلی بازنویسی نمی‌شود. downgrade با گزارش ذخیره‌شده صریحاً رد می‌شود. migration مقصد، push/deploy و تغییر production انجام نشده‌اند.
+
+پشتیبانی واقعی `openai/gpt-6-luna` و کیفیت فارسی/latency در provider منتخب باید با داده آزمون مجاز بررسی شوند؛ مقدار مدل مطابق درخواست کاربر تنظیم شده، تماس واقعی AI در این تغییر انجام نشده است. سنجش مصنوعی کاهش payload تاریخچه، معادل درصد تضمین‌شده کاهش هزینه کل یا توکن واقعی provider نیست.
+
+بررسی محلی نهایی: build صفر warning/error و ۲۰۹/۲۰۹ تست PostgreSQL 18.3 موفق، صفر Skip؛ `tests/HireYar.Tests/TestResults/history-report-verified.trx`. delta idempotent دوبار روی baseline اختصاصی قبلی بدون داده legacy اعمال و فقط یک history entry ثبت شد؛ fixture/scratch حذف و cluster آزمایشی متوقف شدند. guard downgrade از کد migration است و اجرای آن با گزارش موجود در این نوبت آزموده نشده است.

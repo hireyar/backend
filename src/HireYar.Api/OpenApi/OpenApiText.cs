@@ -59,6 +59,8 @@ internal static class OpenApiText
         ("Interviews", "Revoke") => "ابطال دسترسی داوطلب",
         ("Interviews", "AnswerAudio") => "دریافت خصوصی صوت پاسخ داوطلب",
         ("Interviews", "AnswerVideo") => "دریافت خصوصی ویدیوی پاسخ داوطلب",
+        ("Interviews", "GenerateReport") => "تولید و ذخیره گزارش ارزیابی مصاحبه تکمیل‌شده با مدل مستقل",
+        ("Interviews", "EvaluationReport") => "دریافت گزارش ارزیابی ذخیره‌شده سازمان جاری",
         ("Interviews", "IntroductionAudio") => "دریافت خصوصی صوت معرفی کارجو برای سازمان جاری",
         ("Interviews", "IntroductionVideo") => "دریافت خصوصی ویدیوی معرفی کارجو برای سازمان جاری",
         ("Interviews", "QuestionAudio") => "دریافت خصوصی صوت سؤال مصاحبه",

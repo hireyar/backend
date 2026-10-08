@@ -7,8 +7,24 @@ using Microsoft.Extensions.Logging;
 namespace HireYar.Infrastructure.Interviews;
 
 public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiInterviewOptions config, ILogger logger, string providerName)
-    : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider
+    : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IInterviewReportProvider
 {
+    public async Task<InterviewDecisionResult> GenerateReportAsync(InterviewReportContext context, CancellationToken ct)
+    {
+        using var body = JsonContent.Create(new { model = config.EvaluationModel, response_format = new { type = "json_object" },
+            messages = new[] { new { role = "system", content = InterviewReportPrompt.System },
+                new { role = "user", content = JsonSerializer.Serialize(context, new JsonSerializerOptions(JsonSerializerDefaults.Web)) } } });
+        var bytes = await SendAsync("chat/completions", body, "report", config.EvaluationModel, config.EvaluationTimeoutSeconds, 128000, ct);
+        try
+        {
+            using var doc = JsonDocument.Parse(bytes);
+            var json = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+            if (string.IsNullOrWhiteSpace(json) || json.Length > 32000) throw new JsonException();
+            return new(json, providerName, config.EvaluationModel);
+        }
+        catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException)
+        { throw new InterviewProviderException("report_invalid_response"); }
+    }
     public SpeechProfile Profile => new(config.TtsModel, config.TtsVoice, config.TtsSpeed);
     public async Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct)
     {
@@ -104,9 +120,9 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
         catch (InterviewProviderException) { outcome = "failure"; throw; }
         finally
         {
-            var duration = operation switch { "stt" => InterviewMetrics.SttDuration, "llm" => InterviewMetrics.LlmDuration, _ => InterviewMetrics.TtsDuration };
+            var duration = operation switch { "stt" => InterviewMetrics.SttDuration, "llm" => InterviewMetrics.LlmDuration, "report" => InterviewMetrics.ReportDuration, _ => InterviewMetrics.TtsDuration };
             duration.Record(watch.Elapsed.TotalMilliseconds, new KeyValuePair<string, object?>("provider", providerName));
-            if (outcome != "success") (operation switch { "stt" => InterviewMetrics.SttFailure, "llm" => InterviewMetrics.LlmFailure, _ => InterviewMetrics.TtsFailure }).Add(1);
+            if (outcome != "success") (operation switch { "stt" => InterviewMetrics.SttFailure, "llm" => InterviewMetrics.LlmFailure, "report" => InterviewMetrics.ReportFailure, _ => InterviewMetrics.TtsFailure }).Add(1);
             logger.LogInformation("Interview provider operation={Operation} provider={Provider} model={Model} status={Status} httpStatusCode={HttpStatusCode} durationMs={DurationMs} retryCount=0", operation, providerName, model, outcome, status, watch.Elapsed.TotalMilliseconds);
         }
     }
