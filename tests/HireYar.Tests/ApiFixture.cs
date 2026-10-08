@@ -39,6 +39,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public FakePaymentGateway PaymentGateway { get; } = new();
     public TestClock Clock { get; } = new();
     public TestPhoneOtp PhoneOtp { get; } = new();
+    public FakeInvitationNotifier Invitations { get; } = new();
     public FakeQuestionSuggestionProvider QuestionAi { get; } = new();
     public FakeInterviewProvider InterviewAi { get; } = new();
     public FakeInterviewReportProvider ReportAi { get; } = new();
@@ -69,6 +70,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
             if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }
             s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
             s.RemoveAll<IPhoneOtpSender>(); s.AddSingleton<IPhoneOtpSender>(PhoneOtp);
+            s.RemoveAll<HireYar.Application.Interviews.IInterviewInvitationNotifier>(); s.AddSingleton<HireYar.Application.Interviews.IInterviewInvitationNotifier>(Invitations);
             s.RemoveAll<HireYar.Application.Interviews.IQuestionSuggestionProvider>(); s.AddSingleton<HireYar.Application.Interviews.IQuestionSuggestionProvider>(QuestionAi);
             s.RemoveAll<HireYar.Application.Interviews.ISpeechToTextService>(); s.AddSingleton<HireYar.Application.Interviews.ISpeechToTextService>(InterviewAi);
             s.RemoveAll<HireYar.Application.Interviews.IInterviewDecisionService>(); s.AddSingleton<HireYar.Application.Interviews.IInterviewDecisionService>(InterviewAi);

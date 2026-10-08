@@ -43,9 +43,9 @@ public sealed record WizardInvitationRequest(Guid JobPositionId, Guid TemplateId
     [Required, RegularExpression("^09[0-9]{9}$")] string Phone,
     [Range(1, 14)] int DeadlineDays = 3,
     [Required, RegularExpression("^(general|specialized)$")] string InterviewType = "general",
-    [StringLength(32000)] string? ResumeText = null);
+    [StringLength(32000)] string? ResumeText = null, bool SendEmail = false, bool SendSms = false);
 public sealed record PanelInvitationResult(InterviewInvitation Invitation, string EmailDelivery, string SmsDelivery);
-public sealed record ResendInterviewRequest([Range(1, 14)] int DeadlineDays = 3);
+public sealed record ResendInterviewRequest([Range(1, 14)] int DeadlineDays = 3, bool SendEmail = false, bool SendSms = false);
 public sealed class InterviewListQuery
 {
     [Range(1, int.MaxValue)] public int Page { get; set; } = 1;

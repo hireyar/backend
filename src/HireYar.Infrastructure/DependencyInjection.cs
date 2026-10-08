@@ -28,6 +28,11 @@ public static class DependencyInjection
         }).AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(2));
         services.Configure<SecurityOptions>(config.GetSection("Security"));
+        services.Configure<InvitationNotificationOptions>(config.GetSection("InterviewNotifications"));
+        services.AddSingleton<HireYar.Application.Interviews.IInterviewInvitationNotifier>(s => new InterviewInvitationNotifier(
+            new HttpClient { BaseAddress = new Uri("https://api.kavenegar.com/"), Timeout = TimeSpan.FromSeconds(10) },
+            s.GetRequiredService<Microsoft.Extensions.Options.IOptions<InvitationNotificationOptions>>(),
+            s.GetRequiredService<Microsoft.Extensions.Options.IOptions<KavenegarOptions>>()));
         services.AddOptions<KavenegarOptions>().Bind(config.GetSection("Kavenegar"))
             .Validate(o => !o.UseFixedOtp || (o.FixedOtpCode.Length == 6 && o.FixedOtpCode.All(char.IsAsciiDigit)),
                 "Kavenegar:FixedOtpCode must be exactly six ASCII digits when UseFixedOtp is enabled.")

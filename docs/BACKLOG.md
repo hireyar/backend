@@ -1,3 +1,9 @@
+## پیگیری 503 گزارش ارزیابی — 2026-10-08
+
+مدل مشترک گزارش Liara/openai/gpt-6-luna با timeout=90 است؛ مدل در GET models موجود و smoke گزارش با context مصنوعی HTTP 200/حدود ۹٫۳ ثانیه/JSON قابل parse داشت. override توسعه محلی NetArz است؛ GET models آن 404 می‌دهد، بدون اثبات علت خطای گزارش. build و ۴۷ تست مستقل موفق. کد/تنظیمات/کلیدها عوض نشدند.
+
+برای تعیین علت خطای واقعی کاربر، لاگ همان trace با operation=report و provider/model/status/httpStatusCode/durationMs لازم است. HTTP failure/timeout را از JSON/schema/citation rejection پس از HTTP 200 تفکیک کنید؛ متن رزومه/پاسخ/کلید/پرامپت واقعی در Git یا لاگ قرار نگیرد. پیام عمومی evaluation_report_unavailable همه این علت‌ها را یکسان می‌کند؛ در صورت نیاز به اصلاح تشخیص، کد علت ثابت امن را در logging/SSE گزارش نگه دارید. نبود مدل یا رفع خطای مقصد ادعا نشده است؛ این یادداشت مجوز تغییر مدل/مقصد یا انتشار نیست.
+
 ## لاگ زنده آزمایشی — 2026-10-08
 
 بک‌اند و قرارداد [INTERVIEW_DIAGNOSTICS_API](INTERVIEW_DIAGNOSTICS_API.md) تکمیل شدند: flag/DTO نمایش، SSE scoped، metadata واقعی EF/provider/مراحل و capture همان prompt فقط Owner در حافظه محدود. build موفق؛ ۲۲۷ تست suite PostgreSQL واقعی موفق و پس از اصلاح cursor نهایی ۹ تست مرتبط مجدد موفق، صفر Skip/شکست.
@@ -192,3 +198,11 @@ stageAudioUrl برای Welcome/درخواست معرفی/CompanyIntroduction/Goo
 build نهایی صفر warning/error؛ 198/198 تست PostgreSQL 18 اختصاصی محلی موفق، صفر شکست/Skip، شامل شش تست جدید معرفی/replay/ویدیو/تاریخچه/رسانه HR و scope/constraint، lease فعال و جلوگیری از bypass، recovery worker واقعی/backoff، خروجی STT خالی و سقف تلاش/retry، قطع درخواست و رقابت claim، و multipart/OpenAPI. tests/HireYar.Tests/TestResults/voice-introduction-final.trx. migration 20261007151257_AddVoiceIntroduction تولید و در fixture واقعی اعمال شد؛ HasPendingModelChanges=false در تست. delta idempotent artifacts/voice-introduction-migrations.sql دو بار روی baseline اختصاصی قبل از migration موفق و فقط یک history entry داشت؛ baseline این بررسی بدون داده legacy بود، بازنویسی داده تاریخی در migration وجود ندارد. downgrade در حضور معرفی صریحاً رد می‌شود.
 
 باقی: مصرف قرارداد جدید در Angular، اعمال migration و بررسی فعال‌بودن worker در مقصد با مجوز مستقل، آزمون فارسی/STT/TTS/سکوت/VAD و دوربین واقعی. بهینه‌سازی streaming/آماده‌سازی سؤال‌ها و واژه‌نامه تلفظ در این تغییر پیاده نشده‌اند؛ مدل/کلید/appsettings دست‌نخورده‌اند. AI واقعی، push/deploy/commit و تغییر production انجام نشده‌اند. داده تست مصنوعی و SQL فقط محلی بود.
+
+## ارسال اختیاری دعوت — 2026-10-08
+
+روی dev، ارسال SMTP ایمیل و SMS پترن کاوه‌نگار در دعوت ویزارد/قدیمی/resend اضافه شد. InterviewNotifications:Email/Sms فلگ/config مستقل؛ SendEmail/SendSms پیش‌فرض false. پترن دعوت مستقل، token=کد شش‌رقمی و token2=لینک کامل؛ ApiKey خالی SMS از کلید OTP استفاده می‌کند. SMTP UTF-8 شامل نام/شغل/کد/لینک/انقضای UTC است. هر دو فلگ مشترک فعلاً false؛ کلیدهای قبلی محفوظ‌اند. ارسال بعد از commit، خارج قفل مالی و با نتیجه مستقل هر کانال انجام می‌شود؛ خطا لینک را rollback نمی‌کند. بدون retry/صف/ذخیره وضعیت تحویل یا migration؛ قطع فرایند پس از commit ممکن است ارسال را ناتمام بگذارد.
+
+[INTERVIEW_NOTIFICATION_API](INTERVIEW_NOTIFICATION_API.md) قرارداد فرانت و appsettings است. Angular در ریپو نیست؛ دو تیک باید به sendEmail/sendSms وصل شوند. ارسال واقعی یا پذیرش لینک کامل در پترن مقصد تست نشده؛ پترن و SMTP را کاربر تنظیم می‌کند. NotConfigured/NotRequested/Sent/Failed فقط نتیجه همان درخواست‌اند، Sent تأیید دریافت provider است نه تحویل نهایی. ساخت دعوت برای retry ارسال تکرار نشود؛ resend لینک قبلی را باطل می‌کند.
+
+Verification: build صفر warning/error؛ suite نهایی 240/240 موفق، صفر Failed/Skipped، PostgreSQL 18.3 اختصاصی loopback:55473 و provider جعلی، SMTP فقط loopback. tests/HireYar.Tests/TestResults/invitation-notifications-verified.trx. دوازده case مستقل اعلان و یک integration دعوت/commit/resend اضافه شدند؛ شکست اولیه فقط assertion متن ایمیل Base64 بود، رمزگشایی تست اصلاح و suite کامل بازاجرا شد. تغییرات موجود docs و InterviewReportService دست‌نخورده حفظ شدند. commit/push/deploy/production/ارسال واقعی انجام نشد.

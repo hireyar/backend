@@ -26,7 +26,7 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, templateResponse.StatusCode);
         return (hr, job, (await templateResponse.Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!);
     }
-    private async Task<HttpResponseMessage> Invite(Account hr, Guid job, Guid template, string phone = "09123456789", string filename = "resume.pdf", byte[]? bytes = null, string interviewType = "general")
+    private async Task<HttpResponseMessage> Invite(Account hr, Guid job, Guid template, string phone = "09123456789", string filename = "resume.pdf", byte[]? bytes = null, string interviewType = "general", bool sendEmail = false, bool sendSms = false)
     {
         using var client = f.CreateClient(); client.DefaultRequestHeaders.Authorization = new("Bearer", hr.Client.AccessToken);
         using var form = new MultipartFormDataContent();
@@ -34,6 +34,8 @@ public sealed partial class PanelWizardTests(ApiFixture f)
             ["firstName"] = "Synthetic", ["lastName"] = "Candidate", ["email"] = "candidate@example.test", ["phone"] = phone, ["deadlineDays"] = "3", ["interviewType"] = interviewType })
             form.Add(new StringContent(field.Value), field.Key);
         form.Add(new StringContent("Synthetic candidate work history and projects"), "resumeText");
+        form.Add(new StringContent(sendEmail.ToString()), "sendEmail");
+        form.Add(new StringContent(sendSms.ToString()), "sendSms");
         form.Add(new ByteArrayContent(bytes ?? "%PDF-1.7\nSynthetic test document"u8.ToArray()), "resume", filename);
         return await client.PostAsync("/api/panel-wizard/invitations", form);
     }
