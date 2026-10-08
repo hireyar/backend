@@ -40,6 +40,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public TestPhoneOtp PhoneOtp { get; } = new();
     public FakeQuestionSuggestionProvider QuestionAi { get; } = new();
     public FakeInterviewProvider InterviewAi { get; } = new();
+    public FakeInterviewReportProvider ReportAi { get; } = new();
     private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
     private string? connection;
     protected override void ConfigureWebHost(IWebHostBuilder b)
@@ -67,6 +68,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
             s.RemoveAll<HireYar.Application.Interviews.IQuestionSuggestionProvider>(); s.AddSingleton<HireYar.Application.Interviews.IQuestionSuggestionProvider>(QuestionAi);
             s.RemoveAll<HireYar.Application.Interviews.ISpeechToTextService>(); s.AddSingleton<HireYar.Application.Interviews.ISpeechToTextService>(InterviewAi);
             s.RemoveAll<HireYar.Application.Interviews.IInterviewDecisionService>(); s.AddSingleton<HireYar.Application.Interviews.IInterviewDecisionService>(InterviewAi);
+            s.RemoveAll<HireYar.Application.Interviews.IInterviewReportProvider>(); s.AddSingleton<HireYar.Application.Interviews.IInterviewReportProvider>(ReportAi);
             s.RemoveAll<HireYar.Application.Interviews.ITextToSpeechService>(); s.AddSingleton<HireYar.Application.Interviews.ITextToSpeechService>(InterviewAi);
         });
     }

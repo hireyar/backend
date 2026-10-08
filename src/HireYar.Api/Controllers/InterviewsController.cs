@@ -5,8 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Authorize(Roles = "Owner")]
-public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel) : ControllerBase
+public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel, InterviewReportService reports) : ControllerBase
 {
+    [HttpPost("api/interviews/{id:guid}/evaluation-report")]
+    public Task<InterviewReportDto> GenerateReport(Guid id, CancellationToken ct) => reports.GenerateAsync(id, ct);
+    [HttpGet("api/interviews/{id:guid}/evaluation-report")]
+    public Task<InterviewReportDto> EvaluationReport(Guid id, CancellationToken ct) => reports.GetAsync(id, ct);
     [HttpGet("api/interviews")]
     public Task<Page<PanelInterviewDto>> List([FromQuery] InterviewListQuery query, CancellationToken ct) => panel.ListAsync(query, ct);
     [HttpDelete("api/interviews/{id:guid}")]

@@ -8,6 +8,8 @@ public interface IOpenAiInterviewOptions
     string ApiKey { get; }
     string SttModel { get; }
     string LlmModel { get; }
+    string EvaluationModel { get; }
+    int EvaluationTimeoutSeconds { get; }
     string TtsModel { get; }
     string TtsVoice { get; }
     decimal TtsSpeed { get; }

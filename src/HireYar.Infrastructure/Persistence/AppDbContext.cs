@@ -28,6 +28,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<InterviewSession> InterviewSessions => Set<InterviewSession>();
     public DbSet<InterviewAnswer> InterviewAnswers => Set<InterviewAnswer>();
     public DbSet<InterviewIntroduction> InterviewIntroductions => Set<InterviewIntroduction>();
+    public DbSet<InterviewEvaluationReport> InterviewEvaluationReports => Set<InterviewEvaluationReport>();
     public Task ReloadIntroductionAsync(InterviewIntroduction introduction, CancellationToken ct) => Entry(introduction).ReloadAsync(ct);
     public Task ReloadInterviewAsync(InterviewSession session, CancellationToken ct) => Entry(session).ReloadAsync(ct);
     public void DetachEntity(object entity) => Entry(entity).State = EntityState.Detached;

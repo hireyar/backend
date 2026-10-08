@@ -72,7 +72,10 @@ public sealed partial class PanelWizardTests(ApiFixture f)
             var context = f.InterviewAi.LastContext!;
             Assert.Equal(job.Description, context.PositionDescription); Assert.Contains("work history", context.ResumeText);
             Assert.Equal("Synthetic introduction history", context.CandidateIntroduction); Assert.Equal("general", context.InterviewType);
-            Assert.Equal(InterviewDecisionPrompt.Master, context.MasterPrompt); Assert.Equal(5, context.QuestionBank!.Count);
+            Assert.Equal(InterviewDecisionPrompt.Master, context.MasterPrompt);
+            Assert.Equal(context.AvailableQuestions.Select(q => q.QuestionId).Append(context.CurrentQuestionId).ToHashSet(),
+                context.QuestionBank!.Select(q => q.QuestionId).ToHashSet());
+            Assert.Equal(2, context.QuestionBank!.Count);
             Assert.Single(context.PreviousAnswers!); Assert.NotNull(context.PreviousAnswers![0].AssistantReply);
             Assert.Equal("سؤال مصنوعی 2", current.Question!.Text);
             for (var i = 1; i < 5; i++) current = await Submit(current);
@@ -80,7 +83,7 @@ public sealed partial class PanelWizardTests(ApiFixture f)
             var goodbye = (await (await c.PostAsJsonAsync(route + "/stage/advance", new AdvanceInterviewStageRequest("CompanyIntroduction"))).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
             Assert.Equal("Goodbye", goodbye.Stage); Assert.Equal(changed.GoodbyeMessage, goodbye.StageMessage);
             await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == invite.InterviewId);
-                Assert.Equal(5, s.AnsweredQuestionCount); Assert.Equal(6, s.Answers.Count); Assert.Single(s.Answers, a => a.IsInteraction);
+                Assert.Equal(5, s.Questions.Count); Assert.Equal(5, s.AnsweredQuestionCount); Assert.Equal(6, s.Answers.Count); Assert.Single(s.Answers, a => a.IsInteraction);
                 Assert.Equal(InterviewDecisionPrompt.Master, s.MasterPromptSnapshot); Assert.Equal("v2", s.MasterPromptVersion); Assert.False(db.Database.HasPendingModelChanges()); });
         }
         finally { f.InterviewAi.Reset(); }

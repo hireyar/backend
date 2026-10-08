@@ -148,6 +148,120 @@ public sealed class InterviewFlowTests(ApiFixture f)
     }
 
     [PostgresFact]
+    public async Task Evaluation_report_is_scoped_cached_persisted_and_does_not_run_during_live_turns()
+    {
+        f.ReportAi.Reset(); var (hr, invite) = await Invite(); using var c = Candidate(invite);
+        var start = await Start(c, invite.InterviewId); var url = $"/api/interviews/{invite.InterviewId}/evaluation-report";
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Submit(c, invite.InterviewId, start.Question!.Id)).StatusCode);
+        Assert.Equal(0, f.ReportAi.Calls);
+        Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
+        var evidenceBefore = (await (await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).Content.ReadFromJsonAsync<HrInterviewDto>())!.Evidence;
+        var response = await hr.Client.Send(HttpMethod.Post, url); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var report = (await response.Content.ReadFromJsonAsync<InterviewReportDto>())!;
+        Assert.Equal("openai/gpt-6-luna", report.Model); Assert.Single(report.Content.Findings); Assert.Single(f.ReportAi.LastContext!.Answers);
+        Assert.Equal(3, f.ReportAi.LastContext.Questions.Count);
+        var again = (await (await hr.Client.Send(HttpMethod.Post, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
+        var stored = (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
+        Assert.Equal(report.CreatedAtUtc, again.CreatedAtUtc); Assert.Equal(report.CreatedAtUtc, stored.CreatedAtUtc); Assert.Equal(1, f.ReportAi.Calls);
+        var stranger = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, url)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Post, url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(url)).StatusCode);
+        await f.Db(async db => {
+            var row = await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == invite.InterviewId);
+            Assert.NotNull(row.ResultJson); Assert.Null(row.LeaseId); Assert.Equal(report.CreatedAtUtc, row.CreatedAtUtc);
+            Assert.False(db.Database.HasPendingModelChanges());
+        });
+        var evidenceAfter = (await (await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).Content.ReadFromJsonAsync<HrInterviewDto>())!.Evidence;
+        Assert.Equal(evidenceBefore, evidenceAfter);
+    }
+
+    [PostgresFact]
+    public async Task Evaluation_report_failure_releases_claim_and_retry_does_not_change_interview()
+    {
+        f.ReportAi.Reset(); var (hr, invite) = await Invite(); using var c = Candidate(invite); await Start(c, invite.InterviewId);
+        await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null);
+        var url = $"/api/interviews/{invite.InterviewId}/evaluation-report";
+        foreach (var malformed in new[] { true, false })
+        {
+            f.ReportAi.Invalid = malformed; f.ReportAi.Fail = !malformed;
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await hr.Client.Send(HttpMethod.Get, url)).StatusCode);
+            await f.Db(async db => {
+                var row = await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == invite.InterviewId);
+                Assert.Null(row.ResultJson); Assert.Null(row.LeaseId);
+                Assert.Equal(InterviewStatus.Completed, (await db.InterviewSessions.SingleAsync(s => s.Id == invite.InterviewId)).Status);
+            });
+        }
+        f.ReportAi.Invalid = f.ReportAi.Fail = false;
+        Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+        Assert.Equal(3, f.ReportAi.Calls);
+    }
+
+    [PostgresFact]
+    public async Task Evaluation_report_claim_prevents_duplicate_generation_and_deleted_session_cannot_commit()
+    {
+        f.ReportAi.Reset(); var (hr, invite) = await Invite(); using var c = Candidate(invite); await Start(c, invite.InterviewId);
+        await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null);
+        var url = $"/api/interviews/{invite.InterviewId}/evaluation-report";
+        f.ReportAi.Entered = new(TaskCreationOptions.RunContinuationsAsynchronously); f.ReportAi.Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = hr.Client.Send(HttpMethod.Post, url);
+        await f.ReportAi.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+            Assert.Equal(1, f.ReportAi.Calls);
+            Assert.Equal(HttpStatusCode.NoContent, (await hr.Client.Send(HttpMethod.Delete, $"/api/interviews/{invite.InterviewId}")).StatusCode);
+        }
+        finally { f.ReportAi.Release.TrySetResult(); }
+        Assert.Equal(HttpStatusCode.NotFound, (await pending).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await hr.Client.Send(HttpMethod.Get, url)).StatusCode);
+        await f.Db(async db => Assert.Null((await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == invite.InterviewId)).ResultJson));
+        f.ReportAi.Reset();
+    }
+
+    [PostgresFact]
+    public async Task Expired_report_lease_can_be_reclaimed_and_old_generator_cannot_overwrite_result()
+    {
+        f.ReportAi.Reset(); var (hr, invite) = await Invite(); using var c = Candidate(invite); await Start(c, invite.InterviewId);
+        await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null);
+        var url = $"/api/interviews/{invite.InterviewId}/evaluation-report"; var originalOffset = f.Clock.Offset;
+        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.ReportAi.Entered = firstEntered; f.ReportAi.Release = firstRelease;
+        var old = hr.Client.Send(HttpMethod.Post, url); await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            f.Clock.Offset += TimeSpan.FromSeconds(160); f.ReportAi.Entered = f.ReportAi.Release = null;
+            var winner = await hr.Client.Send(HttpMethod.Post, url); Assert.Equal(HttpStatusCode.OK, winner.StatusCode);
+            var report = (await winner.Content.ReadFromJsonAsync<InterviewReportDto>())!;
+            firstRelease.TrySetResult(); Assert.Equal(HttpStatusCode.Conflict, (await old).StatusCode);
+            Assert.Equal(2, f.ReportAi.Calls);
+            var stored = (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
+            Assert.Equal(report.CreatedAtUtc, stored.CreatedAtUtc);
+        }
+        finally { firstRelease.TrySetResult(); f.Clock.Offset = originalOffset; f.ReportAi.Reset(); }
+    }
+
+    [PostgresFact]
+    public async Task Report_table_rejects_cross_organization_session_reference_and_incomplete_metadata()
+    {
+        var (_, invite) = await Invite(); var other = await f.RegisterOwner();
+        await f.Db(async db => {
+            var otherOrg = await db.Users.Where(u => u.Id == other.Id).Select(u => u.OrganizationId).SingleAsync();
+            db.InterviewEvaluationReports.Add(new() { InterviewSessionId = invite.InterviewId, OrganizationId = otherOrg });
+            var error = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            Assert.Equal("23503", ((PostgresException)error.InnerException!).SqlState);
+        });
+        await f.Db(async db => {
+            var org = await db.InterviewSessions.Where(s => s.Id == invite.InterviewId).Select(s => s.OrganizationId).SingleAsync();
+            db.InterviewEvaluationReports.Add(new() { InterviewSessionId = invite.InterviewId, OrganizationId = org, ResultJson = "{}" });
+            var error = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            Assert.Equal("23514", ((PostgresException)error.InnerException!).SqlState);
+        });
+    }
+
+    [PostgresFact]
     public async Task Captured_turn_persists_video_transcript_history_and_replays_without_processing_again()
     {
         var (hr, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);

@@ -1,4 +1,16 @@
-## آخرین تکمیل: معرفی صوتی و صوت مرحله‌ها — 2026-10-07
+## آخرین تکمیل: مدل گزارش مستقل و تاریخچه منتخب — 2026-10-08
+
+روی `dev` پاک، `EvaluationModel=openai/gpt-6-luna` و timeout مستقل به هر دو provider افزوده شدند؛ مدل زنده/کلیدها/URL/STT/TTS و تمام مقادیر قبلی appsettings با مقایسه بدون نمایش secret حفظ شدند. POST/GET evaluation-report برای Owner همان سازمان، Completed و قابلیت قرارداد `interview_report`، با پرامپت مستقل، کل تاریخچه پردازش‌شده، citation واقعی پاسخ نهایی و quote دقیق، و گزارش cached در JSONB پیاده‌اند. claim/lease با قفل کوتاه سازمان، شبکه بیرون transaction، جلوگیری از تماس تکراری و commit generator کهنه/جلسه حذف‌شده دارند؛ گزارش score یا مالی جلسه را تغییر نمی‌دهد. تولید به درخواست پنل است و پاسخ زنده منتظر آن نمی‌ماند. [INTERVIEW_EVALUATION_API](INTERVIEW_EVALUATION_API.md) قرارداد اتصال فرانت است.
+
+تاریخچه از قبل در دیتابیس موجود بود؛ selector فقط payload زنده را محدود می‌کند: تمام تعامل‌های سؤال جاری و گروه‌های اخیر، گروه‌های مرتبط قدیمی در بودجه نرم، و تاریخچه کامل برای اشاره صریح به گذشته/اصلاح یا با خاموش‌کردن گزینه. JD/رزومه/معرفی، وضعیت مهارتی/پوشش و تمام evidence تجمعی حفظ می‌شوند. بانک prompt به current+shortlist مجاز محدود است؛ snapshot کامل و endpoint تاریخچه تغییر حذف ندارند. metric شمارش تاریخچه و مدت/شکست مستقل گزارش اضافه شدند؛ خلاصه‌ساز LLM، embedding، Repository و Realtime جدید نداریم.
+
+tool restore و restore موفق؛ build نهایی صفر warning/error؛ **۲۰۹/۲۰۹ تست PostgreSQL 18.3 اختصاصی محلی موفق، صفر شکست/Skip**، شامل ۶ case تازه history/report rules/wire و ۵ تست واقعی report/cache/scope/failure/retry/رقابت/حذف/reclaim/constraint tenant و metadata. تست قبلی ویزارد اکنون بانک منتخب را در prompt و حفظ همه پنج سؤال/شش نوبت در DB بررسی می‌کند. timestamp گزارش پیش از پاسخ اول به microsecond PostgreSQL normalize شده تا GET/POST cached دقیقاً زمان یکسان بدهند. TRX: `tests/HireYar.Tests/TestResults/history-report-verified.trx`؛ EF drift در تست واقعی false است. اجرای اولیه sandbox به testhost/loopback وصل نشد، و یک run پیش از فعال‌بودن cluster SQL failed شد؛ نتیجه نهایی پس از اجرای خارج sandbox جایگزین آن نتایج محیطی است.
+
+migration `20261008120416_AddInterviewEvaluationReports` فقط جدول گزارش را اضافه می‌کند؛ delta idempotent `artifacts/evaluation-report-migrations.sql` دو بار روی baseline اختصاصی آخرین migration قبلی موفق و یک history entry دارد. baseline این بررسی بدون داده legacy بود؛ migration هیچ UPDATE/backfill تاریخچه ندارد. downgrade با گزارش موجود در کد migration رد می‌شود؛ اجرای downgrade با گزارش واقعی در این نوبت تست نشده است. DBهای fixture صفر باقی ماندند، scratch حذف و cluster اختصاصی متوقف شد.
+
+AI واقعی، کیفیت فارسی/latency/تعداد توکن واقعی مدل منتخب، Angular، migration مقصد، commit/push/deploy و production انجام/تأیید نشده‌اند. تست مصنوعی کاهش بیش از نصف payload **بخش تاریخچه** را در نمونه بلند بررسی می‌کند، نه صرفه‌جویی تضمینی کل prompt/هزینه. حفظ محافظ‌های context معادل اثبات برابری کیفیت واقعی نیست؛ مترادف/ارجاع ضمنی نیاز به آزمون مقایسه‌ای دارد.
+
+## تکمیل قبلی: معرفی صوتی و صوت مرحله‌ها — 2026-10-07
 
 معرفی کارجو اکنون upload/replay/retry/recovery مستقل صوتی دارد و پیام‌های ثابت stageAudioUrl احرازشده دارند. 198/198 تست PostgreSQL واقعی و build موفق؛ migration جدید 20261007151257_AddVoiceIntroduction در مقصد لازم است. [VOICE_INTRODUCTION_API](VOICE_INTRODUCTION_API.md) مرجع اتصال فرانت و محدودیت‌های باقی‌مانده است؛ جزئیات نتیجه اجرای نهایی در انتهای این فایل ثبت‌اند. cluster موقت تست متوقف و DBهای تصادفی fixture و scratch پاک شدند. Angular/AI واقعی و rollout مقصد هنوز تأیید نشده‌اند.
 

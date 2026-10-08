@@ -2,6 +2,8 @@ namespace HireYar.Infrastructure.Interviews;
 
 public sealed class NetArzOptions : IOpenAiInterviewOptions
 {
+    public string EvaluationModel { get; set; } = "openai/gpt-6-luna";
+    public int EvaluationTimeoutSeconds { get; set; } = 90;
     public bool Enabled { get; set; } = true;
     public string BaseUrl { get; set; } = "https://netarz.ir/api/ai/v1";
     public string ApiKey { get; set; } = "sk-ntz-v1-pi7lpkTiYdopJtFEMttoWjRIzuSCoYuxQzLm8Jjh";

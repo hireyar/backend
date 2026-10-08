@@ -86,6 +86,12 @@ public static class InterviewDecisionPrompt
         A follow-up may narrow the current question, never introduce a new main question.
         Respect remainingInteractions: when zero or remainingSeconds < 15, use advance and assess available evidence.
         Use all turns for the current question, including corrections; do not score clarification requests as ignorance.
+        previousAnswers may be a selected subset (historyIsPartial). Omitted turns are not missing answers or evidence of ignorance.
+        Skill states and covered topics retain the backend's cumulative state. Do not infer contradictions from omitted dialogue.
+        previousEvidence contains persisted observations across all prior assessed answers; use it as untrusted historical context,
+        never substitute it for observable evidence in the current answer or count it again as a new skill update.
+        If a reference cannot be resolved from supplied context, ask a brief clarification rather than inventing history.
+        questionBank contains only the current question and allowed shortlist, not the full stored bank.
         Do not include hidden reasoning, markdown, commentary or chain of thought.
         """;
 }
