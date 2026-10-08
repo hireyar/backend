@@ -46,6 +46,7 @@ public sealed class PanelWizardController(JobService jobs, TemplateService templ
     public Task<TemplateDto> UpdateTemplate(Guid id, UpdateWizardTemplateRequest r, CancellationToken ct) => templates.SaveWizardAsync(id, r.Template, r.RowVersion, ct);
 
     [HttpPost("invitations"), Consumes("multipart/form-data"), RequestSizeLimit(11 * 1024 * 1024)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<PanelInvitationResult> Invite([FromForm] WizardInvitationForm r, CancellationToken ct)
     {
         if (r.Resume.Length is <= 0 or > ResumeUploadValidator.MaxBytes) throw AppException.Invalid("invalid_resume_size");

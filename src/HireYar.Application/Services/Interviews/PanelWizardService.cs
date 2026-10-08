@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
-    ISubscriptionEntitlementService entitlements, IInterviewAudioStorage storage, IResumeTextExtractor resumeText)
+    ISubscriptionEntitlementService entitlements, IInterviewAudioStorage storage, IResumeTextExtractor resumeText,
+    IInterviewInvitationSecurity invitationSecurity, InterviewBillingService billing)
 {
     public async Task<PanelInvitationResult> InviteAsync(WizardInvitationRequest r, Stream resume, string filename, CancellationToken ct)
     {
@@ -59,7 +60,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
         session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, extracted, template.Language,
             template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
-        var token = InterviewTokens.Create(); session.SetAccessTokenHash(InterviewTokens.Hash(token));
+        var token = IssueCode(session);
         var saved = await storage.SaveAsync(new MemoryStream(file.Bytes), "resumes", application.Id, ResumeUploadValidator.MaxBytes, ct);
         try
         {
@@ -78,17 +79,61 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         return Result(session, token);
     }
 
-    private static PanelInvitationResult Result(InterviewSession s, string token) => new(
-        new(s.Id, token, s.ExpiresAtUtc, $"/api/candidate/interviews/{s.Id}"), "NotConfigured", "NotConfigured");
+    private string IssueCode(InterviewSession session, string? previous = null)
+    {
+        var code = invitationSecurity.CreateCode(previous); var encrypted = invitationSecurity.Protect(session.Id, code);
+        session.SetProtectedAccessCode(encrypted, InterviewTokens.Hash(encrypted)); return code;
+    }
+    private PanelInvitationResult Result(InterviewSession s, string token) => new(
+        new(s.Id, token, s.ExpiresAtUtc, $"/api/candidate/interviews/{s.Id}", token, invitationSecurity.Link(s.Id)), "NotConfigured", "NotConfigured");
+
+    public async Task<InterviewAccessDetails> AccessAsync(Guid id, CancellationToken ct)
+    {
+        var s = await db.InterviewSessions.AsNoTracking().IgnoreAutoIncludes().SingleOrDefaultAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null, ct)
+            ?? throw AppException.NotFound();
+        return new(s.Id, invitationSecurity.Link(s.Id), invitationSecurity.Unprotect(s.Id, s.ProtectedAccessCode), s.ExpiresAtUtc,
+            s.SupersededByInterviewId is null &&
+            await db.JobPositions.AnyAsync(j => j.Id == s.JobPositionId && j.OrganizationId == user.OrganizationId && j.DeletedAtUtc == null && j.Status != HireYar.Domain.JobPositions.JobStatus.Archived, ct) &&
+            await db.InterviewTemplates.AnyAsync(t => t.Id == s.InterviewTemplateId && t.OrganizationId == user.OrganizationId && t.DeletedAtUtc == null && !t.IsArchived, ct),
+            InterviewInvitationStatus.Get(s.SupersededByInterviewId, s.AccessRevokedAtUtc, s.Status, s.ExpiresAtUtc, time.GetUtcNow()).Status);
+    }
 
     public async Task<PanelInvitationResult> ResendAsync(Guid id, ResendInterviewRequest r, CancellationToken ct)
     {
         var session = await db.InterviewSessions.SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)
             ?? throw AppException.NotFound();
-        if (session.Status != InterviewStatus.Created || session.AccessRevokedAtUtc is not null) throw AppException.Conflict();
-        var token = InterviewTokens.Create(); var now = time.GetUtcNow();
-        session.RenewInvitation(InterviewTokens.Hash(token), now, now.AddDays(r.DeadlineDays));
-        await db.SaveChangesAsync(ct); return Result(session, token);
+        if (r.DeadlineDays is < 1 or > 14) throw AppException.Invalid();
+        return await billing.FinishAsync(session, false, async () => {
+            await db.ReloadInterviewAsync(session, ct);
+            if (session.DeletedAtUtc is not null) throw AppException.NotFound();
+            if (session.SupersededByInterviewId is not null) throw new AppException(409, "invitation_already_replaced", "برای این مصاحبه دعوت جدیدی ساخته شده است.");
+            var job = await db.JobPositions.AsNoTracking().SingleOrDefaultAsync(j => j.Id == session.JobPositionId && j.OrganizationId == user.OrganizationId && j.DeletedAtUtc == null && j.Status != HireYar.Domain.JobPositions.JobStatus.Archived, ct) ?? throw AppException.NotFound();
+            var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(t => t.Id == session.InterviewTemplateId && t.OrganizationId == user.OrganizationId && t.DeletedAtUtc == null && !t.IsArchived, ct) ?? throw AppException.NotFound();
+            await entitlements.RequireAsync(user.OrganizationId, session.AskOneQuestionPerTopic
+                ? [session.RequiredCapabilityCode, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
+                : [session.RequiredCapabilityCode, "ai_interview"], ct);
+            await db.InterviewAnswers.Where(a => a.InterviewSessionId == session.Id).ToListAsync(ct);
+            var now = time.GetUtcNow();
+            var fresh = new InterviewSession(session.OrganizationId, session.JobPositionId, session.CandidateApplicationId, session.InterviewTemplateId,
+                session.Questions.Select(q => new InterviewQuestionSnapshot(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty, q.IsActive, q.Order)),
+                session.Skills, session.MaxQuestionCount, session.MaxDurationSeconds, now, now.AddDays(r.DeadlineDays));
+            if (session.AskOneQuestionPerTopic) fresh.EnableTopicQuestions();
+            fresh.SetRequiredCapability(session.RequiredCapabilityCode); fresh.SetInteractionLimit(session.MaxInteractionsPerQuestion);
+            fresh.SetPanelSnapshot(session.PositionTitleSnapshot ?? job.Title, session.PositionDescriptionSnapshot ?? job.Description,
+                session.TemplateTitleSnapshot ?? template.Title, session.WelcomeMessage ?? template.WelcomeMessage, session.GoodbyeMessage ?? template.GoodbyeMessage);
+            fresh.SetAiSnapshot(session.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, session.MasterPromptVersion ?? InterviewDecisionPrompt.Version,
+                session.ResumeTextSnapshot, session.Language, session.CandidateIntroductionEnabled, session.CandidateIntroductionMessage ?? "",
+                session.CompanyIntroductionEnabled, session.CompanyIntroductionMessage ?? "");
+            var code = IssueCode(fresh, invitationSecurity.Unprotect(session.Id, session.ProtectedAccessCode));
+            db.InterviewSessions.Add(fresh);
+            // Persist the new principal before the self-reference; this is still the same organization transaction.
+            await db.SaveChangesAsync(ct);
+            if (session.Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled)) session.Cancel(now);
+            session.Supersede(fresh.Id, now);
+            var application = await db.CandidateApplications.SingleAsync(a => a.Id == session.CandidateApplicationId && a.OrganizationId == user.OrganizationId, ct);
+            application.Status = CandidateApplicationStatus.Invited; application.UpdatedAtUtc = now;
+            return Result(fresh, code);
+        }, ct);
     }
 
     public async Task<(Stream Content, string ContentType, string Extension)> ResumeAsync(Guid id, CancellationToken ct)
@@ -128,7 +173,8 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                 PositionTitle = x.s.PositionTitleSnapshot ?? x.j.Title, TemplateId = x.s.InterviewTemplateId,
                 TemplateTitle = x.s.TemplateTitleSnapshot ?? x.t.Title, x.s.RequiredCapabilityCode, x.status,
                 x.s.CreatedAtUtc, x.s.ExpiresAtUtc, x.s.StartedAtUtc, x.s.CompletedAtUtc, x.a.ResumeStorageKey,
-                x.s.AccessRevokedAtUtc,
+                x.s.AccessRevokedAtUtc, x.s.SupersededByInterviewId, x.s.ProtectedAccessCode, InterviewStatus = x.s.Status,
+                CanResend = x.s.SupersededByInterviewId == null && x.j.DeletedAtUtc == null && x.j.Status != HireYar.Domain.JobPositions.JobStatus.Archived && x.t.DeletedAtUtc == null && !x.t.IsArchived,
                 VideoAvailable = x.s.Answers.Any(a => a.VideoStorageKey != null),
                 Score = x.s.SkillStates.Where(y => y.EvidenceCount > 0).Select(y => (decimal?)y.CurrentScore).Average() }).ToListAsync(ct);
         return new(rows.Select(x => new PanelInterviewDto(x.Id, x.FirstName, x.LastName, x.Email, x.Phone, x.JobPositionId,
@@ -136,7 +182,9 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             x.status, x.CreatedAtUtc, x.ExpiresAtUtc, x.StartedAtUtc, x.CompletedAtUtc, (int)(x.ExpiresAtUtc - x.CreatedAtUtc).TotalDays,
             x.status == "completed" && x.Score.HasValue ? decimal.Round(x.Score.Value * 100, 2) : null,
             $"/api/interviews/{x.Id}", x.ResumeStorageKey is null ? null : $"/api/interviews/{x.Id}/resume",
-            x.status is "pending" or "expired" && x.StartedAtUtc is null && x.AccessRevokedAtUtc is null,
-            x.status is not ("completed" or "cancelled"), x.VideoAvailable)).ToArray(), total, r.Page, r.PageSize);
+            x.CanResend,
+            x.status is not ("completed" or "cancelled"), x.VideoAvailable, invitationSecurity.Link(x.Id),
+            invitationSecurity.Unprotect(x.Id, x.ProtectedAccessCode),
+            InterviewInvitationStatus.Get(x.SupersededByInterviewId, x.AccessRevokedAtUtc, x.InterviewStatus, x.ExpiresAtUtc, now).Status)).ToArray(), total, r.Page, r.PageSize);
     }
 }

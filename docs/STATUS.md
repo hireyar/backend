@@ -1,3 +1,9 @@
+## آخرین تکمیل: دعوت شش‌رقمی و تشخیص توقف پاسخ صوتی — 2026-10-08
+
+روی dev: کد شش‌رقمی با ذخیره رمز‌شده و قفل پنج تلاش، مشاهده لینک/کد در پنل، دعوت مجدد با جلسه تازه و حفظ تاریخچه، انقضای لینک Completed/جایگزین‌شده با پیام فارسی و status عمومی پیاده شد. مدل گزارش مستقل قبلی حفظ شد. STT صریح JSON و shape warning امن دارد؛ DTO خطای واقعی/وضعیت retry را عرضه می‌کند و رزرو بسته دیگر spinner/recovery پاسخ سؤال را فعال نگه نمی‌دارد. [INTERVIEW_INVITATIONS_API](INTERVIEW_INVITATIONS_API.md) قرارداد فرانت است.
+
+build صفر warning/error؛ **۲۲۰ تست موفق، صفر Skip** با HIREYAR_TEST_POSTGRES روی cluster محلی اختصاصی PostgreSQL 18.3. تست‌های جدید نمایش کد/scoping/cipher، قفل، Completed/closing، concurrent resend، legacy، shape diagnostics و رزرو بسته را پوشش می‌دهند. migration `20261008135241_AddShortInterviewInvitations` و delta idempotent از AddInterviewEvaluationReports روی baseline خالی دوبار موفق، history count=1؛ model drift در تست بررسی شد. downgrade با داده واقعی اجرا نشده است. لاگ سرور HTTP 200 سپس stt_invalid_response را نشان می‌دهد؛ شکل/خالی بودن پاسخ و علت worker روی سرور قطعی نیست. Angular، provider واقعی، migration مقصد، commit/push/deploy انجام نشده‌اند.
+
 ## آخرین تکمیل: مدل گزارش مستقل و تاریخچه منتخب — 2026-10-08
 
 روی `dev` پاک، `EvaluationModel=openai/gpt-6-luna` و timeout مستقل به هر دو provider افزوده شدند؛ مدل زنده/کلیدها/URL/STT/TTS و تمام مقادیر قبلی appsettings با مقایسه بدون نمایش secret حفظ شدند. POST/GET evaluation-report برای Owner همان سازمان، Completed و قابلیت قرارداد `interview_report`، با پرامپت مستقل، کل تاریخچه پردازش‌شده، citation واقعی پاسخ نهایی و quote دقیق، و گزارش cached در JSONB پیاده‌اند. claim/lease با قفل کوتاه سازمان، شبکه بیرون transaction، جلوگیری از تماس تکراری و commit generator کهنه/جلسه حذف‌شده دارند؛ گزارش score یا مالی جلسه را تغییر نمی‌دهد. تولید به درخواست پنل است و پاسخ زنده منتظر آن نمی‌ماند. [INTERVIEW_EVALUATION_API](INTERVIEW_EVALUATION_API.md) قرارداد اتصال فرانت است.

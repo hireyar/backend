@@ -1,4 +1,5 @@
 using System.Net;
+using HireYar.Domain.Interviews;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -112,9 +113,12 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, start.StatusCode);
         var current = (await start.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
         Assert.Equal("شروع آزمایشی", current.WelcomeMessage); Assert.Equal("سؤال مصنوعی 1", current.Question!.Text);
-        Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{id}/resend", new ResendInterviewRequest())).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{id}/cancel")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await candidate.GetAsync($"/api/candidate/interviews/{id}/current")).StatusCode);
+        var replaced = await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{id}/resend", new ResendInterviewRequest());
+        Assert.Equal(HttpStatusCode.OK, replaced.StatusCode);
+        var fresh = (await replaced.Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        Assert.NotEqual(id, fresh.InterviewId);
+        Assert.Equal(HttpStatusCode.Gone, (await candidate.GetAsync($"/api/candidate/interviews/{id}/current")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{fresh.InterviewId}/cancel")).StatusCode);
     }
     [PostgresFact]
     public async Task Wizard_validates_fields_files_scope_and_reuses_organization_template_by_copy()
@@ -152,6 +156,110 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         Assert.Equal("general", Assert.Single(rows.Items).InterviewType);
     }
     [PostgresFact]
+    public async Task Short_access_code_and_link_are_recoverable_only_in_the_owning_organization_panel()
+    {
+        var (hr, job, template) = await Setup(); var response = await Invite(hr, job.Id, template.Id);
+        var issued = (await response.Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        Assert.Matches("^[0-9]{6}$", issued.AccessCode!); Assert.Equal(issued.AccessCode, issued.Token);
+        Assert.EndsWith($"/interview/{issued.InterviewId}", issued.InterviewUrl); Assert.DoesNotContain(issued.Token, issued.InterviewUrl!);
+        var accessResponse = await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{issued.InterviewId}/access");
+        Assert.Equal(HttpStatusCode.OK, accessResponse.StatusCode); Assert.True(accessResponse.Headers.CacheControl!.NoStore);
+        var access = (await accessResponse.Content.ReadFromJsonAsync<InterviewAccessDetails>())!;
+        Assert.Equal(issued.AccessCode, access.AccessCode); Assert.Equal(issued.InterviewUrl, access.InterviewUrl);
+        var listResponse = await hr.Client.Send(HttpMethod.Get, "/api/interviews"); Assert.True(listResponse.Headers.CacheControl!.NoStore);
+        var row = Assert.Single((await listResponse.Content.ReadFromJsonAsync<Page<PanelInterviewDto>>())!.Items);
+        Assert.Equal(issued.AccessCode, row.AccessCode); Assert.Equal(issued.InterviewUrl, row.InterviewUrl);
+        var stranger = await f.RegisterOwner();
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, $"/api/interviews/{issued.InterviewId}/access")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Post, $"/api/interviews/{issued.InterviewId}/resend", new ResendInterviewRequest())).StatusCode);
+        await f.Db(async db => {
+            var s = await db.InterviewSessions.SingleAsync(s => s.Id == issued.InterviewId);
+            Assert.NotEqual(issued.Token, s.ProtectedAccessCode); Assert.NotEqual(InterviewTokens.Hash(issued.Token), s.AccessTokenHash);
+            Assert.Equal(InterviewTokens.Hash(s.ProtectedAccessCode!), s.AccessTokenHash); Assert.False(db.Database.HasPendingModelChanges());
+        });
+    }
+
+    [PostgresFact]
+    public async Task Completed_invitation_shows_terminal_message_and_reinvite_creates_clean_session_with_same_snapshots()
+    {
+        var (hr, job, template) = await Setup(); var issued = (await (await Invite(hr, job.Id, template.Id)).Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        using var c = f.CreateClient(); c.DefaultRequestHeaders.Authorization = new("Bearer", issued.Token);
+        var route = $"/api/candidate/interviews/{issued.InterviewId}";
+        var start = (await (await c.PostAsync(route + "/start", null)).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        if (start.Stage == "Welcome") await c.PostAsJsonAsync(route + "/stage/advance", new AdvanceInterviewStageRequest("Welcome"));
+        var completed = await c.PostAsync(route + "/complete", null); Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        var end = (await completed.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+        var old = await c.GetAsync(route + "/current"); Assert.Equal(HttpStatusCode.Gone, old.StatusCode);
+        Assert.Equal("interview_completed", (await old.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Gone, (await c.PostAsync(route + "/start", null)).StatusCode);
+        // An already displayed goodbye can still finish; reopening the completed link cannot resume the interview.
+        if (end.Stage == "Goodbye") Assert.Equal(HttpStatusCode.OK, (await c.PostAsJsonAsync(route + "/stage/advance", new AdvanceInterviewStageRequest("Goodbye"))).StatusCode);
+        using var anonymous = f.CreateClient();
+        var publicState = (await (await anonymous.GetAsync(route + "/access-status")).Content.ReadFromJsonAsync<InterviewAccessStatus>())!;
+        Assert.Equal("completed", publicState.Status); Assert.Contains("اتمام", publicState.Message);
+        var resent = await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{issued.InterviewId}/resend", new ResendInterviewRequest());
+        Assert.Equal(HttpStatusCode.OK, resent.StatusCode); var fresh = (await resent.Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        Assert.NotEqual(issued.InterviewId, fresh.InterviewId); Assert.NotEqual(issued.Token, fresh.Token);
+        Assert.Equal("changed", (await (await anonymous.GetAsync(route + "/access-status")).Content.ReadFromJsonAsync<InterviewAccessStatus>())!.Status);
+        await f.Db(async db => {
+            var previous = await db.InterviewSessions.SingleAsync(s => s.Id == issued.InterviewId);
+            var next = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == fresh.InterviewId);
+            Assert.Equal(InterviewStatus.Completed, previous.Status); Assert.Equal(fresh.InterviewId, previous.SupersededByInterviewId);
+            Assert.Equal(InterviewStatus.Created, next.Status); Assert.Null(next.StartedAtUtc); Assert.Null(next.CandidateIntroductionTranscript);
+            Assert.Empty(next.Answers); Assert.Empty(next.Evidence); Assert.All(next.Questions, q => Assert.Null(q.AskedAtUtc));
+            Assert.Equal(previous.Questions.Select(q => q.Text), next.Questions.Select(q => q.Text)); Assert.Equal(previous.ResumeTextSnapshot, next.ResumeTextSnapshot);
+        });
+    }
+
+    [PostgresFact]
+    public async Task Five_bad_code_attempts_lock_that_invitation_and_expiry_allows_valid_code_again()
+    {
+        var (hr, job, template) = await Setup(); var issued = (await (await Invite(hr, job.Id, template.Id)).Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        using var c = f.CreateClient(); c.DefaultRequestHeaders.Authorization = new("Bearer", issued.Token == "000000" ? "000001" : "000000");
+        var route = $"/api/candidate/interviews/{issued.InterviewId}/current";
+        for (var attempt = 1; attempt <= 5; attempt++)
+            Assert.Equal(attempt < 5 ? HttpStatusCode.Unauthorized : HttpStatusCode.TooManyRequests, (await c.GetAsync(route)).StatusCode);
+        c.DefaultRequestHeaders.Authorization = new("Bearer", issued.Token);
+        var locked = await c.GetAsync(route); Assert.Equal(HttpStatusCode.TooManyRequests, locked.StatusCode);
+        Assert.Equal("interview_access_locked", (await locked.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        var offset = f.Clock.Offset;
+        try { f.Clock.Offset += TimeSpan.FromMinutes(16); Assert.Equal(HttpStatusCode.OK, (await c.GetAsync(route)).StatusCode); }
+        finally { f.Clock.Offset = offset; }
+        await f.Db(async db => Assert.Equal(5, (await db.InterviewSessions.SingleAsync(s => s.Id == issued.InterviewId)).AccessFailedAttempts));
+    }
+
+    [PostgresFact]
+    public async Task Concurrent_reinvitation_creates_exactly_one_replacement_and_never_reuses_old_url()
+    {
+        var (hr, job, template) = await Setup(); var issued = (await (await Invite(hr, job.Id, template.Id)).Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        var requests = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => hr.Client.Send(HttpMethod.Post,
+            $"/api/interviews/{issued.InterviewId}/resend", new ResendInterviewRequest())));
+        Assert.Single(requests, r => r.StatusCode == HttpStatusCode.OK); Assert.Single(requests, r => r.StatusCode == HttpStatusCode.Conflict);
+        var fresh = (await requests.Single(r => r.StatusCode == HttpStatusCode.OK).Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        Assert.NotEqual(issued.InterviewUrl, fresh.InterviewUrl);
+        await f.Db(async db => {
+            var old = await db.InterviewSessions.SingleAsync(s => s.Id == issued.InterviewId);
+            Assert.Equal(fresh.InterviewId, old.SupersededByInterviewId);
+            Assert.Equal(2, await db.InterviewSessions.CountAsync(s => s.CandidateApplicationId == old.CandidateApplicationId));
+        });
+    }
+
+    [PostgresFact]
+    public async Task Legacy_hash_only_invitation_remains_usable_and_reinvite_upgrades_it_to_short_code()
+    {
+        var (hr, job, template) = await Setup(); var issued = (await (await Invite(hr, job.Id, template.Id)).Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        var legacyToken = InterviewTokens.Create();
+        await f.Db(db => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"InterviewSessions\" SET \"ProtectedAccessCode\" = NULL, \"AccessTokenHash\" = {InterviewTokens.Hash(legacyToken)} WHERE \"Id\" = {issued.InterviewId}"));
+        using var c = f.CreateClient(); c.DefaultRequestHeaders.Authorization = new("Bearer", legacyToken);
+        Assert.Equal(HttpStatusCode.OK, (await c.GetAsync($"/api/candidate/interviews/{issued.InterviewId}/current")).StatusCode);
+        var access = (await (await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{issued.InterviewId}/access")).Content.ReadFromJsonAsync<InterviewAccessDetails>())!;
+        Assert.Null(access.AccessCode);
+        var replacement = (await (await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{issued.InterviewId}/resend", new ResendInterviewRequest())).Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+        Assert.Matches("^[0-9]{6}$", replacement.Token);
+        Assert.Equal(HttpStatusCode.Gone, (await c.GetAsync($"/api/candidate/interviews/{issued.InterviewId}/current")).StatusCode);
+    }
+
+    [PostgresFact]
     public async Task Resend_rotates_token_and_expiry_and_filters_expired_and_cancelled()
     {
         var (hr, job, template) = await Setup();
@@ -162,13 +270,16 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         {
             var expired = await (await hr.Client.Send(HttpMethod.Get, "/api/interviews?statuses=expired")).Content.ReadFromJsonAsync<Page<PanelInterviewDto>>(); Assert.Equal(id, Assert.Single(expired!.Items).Id);
             var resent = await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{id}/resend", new ResendInterviewRequest(7)); Assert.Equal(HttpStatusCode.OK, resent.StatusCode);
-            var fresh = (await resent.Content.ReadFromJsonAsync<PanelInvitationResult>())!; Assert.NotEqual(invitation.Invitation.Token, fresh.Invitation.Token);
+            var fresh = (await resent.Content.ReadFromJsonAsync<PanelInvitationResult>())!;
+            Assert.NotEqual(id, fresh.Invitation.InterviewId); Assert.NotEqual(invitation.Invitation.Token, fresh.Invitation.Token);
             using var c = f.CreateClient(); c.DefaultRequestHeaders.Authorization = new("Bearer", invitation.Invitation.Token);
-            Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/candidate/interviews/{id}/current")).StatusCode);
+            var changed = await c.GetAsync($"/api/candidate/interviews/{id}/current"); Assert.Equal(HttpStatusCode.Gone, changed.StatusCode);
+            Assert.Equal("interview_address_changed", (await changed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
             c.DefaultRequestHeaders.Authorization = new("Bearer", fresh.Invitation.Token);
-            Assert.Equal(HttpStatusCode.OK, (await c.GetAsync($"/api/candidate/interviews/{id}/current")).StatusCode);
-            Assert.Equal(HttpStatusCode.NoContent, (await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{id}/cancel")).StatusCode);
-            var cancelled = await (await hr.Client.Send(HttpMethod.Get, "/api/interviews?statuses=cancelled")).Content.ReadFromJsonAsync<Page<PanelInterviewDto>>(); Assert.Equal(id, Assert.Single(cancelled!.Items).Id);
+            Assert.Equal(HttpStatusCode.OK, (await c.GetAsync($"/api/candidate/interviews/{fresh.Invitation.InterviewId}/current")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await hr.Client.Send(HttpMethod.Post, $"/api/interviews/{fresh.Invitation.InterviewId}/cancel")).StatusCode);
+            var cancelled = await (await hr.Client.Send(HttpMethod.Get, "/api/interviews?statuses=cancelled")).Content.ReadFromJsonAsync<Page<PanelInterviewDto>>();
+            Assert.Equal(2, cancelled!.Items.Count); Assert.Contains(cancelled.Items, row => row.Id == id && !row.CanResend);
         }
         finally { f.Clock.Offset = TimeSpan.Zero; }
     }

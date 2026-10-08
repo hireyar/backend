@@ -26,6 +26,30 @@ public sealed class InterviewSession
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
     public Guid? CurrentQuestionId { get; private set; }
+    public string? ProtectedAccessCode { get; private set; }
+    public Guid? SupersededByInterviewId { get; private set; }
+    public int AccessFailedAttempts { get; private set; }
+    public DateTimeOffset? AccessFailureWindowAtUtc { get; private set; }
+    public DateTimeOffset? AccessLockedUntilUtc { get; private set; }
+    public void SetProtectedAccessCode(string protectedCode, string fingerprint)
+    {
+        InterviewRules.Require(Status == InterviewStatus.Created, "interview_already_started");
+        ProtectedAccessCode = InterviewRules.Text(protectedCode, 2048); SetAccessTokenHash(fingerprint);
+    }
+    public void RecordAccessFailure(DateTimeOffset now)
+    {
+        CheckTime(now);
+        if (AccessFailureWindowAtUtc is null || now >= AccessFailureWindowAtUtc.Value.AddMinutes(15))
+        { AccessFailedAttempts = 0; AccessFailureWindowAtUtc = now; AccessLockedUntilUtc = null; }
+        AccessFailedAttempts = Math.Min(5, AccessFailedAttempts + 1);
+        if (AccessFailedAttempts == 5) AccessLockedUntilUtc = now.AddMinutes(15);
+    }
+    public void Supersede(Guid replacementId, DateTimeOffset now)
+    {
+        CheckTime(now); InterviewRules.Require(replacementId != Id && SupersededByInterviewId is null, "invitation_already_replaced");
+        SupersededByInterviewId = replacementId; RevokeAccess(now);
+        ProcessingLeaseId = null; ProcessingLeaseExpiresAtUtc = null; ProcessingRevision = Guid.NewGuid();
+    }
     public bool AskOneQuestionPerTopic { get; private set; }
     public void EnableTopicQuestions()
     {

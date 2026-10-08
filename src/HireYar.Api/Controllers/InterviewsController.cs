@@ -12,11 +12,16 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
     [HttpGet("api/interviews/{id:guid}/evaluation-report")]
     public Task<InterviewReportDto> EvaluationReport(Guid id, CancellationToken ct) => reports.GetAsync(id, ct);
     [HttpGet("api/interviews")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<Page<PanelInterviewDto>> List([FromQuery] InterviewListQuery query, CancellationToken ct) => panel.ListAsync(query, ct);
     [HttpDelete("api/interviews/{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct) { await service.DeleteAsync(id, ct); return NoContent(); }
     [HttpPost("api/interviews/{id:guid}/resend")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<PanelInvitationResult> Resend(Guid id, ResendInterviewRequest r, CancellationToken ct) => panel.ResendAsync(id, r, ct);
+    [HttpGet("api/interviews/{id:guid}/access")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<InterviewAccessDetails> Access(Guid id, CancellationToken ct) => panel.AccessAsync(id, ct);
     [HttpPost("api/interviews/{id:guid}/cancel")]
     public async Task<IActionResult> Cancel(Guid id, CancellationToken ct) { await service.RevokeAsync(id, ct); return NoContent(); }
     [HttpGet("api/interviews/{id:guid}/resume")]
@@ -39,6 +44,7 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
     [HttpPut("api/job-positions/{positionId:guid}/question-bank/{questionId:guid}")]
     public Task<BankQuestionDto> UpdateQuestion(Guid positionId, Guid questionId, UpdateBankQuestionRequest r, CancellationToken ct) => service.SaveQuestionAsync(positionId, questionId, r.Question, r.RowVersion, ct);
     [HttpPost("api/job-positions/{positionId:guid}/applications/{applicationId:guid}/interviews")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<InterviewInvitation> Invite(Guid positionId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct) => service.InviteAsync(positionId, applicationId, r, ct);
     [HttpGet("api/interviews/{id:guid}")]
     public Task<HrInterviewDto> Get(Guid id, CancellationToken ct) => service.GetAsync(id, ct);

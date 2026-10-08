@@ -63,4 +63,5 @@ public sealed record PanelInterviewDto(Guid Id, string FirstName, string LastNam
     Guid JobPositionId, string PositionTitle, Guid TemplateId, string TemplateTitle, string InterviewType,
     string Status, DateTimeOffset InvitedAtUtc, DateTimeOffset ExpiresAtUtc, DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc, int DeadlineDays, decimal? EvaluationPercent,
-    string ReportUrl, string? ResumeUrl, bool CanResend, bool CanCancel, bool VideoAvailable);
+    string ReportUrl, string? ResumeUrl, bool CanResend, bool CanCancel, bool VideoAvailable,
+    string? InterviewUrl = null, string? AccessCode = null, string? AccessStatus = null);

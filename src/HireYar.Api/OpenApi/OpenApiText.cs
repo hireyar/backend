@@ -60,6 +60,8 @@ internal static class OpenApiText
         ("Interviews", "AnswerAudio") => "دریافت خصوصی صوت پاسخ داوطلب",
         ("Interviews", "AnswerVideo") => "دریافت خصوصی ویدیوی پاسخ داوطلب",
         ("Interviews", "GenerateReport") => "تولید و ذخیره گزارش ارزیابی مصاحبه تکمیل‌شده با مدل مستقل",
+        ("Interviews", "Access") => "مشاهده لینک و کد شش‌رقمی دسترسی مصاحبه سازمان جاری",
+        ("CandidateInterviews", "AccessStatus") => "وضعیت عمومی دسترسی لینک مصاحبه بدون اطلاعات کارجو",
         ("Interviews", "EvaluationReport") => "دریافت گزارش ارزیابی ذخیره‌شده سازمان جاری",
         ("Interviews", "IntroductionAudio") => "دریافت خصوصی صوت معرفی کارجو برای سازمان جاری",
         ("Interviews", "IntroductionVideo") => "دریافت خصوصی ویدیوی معرفی کارجو برای سازمان جاری",

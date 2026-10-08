@@ -26,8 +26,11 @@ public sealed class IntroductionUpload
 [ApiController, Route("api/candidate/interviews/{interviewId:guid}")]
 [Authorize(AuthenticationSchemes = InterviewAuthenticationHandler.SchemeName)]
 [EnableRateLimiting("candidate")]
-public sealed class CandidateInterviewsController(CandidateInterviewService service) : ControllerBase
+public sealed class CandidateInterviewsController(CandidateInterviewService service, InterviewAccessStatusService accessStatus) : ControllerBase
 {
+    [HttpGet("access-status"), AllowAnonymous]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<InterviewAccessStatus> AccessStatus(Guid interviewId, CancellationToken ct) => accessStatus.GetAsync(interviewId, ct);
     [HttpPost("start")] public Task<CandidateInterviewDto> Start(Guid interviewId, CancellationToken ct) => service.StartAsync(interviewId, ct);
     [HttpGet("current")] public Task<CandidateInterviewDto> Current(Guid interviewId, CancellationToken ct) => service.CurrentAsync(interviewId, ct);
     [HttpPost("stage/advance")] public Task<CandidateInterviewDto> AdvanceStage(Guid interviewId, AdvanceInterviewStageRequest r, CancellationToken ct) => service.AdvanceStageAsync(interviewId, r, ct);

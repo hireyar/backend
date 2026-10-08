@@ -204,8 +204,8 @@ public sealed class BillingTests(ApiFixture f)
             form.Add(bytes, "audio", "answer.mp3"); form.Add(new StringContent(current.Question!.Id.ToString()), "questionId");
             form.Add(new StringContent("1"), "durationSeconds");
             var answer = await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/answers", form); Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
+            Assert.Equal(HttpStatusCode.Gone, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
+            Assert.Equal(HttpStatusCode.Gone, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
             await f.Db(async db => { var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId);
                 Assert.InRange(bill.BillableSeconds, 42, 45); Assert.Equal(BillingMath.Cost(bill.BillableSeconds, 0.05m), bill.BilledAmountUsd);
                 Assert.Equal(1, await db.AiCreditTransactions.CountAsync(x => x.ReferenceId == invite.InterviewId)); });

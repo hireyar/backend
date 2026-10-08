@@ -32,16 +32,28 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
         var stream = new StreamContent(audio); stream.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         form.Add(stream, "file", Path.GetFileName(fileName)); form.Add(new StringContent(config.SttModel), "model");
         form.Add(new StringContent("fa"), "language");
+        form.Add(new StringContent("json"), "response_format");
         var bytes = await SendAsync("audio/transcriptions", form, "stt", config.SttModel, config.SttTimeoutSeconds, 128000, ct);
+        var reason = "invalid_json";
         try
         {
             using var doc = JsonDocument.Parse(bytes);
-            var text = doc.RootElement.GetProperty("text").GetString();
-            if (string.IsNullOrWhiteSpace(text) || text.Length > 32000) throw new JsonException();
+            reason = "missing_text";
+            if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("text", out var value)) throw new JsonException();
+            reason = "text_not_string";
+            if (value.ValueKind != JsonValueKind.String) throw new JsonException();
+            var text = value.GetString();
+            reason = "empty_text";
+            if (string.IsNullOrWhiteSpace(text)) throw new JsonException();
+            reason = "text_too_long";
+            if (text.Length > 32000) throw new JsonException();
             return new(text, providerName, config.SttModel);
         }
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException)
-        { InterviewMetrics.SttFailure.Add(1); throw new InterviewProviderException("stt_invalid_response"); }
+        {
+            logger.LogWarning("Interview STT response rejected provider={Provider} model={Model} reason={Reason} responseBytes={ResponseBytes}", providerName, config.SttModel, reason, bytes.Length);
+            InterviewMetrics.SttFailure.Add(1); throw new InterviewProviderException("stt_invalid_response");
+        }
     }
     public async Task<InterviewDecisionResult> EvaluateAsync(InterviewDecisionContext context, CancellationToken ct)
     {

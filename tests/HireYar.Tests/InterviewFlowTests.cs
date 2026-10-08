@@ -290,7 +290,7 @@ public sealed class InterviewFlowTests(ApiFixture f)
         Assert.Equal(3, history.Length); Assert.Equal("assistant", history[0].Role); Assert.Equal("candidate", history[1].Role);
         Assert.Equal(result.Answer.Id, history[1].AnswerId); Assert.Equal(result.Answer.Transcript, history[1].Text);
         Assert.Equal(3, history.Select(m => m.Id).Distinct().Count());
-        Assert.Equal(HttpStatusCode.NotFound, (await reopened.GetAsync($"/api/candidate/interviews/{Guid.NewGuid()}/messages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await reopened.GetAsync($"/api/candidate/interviews/{Guid.NewGuid()}/messages")).StatusCode);
         await f.Db(async db => {
             var answer = await db.InterviewAnswers.SingleAsync(a => a.Id == result.Answer.Id);
             Assert.NotNull(answer.VideoStorageKey); Assert.Equal(ended, answer.LastSpeechEndUtc);
@@ -370,7 +370,7 @@ public sealed class InterviewFlowTests(ApiFixture f)
     {
         var (hr, invite) = await Invite(); using var c = Candidate(invite);
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync("/api/auth/me")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/candidate/interviews/{Guid.NewGuid()}/current")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/candidate/interviews/{Guid.NewGuid()}/current")).StatusCode);
         var start = await Start(c, invite.InterviewId); var initial = start.Question!.Id; var calls = f.InterviewAi.TtsCalls;
         Assert.Equal(initial, (await Start(c, invite.InterviewId)).Question!.Id); Assert.Equal(calls, f.InterviewAi.TtsCalls);
         Assert.Equal(HttpStatusCode.OK, (await c.GetAsync(start.Question.AudioUrl)).StatusCode);
@@ -384,7 +384,8 @@ public sealed class InterviewFlowTests(ApiFixture f)
         var report = await reportResponse.Content.ReadFromJsonAsync<JsonElement>(); Assert.Equal(3, report.GetProperty("evidence").GetArrayLength());
         await f.Db(async db => {
             var s = await db.InterviewSessions.Include(x => x.Answers).SingleAsync(x => x.Id == invite.InterviewId);
-            Assert.NotEqual(invite.Token, s.AccessTokenHash); Assert.True(InterviewTokens.Matches(invite.Token, s.AccessTokenHash));
+            Assert.NotEqual(invite.Token, s.AccessTokenHash); Assert.NotNull(s.ProtectedAccessCode);
+            Assert.Equal(InterviewTokens.Hash(s.ProtectedAccessCode!), s.AccessTokenHash);
             Assert.Equal(3, s.Answers.Count); Assert.Equal(3, s.Questions.Count); Assert.Null(s.ProcessingLeaseId);
         });
         var other = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).StatusCode);
@@ -460,7 +461,7 @@ public sealed class InterviewFlowTests(ApiFixture f)
         var (hr, invite) = await Invite(); using var c = Candidate(invite);
         Assert.Equal(HttpStatusCode.Unauthorized, (await hr.Client.Send(HttpMethod.Get, $"/api/candidate/interviews/{invite.InterviewId}/current")).StatusCode);
         f.Clock.Offset = TimeSpan.FromDays(4);
-        try { Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/candidate/interviews/{invite.InterviewId}/current")).StatusCode); }
+        try { Assert.Equal(HttpStatusCode.Gone, (await c.GetAsync($"/api/candidate/interviews/{invite.InterviewId}/current")).StatusCode); }
         finally { f.Clock.Offset = TimeSpan.Zero; }
     }
 
@@ -471,9 +472,9 @@ public sealed class InterviewFlowTests(ApiFixture f)
         var (_, second) = await Invite(); using var otherCandidate = Candidate(second);
         var started = await Start(c, invite.InterviewId);
         var otherStarted = await Start(otherCandidate, second.InterviewId);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/candidate/interviews/{second.InterviewId}/current")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.PostAsync($"/api/candidate/interviews/{second.InterviewId}/start", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync(otherStarted.Question!.AudioUrl)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/candidate/interviews/{second.InterviewId}/current")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.PostAsync($"/api/candidate/interviews/{second.InterviewId}/start", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(otherStarted.Question!.AudioUrl)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/interviews/{invite.InterviewId}")).StatusCode);
         Guid futureQuestion = Guid.Empty;
         await f.Db(async db => {
@@ -572,6 +573,33 @@ public sealed class InterviewFlowTests(ApiFixture f)
                 Assert.Equal(1, s.AnsweredQuestionCount); Assert.Single(s.Evidence); Assert.Equal(1, s.RecoveryAttempts); Assert.Null(s.ProcessingLeaseId); });
         }
         finally { options.BackgroundRecoveryEnabled = previous; f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
+    }
+    [PostgresFact]
+    public async Task Closed_billing_stops_processing_indicator_and_recovery_preserves_failed_audio()
+    {
+        f.InterviewAi.Reset(); var (_, invite) = await Invite(); using var c = Candidate(invite); var start = await Start(c, invite.InterviewId);
+        f.InterviewAi.FailStt = true;
+        try
+        {
+            var failed = (await (await Submit(c, invite.InterviewId, start.Question!.Id)).Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
+            Assert.Equal("Transcribing", failed.Answer!.FailureStage); Assert.Equal("stt_http_500", failed.Answer.FailureCode);
+            Guid org = default;
+            await f.Db(async db => {
+                var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId);
+                org = bill.OrganizationId; bill.Status = HireYar.Domain.Billing.InterviewBillingStatus.Settled;
+                await db.SaveChangesAsync();
+            });
+            f.Clock.Offset = TimeSpan.FromMinutes(2); var calls = f.InterviewAi.SttCalls;
+            await using (var scope = f.Services.CreateAsyncScope())
+                await scope.ServiceProvider.GetRequiredService<CandidateInterviewService>().RecoverAsync(org, invite.InterviewId, default);
+            Assert.Equal(calls, f.InterviewAi.SttCalls);
+            var current = (await c.GetFromJsonAsync<CandidateInterviewDto>($"/api/candidate/interviews/{invite.InterviewId}/current"))!;
+            Assert.False(current.IsProcessing); Assert.False(current.BackgroundRetryPending); Assert.False(current.Answer!.CanRetry);
+            Assert.Equal("unavailable", current.ProcessingState); Assert.NotNull(current.ProcessingMessage);
+            await f.Db(async db => { var answer = await db.InterviewAnswers.SingleAsync(x => x.Id == failed.Answer.Id);
+                Assert.Equal(AnswerStatus.Failed, answer.Status); Assert.NotNull(answer.AudioStorageKey); Assert.Null(answer.Transcript); });
+        }
+        finally { f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
     }
     private async Task VerifyRecovery(AnswerStatus stage)
     {

@@ -40,7 +40,14 @@ public static class InterviewDependencyInjection
         services.AddOptions<InterviewStorageOptions>().Bind(config.GetSection("InterviewStorage"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.RootPath) && !o.RootPath.Split('/', '\\').Contains("wwwroot", StringComparer.OrdinalIgnoreCase), "InterviewStorage must be private and outside wwwroot.").ValidateOnStart();
         services.AddScoped<QuestionSuggestionService>();
+        services.AddOptions<InterviewInvitationOptions>().Bind(config.GetSection("InterviewInvitations"))
+            .Validate(o => o.CandidateLinkPath.StartsWith('/') && !o.CandidateLinkPath.StartsWith("//") &&
+                o.CandidateLinkPath.Contains("{id}") && o.CandidateLinkPath.Length <= 200 &&
+                !o.CandidateLinkPath.Any(char.IsWhiteSpace) && !o.CandidateLinkPath.Contains('?') && !o.CandidateLinkPath.Contains('#'),
+                "InterviewInvitations:CandidateLinkPath must be a relative page path containing {id} without query or fragment.").ValidateOnStart();
+        services.AddSingleton<IInterviewInvitationSecurity, ProtectedInterviewInvitationSecurity>();
         services.AddScoped<InterviewReportService>();
+        services.AddScoped<InterviewAccessStatusService>();
         services.AddSingleton<IResumeTextExtractor, ResumeTextExtractor>();
         services.AddHostedService<InterviewRecoveryWorker>();
         services.AddSingleton<IInterviewAudioStorage, LocalInterviewAudioStorage>();

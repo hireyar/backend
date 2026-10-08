@@ -71,6 +71,10 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.HasKey(x => x.Id); b.HasAlternateKey(x => new { x.OrganizationId, x.Id });
         b.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
         b.Property(x => x.AccessTokenHash).HasMaxLength(64).IsRequired(); b.HasIndex(x => x.AccessTokenHash).IsUnique();
+        b.Property(x => x.ProtectedAccessCode).HasMaxLength(2048);
+        b.HasOne<InterviewSession>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.SupersededByInterviewId })
+            .HasPrincipalKey(x => new { x.OrganizationId, x.Id });
+        b.HasIndex(x => x.SupersededByInterviewId).IsUnique().HasFilter("\"SupersededByInterviewId\" IS NOT NULL");
         b.Property(x => x.RequiredCapabilityCode).HasMaxLength(64);
         b.Property(x => x.PositionTitleSnapshot).HasMaxLength(200);
         b.Property(x => x.PositionDescriptionSnapshot).HasMaxLength(10000);
@@ -100,6 +104,8 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.ToTable(t => {
             t.HasCheckConstraint("CK_Interview_Stage", "\"Stage\" IN ('Welcome','CandidateIntroduction','Questions','CompanyIntroduction','Goodbye','Finished')");
             t.HasCheckConstraint("CK_Interview_Recovery", "\"RecoveryAttempts\" >= 0");
+            t.HasCheckConstraint("CK_Interview_AccessAttempts", "\"AccessFailedAttempts\" BETWEEN 0 AND 5");
+            t.HasCheckConstraint("CK_Interview_Replacement", "\"SupersededByInterviewId\" IS NULL OR (\"SupersededByInterviewId\" <> \"Id\" AND \"AccessRevokedAtUtc\" IS NOT NULL)");
             t.HasCheckConstraint("CK_Interview_Interactions", "\"MaxInteractionsPerQuestion\" BETWEEN 0 AND 3");
             t.HasCheckConstraint("CK_Interview_Status", "\"Status\" IN ('Created','WaitingForAnswer','ProcessingAnswer','Completed','Cancelled')");
             t.HasCheckConstraint("CK_Interview_Limits", "\"MaxQuestionCount\" BETWEEN 1 AND 30 AND \"MaxDurationSeconds\" BETWEEN 300 AND 3600");
