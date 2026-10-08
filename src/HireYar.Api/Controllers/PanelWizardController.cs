@@ -21,6 +21,8 @@ public sealed class WizardInvitationForm
     [Required, RegularExpression("^(general|specialized)$")] public string InterviewType { get; set; } = "general";
     [Required] public IFormFile Resume { get; set; } = null!;
     [StringLength(32000)] public string? ResumeText { get; set; }
+    public bool SendEmail { get; set; }
+    public bool SendSms { get; set; }
 }
 public sealed record UpdateWizardPositionRequest([Required] WizardPositionRequest Position,
     [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
@@ -51,6 +53,6 @@ public sealed class PanelWizardController(JobService jobs, TemplateService templ
     {
         if (r.Resume.Length is <= 0 or > ResumeUploadValidator.MaxBytes) throw AppException.Invalid("invalid_resume_size");
         await using var stream = r.Resume.OpenReadStream();
-        return await wizard.InviteAsync(new(r.JobPositionId, r.TemplateId, r.FirstName, r.LastName, r.Email, r.Phone, r.DeadlineDays, r.InterviewType, r.ResumeText), stream, r.Resume.FileName, ct);
+        return await wizard.InviteAsync(new(r.JobPositionId, r.TemplateId, r.FirstName, r.LastName, r.Email, r.Phone, r.DeadlineDays, r.InterviewType, r.ResumeText, r.SendEmail, r.SendSms), stream, r.Resume.FileName, ct);
     }
 }

@@ -8,7 +8,7 @@ namespace HireYar.Application.Interviews;
 
 public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
     ISubscriptionEntitlementService entitlements, IInterviewAudioStorage storage, IResumeTextExtractor resumeText,
-    IInterviewInvitationSecurity invitationSecurity, InterviewBillingService billing)
+    IInterviewInvitationSecurity invitationSecurity, InterviewBillingService billing, IInterviewInvitationNotifier notifier)
 {
     public async Task<PanelInvitationResult> InviteAsync(WizardInvitationRequest r, Stream resume, string filename, CancellationToken ct)
     {
@@ -76,7 +76,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             }, ct);
         }
         catch { await storage.DeleteAsync(saved.Key, CancellationToken.None); throw; }
-        return Result(session, token);
+        return await NotifyAsync(session, token, application, r.SendEmail, r.SendSms, ct);
     }
 
     private string IssueCode(InterviewSession session, string? previous = null)
@@ -86,6 +86,14 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
     }
     private PanelInvitationResult Result(InterviewSession s, string token) => new(
         new(s.Id, token, s.ExpiresAtUtc, $"/api/candidate/interviews/{s.Id}", token, invitationSecurity.Link(s.Id)), "NotConfigured", "NotConfigured");
+
+    private async Task<PanelInvitationResult> NotifyAsync(InterviewSession s, string code, CandidateApplication candidate, bool email, bool sms, CancellationToken ct)
+    {
+        var result = Result(s, code);
+        var delivery = await notifier.SendAsync(new(candidate.Email, candidate.Phone, $"{candidate.FirstName} {candidate.LastName}",
+            s.PositionTitleSnapshot ?? "", result.Invitation), email, sms, ct);
+        return result with { EmailDelivery = delivery.EmailDelivery, SmsDelivery = delivery.SmsDelivery };
+    }
 
     public async Task<InterviewAccessDetails> AccessAsync(Guid id, CancellationToken ct)
     {
@@ -103,7 +111,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         var session = await db.InterviewSessions.SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)
             ?? throw AppException.NotFound();
         if (r.DeadlineDays is < 1 or > 14) throw AppException.Invalid();
-        return await billing.FinishAsync(session, false, async () => {
+        var result = await billing.FinishAsync(session, false, async () => {
             await db.ReloadInterviewAsync(session, ct);
             if (session.DeletedAtUtc is not null) throw AppException.NotFound();
             if (session.SupersededByInterviewId is not null) throw new AppException(409, "invitation_already_replaced", "برای این مصاحبه دعوت جدیدی ساخته شده است.");
@@ -134,6 +142,10 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             application.Status = CandidateApplicationStatus.Invited; application.UpdatedAtUtc = now;
             return Result(fresh, code);
         }, ct);
+        var candidate = await db.CandidateApplications.AsNoTracking().SingleAsync(a => a.Id == session.CandidateApplicationId && a.OrganizationId == user.OrganizationId, ct);
+        var delivery = await notifier.SendAsync(new(candidate.Email, candidate.Phone, $"{candidate.FirstName} {candidate.LastName}",
+            session.PositionTitleSnapshot ?? "", result.Invitation), r.SendEmail, r.SendSms, ct);
+        return result with { EmailDelivery = delivery.EmailDelivery, SmsDelivery = delivery.SmsDelivery };
     }
 
     public async Task<(Stream Content, string ContentType, string Extension)> ResumeAsync(Guid id, CancellationToken ct)

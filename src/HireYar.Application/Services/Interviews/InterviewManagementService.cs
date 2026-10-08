@@ -6,7 +6,7 @@ namespace HireYar.Application.Interviews;
 
 public sealed class InterviewManagementService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
     ISubscriptionEntitlementService entitlements, InterviewBillingService billing, IInterviewAudioStorage storage, IInterviewInvitationSecurity invitationSecurity,
-    IInterviewDiagnostics diagnostics)
+    IInterviewDiagnostics diagnostics, IInterviewInvitationNotifier notifier)
 {
     private async Task CheckJob(Guid id, CancellationToken ct)
     { if (!await db.JobPositions.AnyAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)) throw AppException.NotFound(); }
@@ -60,8 +60,15 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
             .OrderBy(x => x.CreatedAtUtc).ThenBy(x => x.Id).Take(100)
             .Select(x => new BankQuestionDto(x.Id, x.SkillId, x.Text, x.Topic, x.Difficulty, x.IsActive, x.RowVersion)).ToListAsync(ct);
     }
-    public Task<InterviewInvitation> InviteAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct) =>
-        db.WithOrganizationBillingLockAsync(user.OrganizationId, () => InviteLockedAsync(jobId, applicationId, r, ct), ct);
+    public async Task<InterviewInvitation> InviteAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct)
+    {
+        var invitation = await db.WithOrganizationBillingLockAsync(user.OrganizationId, () => InviteLockedAsync(jobId, applicationId, r, ct), ct);
+        var candidate = await db.CandidateApplications.AsNoTracking().SingleAsync(x => x.Id == applicationId && x.OrganizationId == user.OrganizationId, ct);
+        var session = await db.InterviewSessions.AsNoTracking().SingleAsync(x => x.Id == invitation.InterviewId && x.OrganizationId == user.OrganizationId, ct);
+        var delivery = await notifier.SendAsync(new(candidate.Email, candidate.Phone, $"{candidate.FirstName} {candidate.LastName}",
+            session.PositionTitleSnapshot ?? "", invitation), r.SendEmail, r.SendSms, ct);
+        return invitation with { EmailDelivery = delivery.EmailDelivery, SmsDelivery = delivery.SmsDelivery };
+    }
     private async Task<InterviewInvitation> InviteLockedAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct)
     {
         await CheckJob(jobId, ct);
