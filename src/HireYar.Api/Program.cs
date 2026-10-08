@@ -161,6 +161,7 @@ app.Use(async (context, next) => { context.Response.Headers.CacheControl = "no-s
 app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
 // IP limits also cover failed candidate authentication attempts.
 app.UseRouting(); app.UseCors(); app.UseRateLimiter(); app.UseAuthentication(); app.UseAuthorization();
+app.UseMiddleware<InterviewDiagnosticMiddleware>();
 app.MapControllers(); app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapOpenApi().AllowAnonymous();
 app.Run();

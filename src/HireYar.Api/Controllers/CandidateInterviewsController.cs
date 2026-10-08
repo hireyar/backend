@@ -33,6 +33,9 @@ public sealed class IntroductionUpload
 [EnableRateLimiting("candidate")]
 public sealed class CandidateInterviewsController(CandidateInterviewService service, InterviewAccessStatusService accessStatus) : ControllerBase
 {
+    [HttpGet("diagnostics"), Produces("text/event-stream")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task Diagnostics(Guid interviewId, CancellationToken ct) => InterviewDiagnosticStream.SendAsync(HttpContext, interviewId, false, ct);
     [HttpGet("access-status"), AllowAnonymous]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<InterviewAccessStatus> AccessStatus(Guid interviewId, CancellationToken ct) => accessStatus.GetAsync(interviewId, ct);

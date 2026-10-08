@@ -144,6 +144,7 @@ public sealed partial class CandidateInterviewService
 
     private async Task ProcessIntroduction(InterviewSession s, InterviewIntroduction introduction, Guid lease, CancellationToken ct)
     {
+        InterviewTrace.Stage("TranscribingIntroduction", "تبدیل معرفی صوتی کارجو به متن؛ بدون ارزیابی مهارت یا LLM");
         SpeechTranscriptionResult? transcript = null; string? failure = null;
         try
         {
@@ -158,7 +159,11 @@ public sealed partial class CandidateInterviewService
             await billing.EnsureProcessingAllowedAsync(s, ct);
             if (s.Stage != InterviewStage.CandidateIntroduction || s.Status != InterviewStatus.WaitingForAnswer) throw AppException.Conflict();
             introduction.CheckLease(lease, time.GetUtcNow());
-            if (failure is not null) introduction.Fail(lease, failure, time.GetUtcNow());
+            if (failure is not null)
+            {
+                InterviewTrace.Emit("processing", "introduction", "failed", "تبدیل معرفی به متن ناموفق بود؛ وضعیت retry ذخیره می‌شود", failureCode: failure);
+                introduction.Fail(lease, failure, time.GetUtcNow());
+            }
             else
             {
                 introduction.Complete(lease, transcript!.Text, transcript.Provider, transcript.Model, time.GetUtcNow());

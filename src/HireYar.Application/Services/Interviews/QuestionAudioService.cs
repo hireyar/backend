@@ -18,7 +18,11 @@ public sealed class QuestionAudioService(IApplicationDbContext db, IInterviewAud
         var cached = await db.QuestionAudios.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == organizationId && x.AudioHash == hash, ct);
         if (cached is not null)
         {
-            try { await using var existing = await storage.OpenReadAsync(cached.AudioStorageKey, ct); return cached; }
+            try {
+                await using var existing = await storage.OpenReadAsync(cached.AudioStorageKey, ct);
+                InterviewTrace.Emit("audio", "cache", "hit", "صوت آماده از cache خصوصی خوانده شد؛ تماس TTS تازه انجام نمی‌شود");
+                return cached;
+            }
             catch (FileNotFoundException) { }
             catch (DirectoryNotFoundException) { }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -28,6 +32,7 @@ public sealed class QuestionAudioService(IApplicationDbContext db, IInterviewAud
             }
         }
         if (!generate) return null;
+        InterviewTrace.Stage("GeneratingAudio", "تولید صوت سؤال یا پیام؛ صوت آماده در cache وجود ندارد");
         try
         {
             var audio = await speech.GenerateAsync(text, ct);

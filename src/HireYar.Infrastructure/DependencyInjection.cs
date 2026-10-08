@@ -16,7 +16,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(config.GetConnectionString("Default"), n => n.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+        services.AddSingleton<InterviewDiagnosticCommandInterceptor>();
+        services.AddDbContext<AppDbContext>((sp, o) => o.UseNpgsql(config.GetConnectionString("Default"), n => n.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
+            .AddInterceptors(sp.GetRequiredService<InterviewDiagnosticCommandInterceptor>()));
         services.AddScoped<IApplicationDbContext>(s => s.GetRequiredService<AppDbContext>());
         services.AddIdentityCore<ApplicationUser>(o =>
         {

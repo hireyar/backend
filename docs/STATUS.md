@@ -1,3 +1,13 @@
+## لاگ زنده آزمایشی مصاحبه — 2026-10-08
+
+روی dev از Git پاک، SSE موقت برای مراحل/API/دستورهای EF PostgreSQL/تماس واقعی STT-LLM-TTS و cache/retry/fallback اضافه شد. InterviewDiagnostics:Enabled و CapturePrompts در appsettings برای آزمایش true هستند؛ config در startup خوانده می‌شود. DTO داوطلب و جزئیات HR diagnosticsEnabled/diagnosticsUrl دارند؛ HR diagnosticPromptsEnabled هم دارد. Disabled جمع‌آوری و endpoint را خاموش و نمایش DTO را false می‌کند. سایر تنظیمات و کلیدهای موجود با مقایسه JSON بدون نمایش مقدار عیناً محفوظ تأیید شدند.
+
+بدنه واقعی LLM شامل system/context از همان JsonContent ارسالی در حافظه محدود و گذرا capture می‌شود؛ فقط stream Owner همان سازمان آن را می‌دهد. stream candidate حتی با query اضافی payload نمی‌دهد. SQL/parameters/DB values/header/token/raw response ثبت نمی‌شوند؛ فقط identifierهای schema مدل، route template، مسیر نسبی provider، نام مدل/هدف/وضعیت/مدت و کد خطای ثابت. recovery worker هم context مستقل دارد؛ stream خودش و recheck دسترسی trace نمی‌شوند. [INTERVIEW_DIAGNOSTICS_API](INTERVIEW_DIAGNOSTICS_API.md) قرارداد نهایی فرانت و محدودیت‌هاست.
+
+build نهایی صفر warning/error؛ suite کامل **۲۲۷ موفق، صفر شکست/Skip** روی PostgreSQL 18.3 اختصاصی loopback:55469 و AI مصنوعی؛ tests/HireYar.Tests/TestResults/diagnostics-verified.trx. پس از اصلاح نهایی اعلان reset برای reconnect بعد از انقضای buffer، build و **۹ تست مرتبط موفق، صفر شکست/Skip** با همان SQL واقعی بازاجرا شدند؛ diagnostics-final.trx. پنج تست تازه (سه unit/provider و دو integration) disabled/scoped/redacted/exact-wire-before-completion/retention/replay/AsyncLocal/ظرفیت و SSE زنده/ابطال حین اتصال را بررسی می‌کنند. تعداد ۹ نهایی شامل caseهای تشخیص قبلی نیز هست. fixtureهای قبلی diagnostics را صریح false دارند. DBهای تصادفی صفر باقی ماندند و cluster اختصاصی متوقف شد.
+
+Angular/AI واقعی/proxy مقصد/multi-replica routing بررسی یا تغییر نشده‌اند. حافظه ده دقیقه‌ای، ۲۵۶ رویداد/۱۲۸ جلسه، بودجه تقریبی ۶۴ MiB، prompt حداکثر ۵۲۴۲۸۸ کاراکتر با علامت truncation، چهار stream هر جلسه/۶۴ کل و اتصال ۳۰ثانیه‌ای قابل reconnect دارد. این لاگ مشاهده pipeline HTTP نوبتی است و provider مصاحبه Realtime نیست. migration/commit/push/deploy/production انجام نشده‌اند.
+
 ## تست میکروفون ویزارد داوطلب — 2026-10-08
 
 روی dev از Git پاک، POST `/api/candidate/interviews/{id}/audio-check` با فرم audio و durationSeconds اختیاری اضافه شد. دسترسی دعوت/Created، اندازه/امضای فایل، طول کامل upload و recheck دسترسی پس از STT دارد؛ خروجی transcript/audioReceived/receivedBytes/speechRecognized/clarityVerified/message و OpenAPI صریح عرضه می‌شود. تست هیچ پاسخ، معرفی، زمان یا داده storage/DB ایجاد نمی‌کند. [INTERVIEW_AUDIO_CHECK_API](INTERVIEW_AUDIO_CHECK_API.md) قرارداد است؛ کیفیت صوت واقعی و Angular هنوز بررسی/پیاده نشده‌اند.

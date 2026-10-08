@@ -107,12 +107,23 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
     private async Task<byte[]> SendAsync(string path, HttpContent body, string operation, string model, int timeoutSeconds, int maxBytes, CancellationToken ct)
     {
         var watch = Stopwatch.StartNew(); int? status = null; string outcome = "success";
+        var operationId = Guid.NewGuid().ToString("N");
+        var purpose = operation switch {
+            "stt" => "تبدیل فایل صوتی به متن؛ این مرحله LLM ارزیابی نیست",
+            "llm" => "LLM: بررسی پاسخ، ارزیابی مهارت و تصمیم درباره ادامه سؤال یا انتخاب سؤال بعدی",
+            "report" => "LLM: تولید گزارش نهایی با تاریخچه کامل مصاحبه",
+            _ => "TTS: تبدیل متن پیام یا سؤال به صوت"
+        };
+        InterviewTrace.Emit("provider", operation, "started", purpose, operationId, "POST", path, providerName, model);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
         {
             if (!config.Enabled || string.IsNullOrWhiteSpace(config.ApiKey)) throw new InterviewProviderException("provider_not_configured");
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(config.BaseUrl.TrimEnd('/') + "/"), path)) { Content = body };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.ApiKey);
+            if (operation is "llm" or "report" && InterviewTrace.CapturePrompts)
+                InterviewTrace.Emit("prompt", operation, "prepared", "بدنه JSON واقعی ارسالی به مدل؛ شامل system و context", operationId,
+                    "POST", path, providerName, model, promptJson: await body.ReadAsStringAsync(ct));
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             status = (int)response.StatusCode;
             if (!response.IsSuccessStatusCode) throw new InterviewProviderException($"{operation}_http_{status}");
@@ -132,6 +143,9 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
         catch (InterviewProviderException) { outcome = "failure"; throw; }
         finally
         {
+            InterviewTrace.Emit("provider", operation, outcome == "success" ? "httpSucceeded" : outcome, purpose, operationId,
+                "POST", path, providerName, model, watch.Elapsed.TotalMilliseconds, status,
+                outcome == "success" ? null : $"{operation}_{outcome}");
             var duration = operation switch { "stt" => InterviewMetrics.SttDuration, "llm" => InterviewMetrics.LlmDuration, "report" => InterviewMetrics.ReportDuration, _ => InterviewMetrics.TtsDuration };
             duration.Record(watch.Elapsed.TotalMilliseconds, new KeyValuePair<string, object?>("provider", providerName));
             if (outcome != "success") (operation switch { "stt" => InterviewMetrics.SttFailure, "llm" => InterviewMetrics.LlmFailure, "report" => InterviewMetrics.ReportFailure, _ => InterviewMetrics.TtsFailure }).Add(1);

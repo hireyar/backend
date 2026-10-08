@@ -35,6 +35,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public bool Production { get; init; }
     public bool UseFixedOtp { get; init; }
     public bool DisabledPayments { get; init; }
+    public bool DiagnosticsEnabled { get; init; }
     public FakePaymentGateway PaymentGateway { get; } = new();
     public TestClock Clock { get; } = new();
     public TestPhoneOtp PhoneOtp { get; } = new();
@@ -48,6 +49,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddConsole(); });
         b.UseEnvironment(Production ? "Production" : "Development");
         b.UseSetting("SkipLocalSettings", "true");
+        b.UseSetting("InterviewDiagnostics:Enabled", DiagnosticsEnabled.ToString());
+        b.UseSetting("InterviewDiagnostics:CapturePrompts", "true");
         b.UseSetting("ConnectionStrings:Default", connection!);
         b.UseSetting("Security:SigningKey", Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
         b.UseSetting("Kavenegar:UseFixedOtp", UseFixedOtp.ToString());

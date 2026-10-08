@@ -16,6 +16,7 @@ public sealed partial class CandidateInterviewService
         if (stream.Length != length) throw AppException.Invalid("audio_incomplete");
         var mime = contentType.Split(';')[0].Trim().ToLowerInvariant();
         SpeechTranscriptionResult result;
+        InterviewTrace.Stage("MicrophoneCheck", "تست گذرای میکروفون با STT؛ بدون ذخیره پاسخ یا شروع مصاحبه");
         try
         {
             // Do not forward a user-controlled file name to the provider.

@@ -57,7 +57,7 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
     public void Reset() { FailStt = FailLlm = InvalidLlm = FailTts = false; Entered = Release = SttEntered = SttRelease = null; LastContext = null; InteractionAction = SttText = null; }
 }
 [Collection("Postgres")]
-public sealed class InterviewFlowTests(ApiFixture f)
+public sealed partial class InterviewFlowTests(ApiFixture f)
 {
     private sealed class TestAccess(Guid id) : ICurrentInterviewAccess { public Guid InterviewId => id; }
     private sealed class SimultaneousStorage(IInterviewAudioStorage inner) : IInterviewAudioStorage

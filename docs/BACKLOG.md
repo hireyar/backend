@@ -1,3 +1,9 @@
+## لاگ زنده آزمایشی — 2026-10-08
+
+بک‌اند و قرارداد [INTERVIEW_DIAGNOSTICS_API](INTERVIEW_DIAGNOSTICS_API.md) تکمیل شدند: flag/DTO نمایش، SSE scoped، metadata واقعی EF/provider/مراحل و capture همان prompt فقط Owner در حافظه محدود. build موفق؛ ۲۲۷ تست suite PostgreSQL واقعی موفق و پس از اصلاح cursor نهایی ۹ تست مرتبط مجدد موفق، صفر Skip/شکست.
+
+باقی تحویل همین درخواست: Angular ریپوی جدا فقط طبق diagnosticsEnabled UI موقت را نمایش دهد؛ fetch streaming با Bearer و parser SSE، dedup/cursor/reconnect/closed/reset و پاک‌کردن UI هنگام خاموش‌شدن flag را مصرف کند. نمایش prompt فقط در ابزار احرازشده Owner، نه با کد دعوت؛ credential مالک در صفحه عمومی قرار نگیرد. در مقصد restart پس از تغییر flag، buffering/timeouts proxy و در صورت چند replica routing همان process بررسی شوند. وقتی آزمایش تمام شد Enabled=false؛ حذف نهایی کد به درخواست مستقل. AI واقعی و rollout انجام نشده‌اند؛ این فهرست مجوز اجرای خودکار Angular یا انتشار نیست.
+
 ## تست میکروفون داوطلب — 2026-10-08
 
 API گذرای audio-check قبل از start پیاده و با build بدون هشدار/خطا و ۲۲۲ تست موفق PostgreSQL واقعی تأیید شد؛ قرارداد [INTERVIEW_AUDIO_CHECK_API](INTERVIEW_AUDIO_CHECK_API.md). تحویل فرانت باقی است: نمونه کوتاه، ارسال multipart با کد دعوت، نمایش transcript، تطبیق جمله توسط کاربر و retry خطا. کیفیت واقعی STT فارسی/سکوت/نویز/قطع ضبط باید با provider واقعی بررسی شود. سنجش مستقل شفافیت و کامل‌بودن جمله پیاده نشده؛ clarityVerified=false است. این فهرست مجوز توسعه خودکار موارد دیگر یا انتشار نیست.
