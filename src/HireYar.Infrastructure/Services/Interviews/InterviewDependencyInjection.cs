@@ -8,6 +8,8 @@ public static class InterviewDependencyInjection
 {
     public static IServiceCollection AddInterviews(this IServiceCollection services, IConfiguration config)
     {
+        services.AddSingleton(config.GetSection("InterviewDiagnostics").Get<InterviewDiagnosticOptions>() ?? new());
+        services.AddSingleton<IInterviewDiagnostics, InterviewDiagnostics>();
         var provider = config["AI:Provider"] ?? "Disabled";
         if (provider is not ("NetArz" or "Liara" or "Disabled"))
             throw new InvalidOperationException("AI:Provider must be NetArz, Liara or Disabled.");

@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 public sealed class InterviewManagementService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
-    ISubscriptionEntitlementService entitlements, InterviewBillingService billing, IInterviewAudioStorage storage, IInterviewInvitationSecurity invitationSecurity)
+    ISubscriptionEntitlementService entitlements, InterviewBillingService billing, IInterviewAudioStorage storage, IInterviewInvitationSecurity invitationSecurity,
+    IInterviewDiagnostics diagnostics)
 {
     private async Task CheckJob(Guid id, CancellationToken ct)
     { if (!await db.JobPositions.AnyAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)) throw AppException.NotFound(); }
@@ -111,7 +112,8 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
             s.CoveredTopics.Select(x => new HrTopicDto(x.SkillId, x.Topic, x.Coverage, x.EvidenceCount)).ToArray(),
             s.CandidateIntroductionTranscript,
             introduction is null ? null : new(introduction.Id, introduction.Status.ToString(), introduction.Transcript, introduction.SubmittedAtUtc,
-                $"/api/interviews/{s.Id}/introduction/audio", introduction.VideoStorageKey is null ? null : $"/api/interviews/{s.Id}/introduction/video"));
+                $"/api/interviews/{s.Id}/introduction/audio", introduction.VideoStorageKey is null ? null : $"/api/interviews/{s.Id}/introduction/video"),
+            diagnostics.Enabled, diagnostics.Enabled ? $"/api/interviews/{s.Id}/diagnostics" : null, diagnostics.CapturePrompts);
     }
     public async Task<(Stream Content, string ContentType)> OpenIntroductionMediaAsync(Guid id, bool video, CancellationToken ct)
     {

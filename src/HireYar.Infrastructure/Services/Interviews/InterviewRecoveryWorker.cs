@@ -33,6 +33,8 @@ public sealed class InterviewRecoveryWorker(IServiceScopeFactory scopes, Intervi
                     try
                     {
                         await using var work = scopes.CreateAsyncScope();
+                        using var trace = InterviewTrace.Begin(work.ServiceProvider.GetRequiredService<IInterviewDiagnostics>(), item.OrganizationId, item.Id, Guid.NewGuid().ToString("N"));
+                        InterviewTrace.Stage("BackgroundRecovery", "بازیابی پردازش پاسخ پذیرفته‌شده توسط worker");
                         await work.ServiceProvider.GetRequiredService<CandidateInterviewService>().RecoverAsync(item.OrganizationId, item.Id, stoppingToken);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
@@ -52,6 +54,8 @@ public sealed class InterviewRecoveryWorker(IServiceScopeFactory scopes, Intervi
                     try
                     {
                         await using var work = scopes.CreateAsyncScope();
+                        using var trace = InterviewTrace.Begin(work.ServiceProvider.GetRequiredService<IInterviewDiagnostics>(), item.OrganizationId, item.Id, Guid.NewGuid().ToString("N"));
+                        InterviewTrace.Stage("BackgroundRecovery", "بازیابی معرفی صوتی پذیرفته‌شده توسط worker");
                         await work.ServiceProvider.GetRequiredService<CandidateInterviewService>().RecoverIntroductionAsync(item.OrganizationId, item.Id, stoppingToken);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }

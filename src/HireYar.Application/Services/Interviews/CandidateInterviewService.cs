@@ -9,13 +9,13 @@ namespace HireYar.Application.Interviews;
 public sealed partial class CandidateInterviewService(IApplicationDbContext db, ICurrentInterviewAccess access, TimeProvider time,
     InterviewOptions options, InterviewPolicy policy, InterviewDecisionValidator validator, IInterviewAudioStorage storage,
     ISpeechToTextService stt, IInterviewDecisionService decisions, QuestionAudioService audio, ILogger<CandidateInterviewService> logger,
-    InterviewBillingService billing)
+    InterviewBillingService billing, IInterviewDiagnostics diagnostics)
 {
     private async Task<InterviewSession> Load(Guid id, CancellationToken ct)
     {
         if (access.InterviewId != id) throw AppException.NotFound();
         var s = await db.InterviewSessions.Include(x => x.Answers).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound();
-        CheckAccess(s); return s;
+        CheckAccess(s); InterviewTrace.Stage(s.Stage.ToString(), "جلسه و پاسخ‌های ذخیره‌شده دریافت و دسترسی بررسی شد"); return s;
     }
     private void CheckAccess(InterviewSession s)
     {
@@ -167,6 +167,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
             var capabilities = await billing.CapabilitiesAsync(s, ct);
             if (answer.Transcript is null)
             {
+                InterviewTrace.Stage("Transcribing", "تبدیل صوت پاسخ ذخیره‌شده به متن");
                 s.CheckLease(lease, time.GetUtcNow()); s.BeginTranscription(answer.Id); await db.SaveChangesAsync(ct);
                 SpeechTranscriptionResult transcript;
                 try
@@ -177,16 +178,20 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                 }
                 catch (Exception e) when (e is InterviewProviderException or IOException or UnauthorizedAccessException)
                 {
+                    InterviewTrace.Emit("processing", "transcription", "failed", "تبدیل صوت پاسخ به متن ناموفق بود", failureCode: e is InterviewProviderException failure ? failure.Code : "audio_unavailable");
                     await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
                     s.FailAnswer(answer.Id); answer.SetDiagnostics("Transcribing", e is InterviewProviderException p ? p.Code : "audio_unavailable", null);
                     s.ScheduleRecovery(time.GetUtcNow(), 30 * (1 << Math.Min(s.RecoveryAttempts, 5)));
                     s.ReleaseLease(lease, time.GetUtcNow()); await db.SaveChangesAsync(ct);
+                    InterviewTrace.Emit("recovery", "answer", "scheduled", "وضعیت تلاش مجدد پاسخ در دیتابیس ذخیره شد");
                     logger.LogWarning("Interview answer retry available interviewId={InterviewId} answerId={AnswerId} failureCode={FailureCode}", s.Id, answer.Id, answer.FailureCode);
                     return await Map(s, false, ct);
                 }
                 await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
                 s.SetTranscript(answer.Id, transcript.Text, transcript.Provider, transcript.Model); await db.SaveChangesAsync(ct);
             }
+            else InterviewTrace.Emit("processing", "transcription", "skipped", "متن پاسخ قبلاً ذخیره شده است؛ تماس STT تکرار نمی‌شود");
+            InterviewTrace.Stage("PreparingContext", "آماده‌سازی شرح شغل، snapshot رزومه، سؤال‌های مجاز و تاریخچه منتخب برای ارزیابی");
             s.CheckLease(lease, time.GetUtcNow()); s.BeginEvaluation(answer.Id); await db.SaveChangesAsync(ct);
             var shortlist = policy.GetAllowedQuestions(s, time.GetUtcNow(), options.ShortlistLimit, adaptDifficulty: capabilities.Contains("adaptive_difficulty"));
             var position = await db.JobPositions.AsNoTracking().SingleAsync(x => x.Id == s.JobPositionId && x.OrganizationId == s.OrganizationId, ct);
@@ -197,6 +202,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
             InterviewDecisionResult? decision = null; string? failureCode = null;
             try
             {
+                InterviewTrace.Stage("Evaluating", "بررسی کفایت پاسخ، ارزیابی مهارت و تصمیم درباره ادامه همین سؤال یا سؤال بعدی");
                 if (capabilities.Contains("answer_analysis") || capabilities.Contains("adaptive_questions"))
                   decision = await decisions.EvaluateAsync(new(s.PositionTitleSnapshot ?? position.Title, question.QuestionId, s.Status.ToString(), s.AnsweredQuestionCount,
                     s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow()), question, answer.Transcript!, s.Skills, s.SkillStates, s.CoveredTopics, shortlist,
@@ -206,10 +212,12 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                     s.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, s.RemainingInteractions, history.TotalTurns, history.IsPartial,
                     s.Evidence.Select(e => new HrEvidenceDto(e.InterviewAnswerId, e.QuestionId, e.SkillId, e.ScoreBefore, e.ScoreAfter,
                         e.Delta, e.Confidence, e.Evidence, e.CreatedAtUtc)).ToArray()), ct);
+                else InterviewTrace.Emit("provider", "llm", "skipped", "قابلیت ارزیابی AI در قرارداد این جلسه فعال نیست؛ تصمیم بک‌اند اجرا می‌شود");
             }
             catch (InterviewProviderException e)
             {
                 failureCode = e.Code;
+                InterviewTrace.Emit("processing", "evaluation", "failed", "ارزیابی پاسخ ناموفق بود", failureCode: e.Code);
                 if (options.BackgroundRecoveryEnabled && s.RecoveryAttempts < options.MaxRecoveryAttempts)
                 {
                     await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
@@ -220,7 +228,9 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                 }
             }
             await db.ReloadInterviewAsync(s, ct); CheckAccess(s); s.CheckLease(lease, time.GetUtcNow());
+            InterviewTrace.Stage("ValidatingDecision", "اعتبارسنجی خروجی مدل با سیاست سرور و انتخاب fallback در صورت نیاز");
             var result = validator.ValidateOrFallback(decision?.Json, s, shortlist.Select(x => x.QuestionId).ToArray(), time.GetUtcNow());
+            InterviewTrace.Emit("decision", "validate", result.UsedFallback ? "fallback" : "succeeded", result.UsedFallback ? "ادامه با تصمیم جایگزین بک‌اند" : "تصمیم مدل معتبر است");
             if (result.Action != "advance")
             {
                 s.ContinueQuestion(answer.Id, result.CandidateMessage!, decision!.Model, s.MasterPromptVersion ?? InterviewDecisionPrompt.Version, time.GetUtcNow());
@@ -251,6 +261,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                 }
                 s.AskNext(next.QuestionId, time.GetUtcNow());
             }
+            InterviewTrace.Stage("SavingResult", "ذخیره نتیجه پاسخ و وضعیت سؤال بعدی یا پایان مصاحبه");
             s.ReleaseLease(lease, time.GetUtcNow());
             if (s.Status == InterviewStatus.Completed) await billing.FinishAsync(s, false, ct);
             else await db.SaveChangesAsync(ct);
@@ -360,6 +371,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
             introduction is null ? null : new(introduction.Id, introduction.ClientTurnId, introduction.Status.ToString(), introduction.Transcript,
                 introCanRetry, introduction.FailureCode, introduction.RecoveryAttempts, introPending, introduction.SubmittedAtUtc,
                 introduction.LastSpeechEndUtc, introduction.DurationSeconds, introduction.VideoStorageKey is not null),
-            processingState, processingMessage, answerPending ? s.NextRecoveryAtUtc : null);
+            processingState, processingMessage, answerPending ? s.NextRecoveryAtUtc : null,
+            diagnostics.Enabled, diagnostics.Enabled ? $"/api/candidate/interviews/{s.Id}/diagnostics" : null);
     }
 }

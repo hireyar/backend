@@ -15,6 +15,8 @@ internal static class OpenApiText
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("InterviewDiagnostics", "Stream") => "لاگ زنده موقت مصاحبه و پرامپت واقعی؛ فقط مالک سازمان",
+        ("CandidateInterviews", "Diagnostics") => "لاگ زنده موقت مراحل مصاحبه بدون محتوای پرامپت",
         ("Auth", "Csrf") => "۱. دریافت توکن CSRF",
         ("Auth", "RequestOtp") => "۲. ارسال کد ورود به موبایل",
         ("Auth", "VerifyOtp") => "۳. تأیید کد و ورود یا ثبت‌نام",

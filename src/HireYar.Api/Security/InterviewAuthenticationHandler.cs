@@ -51,7 +51,7 @@ public sealed class InterviewAuthenticationHandler(IOptionsMonitor<Authenticatio
             }
             return AuthenticateResult.Fail("Invalid interview access.");
         }
-        var identity = new ClaimsIdentity([new Claim("interview", s.Id.ToString())], SchemeName);
+        var identity = new ClaimsIdentity([new Claim("interview", s.Id.ToString()), new Claim("interview_organization", s.OrganizationId.ToString())], SchemeName);
         return AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName));
     }
     private static InterviewAccessStatus Locked() => new("locked", "interview_access_locked", "تعداد تلاش‌های ناموفق زیاد است. پانزده دقیقه بعد دوباره تلاش کنید.");
