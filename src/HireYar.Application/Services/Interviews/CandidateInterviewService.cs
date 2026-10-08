@@ -19,6 +19,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
     }
     private void CheckAccess(InterviewSession s)
     {
+        if (s.SupersededByInterviewId is not null) throw new AppException(410, "interview_address_changed", "آدرس این مصاحبه تغییر کرده است. لطفاً از دعوت جدید استفاده کنید.");
         if (s.DeletedAtUtc is not null || s.AccessRevokedAtUtc is not null) throw AppException.Unauthorized();
         if (s.ExpiresAtUtc <= time.GetUtcNow()) throw new AppException(410, "interview_expired", "The interview invitation expired.");
     }
@@ -40,7 +41,12 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
         }, ct);
         return await Map(s, true, ct);
     }
-    public async Task<CandidateInterviewDto> CurrentAsync(Guid id, CancellationToken ct) => await Map(await Load(id, ct), false, ct);
+    public async Task<CandidateInterviewDto> CurrentAsync(Guid id, CancellationToken ct)
+    {
+        var s = await Load(id, ct);
+        if (s.Status == InterviewStatus.Completed) throw new AppException(410, "interview_completed", "این مصاحبه به اتمام رسیده است.");
+        return await Map(s, false, ct);
+    }
     public async Task<CandidateInterviewDto> AdvanceStageAsync(Guid id, AdvanceInterviewStageRequest r, CancellationToken ct)
     {
         if (!Enum.TryParse<InterviewStage>(r.Stage, false, out var stage) || !Enum.IsDefined(stage)) throw AppException.Invalid("invalid_interview_stage");
@@ -144,6 +150,8 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
             var now = time.GetUtcNow();
             if (s.Status != InterviewStatus.ProcessingAnswer || s.DeletedAtUtc is not null || s.AccessRevokedAtUtc is not null || s.ExpiresAtUtc <= now ||
                 s.RecoveryAttempts >= options.MaxRecoveryAttempts || s.NextRecoveryAtUtc > now || s.ProcessingLeaseExpiresAtUtc > now) return false;
+            if (!await db.InterviewBillings.AnyAsync(x => x.OrganizationId == organizationId && x.InterviewSessionId == id &&
+                x.Status == HireYar.Domain.Billing.InterviewBillingStatus.Reserved, ct)) return false;
             await billing.EnsureProcessingAllowedAsync(s, ct);
             answer = s.Answers.SingleOrDefault(a => a.QuestionId == s.CurrentQuestionId && a.Status != AnswerStatus.Processed);
             if (answer is null) return false;
@@ -321,17 +329,28 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
         }
         var a = resultAnswer ?? s.Answers.Where(x => x.QuestionId == s.CurrentQuestionId).OrderByDescending(x => x.SubmittedAtUtc).ThenByDescending(x => x.Id).FirstOrDefault()
             ?? s.Answers.OrderByDescending(x => x.SubmittedAtUtc).FirstOrDefault();
-        var canRetry = a is not null && a.Status != AnswerStatus.Processed && a.QuestionId == s.CurrentQuestionId && s.Status == InterviewStatus.ProcessingAnswer &&
+        var processingAllowed = s.Status != InterviewStatus.ProcessingAnswer || await db.InterviewBillings.AsNoTracking().AnyAsync(x =>
+            x.OrganizationId == s.OrganizationId && x.InterviewSessionId == s.Id && x.Status == HireYar.Domain.Billing.InterviewBillingStatus.Reserved, ct);
+        var leaseActive = s.ProcessingLeaseExpiresAtUtc > time.GetUtcNow();
+        var canRetry = processingAllowed && a is not null && a.Status != AnswerStatus.Processed && a.QuestionId == s.CurrentQuestionId && s.Status == InterviewStatus.ProcessingAnswer &&
             (s.ProcessingLeaseId is null || s.ProcessingLeaseExpiresAtUtc <= time.GetUtcNow());
-        var answerPending = s.Status == InterviewStatus.ProcessingAnswer && options.BackgroundRecoveryEnabled &&
+        var answerPending = processingAllowed && s.Status == InterviewStatus.ProcessingAnswer && options.BackgroundRecoveryEnabled &&
             (s.RecoveryAttempts < options.MaxRecoveryAttempts || s.ProcessingLeaseExpiresAtUtc > time.GetUtcNow());
         var stageMessage = StageText(s);
+        var processingState = s.Status != InterviewStatus.ProcessingAnswer ? "idle" : !processingAllowed ? "unavailable" :
+            leaseActive ? (a?.Status == AnswerStatus.Evaluating ? "evaluating" : "transcribing") : answerPending ? "retryScheduled" : "retryAvailable";
+        var processingMessage = processingState switch {
+            "unavailable" => "امکان پردازش این مصاحبه دیگر وجود ندارد؛ پاسخ شما ذخیره شده است. برای دعوت مجدد با سازمان تماس بگیرید.",
+            "retryScheduled" => "پردازش پاسخ با خطا مواجه شد؛ تلاش مجدد به صورت خودکار انجام می‌شود.",
+            "retryAvailable" => "پردازش پاسخ انجام نشد. پاسخ ذخیره شده است؛ لطفاً دوباره تلاش کنید.",
+            _ => (string?)null
+        };
         return new(s.Id, s.Status.ToString(), (s.Stage == InterviewStage.Questions || s.Stage == InterviewStage.CandidateIntroduction && introduction is null) && s.Status == InterviewStatus.WaitingForAnswer && s.RemainingSeconds(time.GetUtcNow()) > 0,
-            s.Status == InterviewStatus.ProcessingAnswer && (!canRetry || answerPending) || s.Stage == InterviewStage.CandidateIntroduction &&
+            processingAllowed && s.Status == InterviewStatus.ProcessingAnswer && (!canRetry || answerPending) || s.Stage == InterviewStage.CandidateIntroduction &&
                 (introPending || introduction?.ProcessingLeaseExpiresAtUtc > time.GetUtcNow()), q,
             new(s.AnsweredQuestionCount, s.MaxQuestionCount, s.RemainingSeconds(time.GetUtcNow())),
             a is null ? null : new(a.Id, a.QuestionId, a.Status.ToString(), canRetry, a.Status == AnswerStatus.Failed ? "answer_retry_available" : null,
-                a.Transcript, a.ClientTurnId, a.SubmittedAtUtc, a.LastSpeechEndUtc, a.DurationSeconds, a.VideoStorageKey is not null),
+                a.Transcript, a.ClientTurnId, a.SubmittedAtUtc, a.LastSpeechEndUtc, a.DurationSeconds, a.VideoStorageKey is not null, a.FailureStage, a.FailureCode),
             s.CompletionReason?.ToString(), s.WelcomeMessage, s.Status == InterviewStatus.Completed ? s.GoodbyeMessage : null,
             new(true, options.MaxUploadBytes, options.MaxVideoUploadBytes, options.MaxAnswerSeconds), s.Stage.ToString(),
             stageMessage,
@@ -340,6 +359,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
             s.Status is not (InterviewStatus.Created or InterviewStatus.Cancelled) && !string.IsNullOrWhiteSpace(stageMessage) ? $"/api/candidate/interviews/{s.Id}/stages/{s.Stage}/audio" : null,
             introduction is null ? null : new(introduction.Id, introduction.ClientTurnId, introduction.Status.ToString(), introduction.Transcript,
                 introCanRetry, introduction.FailureCode, introduction.RecoveryAttempts, introPending, introduction.SubmittedAtUtc,
-                introduction.LastSpeechEndUtc, introduction.DurationSeconds, introduction.VideoStorageKey is not null));
+                introduction.LastSpeechEndUtc, introduction.DurationSeconds, introduction.VideoStorageKey is not null),
+            processingState, processingMessage, answerPending ? s.NextRecoveryAtUtc : null);
     }
 }

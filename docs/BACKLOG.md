@@ -1,3 +1,9 @@
+## آخرین تکمیل: دعوت جدید و خطای STT — 2026-10-08
+
+درخواست کد شش‌رقمی، نمایش لینک/کد در API پنل، reinvite با حفظ جلسه قبلی و پیام انقضا تکمیل و با ۲۲۰ تست موفق تأیید شد. وضعیت processing/retry و FailureStage/FailureCode برای فرانت روشن شد؛ STT JSON صریح و تشخیص امن پاسخ نامعتبر اضافه شد؛ recovery پاسخ با رزرو بسته متوقف است.
+
+باقی تحویل: Angular ریپوی جدا باید فرم کد رشته‌ای، access-status/410 و processingMessage/isProcessing/answer.canRetry را مصرف کند. بررسی reason جدید روی Liara واقعی و آزمون صوت واقعی لازم است تا علت پاسخ نامعتبر گزارش‌شده تأیید شود. migration مقصد و انتشار نیاز به درخواست مستقل دارند. [INTERVIEW_INVITATIONS_API](INTERVIEW_INVITATIONS_API.md) مرجع قرارداد است؛ این فهرست مجوز توسعه مراحل دیگر نیست.
+
 ## آخرین تکمیل: مدل گزارش مستقل و انتخاب تاریخچه — 2026-10-08
 
 درخواست مستقل کاربر روی dev تکمیل شد: EvaluationModel/timeout مستقل، گزارش کامل Completed با generation به درخواست پنل و cache پایدار، citation/quote معتبر و lease/tenant/حذف/reclaim؛ تاریخچه کامل DB موجود حفظ و ورودی زنده با selector محلی و محافظ context/شواهد تجمعی محدود می‌شود. build صفر warning/error و **۲۰۹ تست PostgreSQL واقعی موفق، صفر Skip**؛ migration جدید و delta idempotent روی baseline قبلی دوبار موفق. [INTERVIEW_EVALUATION_API](INTERVIEW_EVALUATION_API.md) قرارداد است و جزئیات تست در STATUS/HANDOFF هستند.

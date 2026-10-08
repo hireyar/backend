@@ -14,12 +14,17 @@ public sealed record UpdateBankQuestionRequest(BankQuestionRequest Question, [Re
 public sealed record BankQuestionDto(Guid Id, Guid SkillId, string Text, string Topic, int Difficulty, bool IsActive, byte[] RowVersion);
 public sealed record CreateInterviewRequest(Guid TemplateId, [Range(1, 30)] int MaxQuestionCount = 12, [Range(1, 168)] int ExpiresInHours = 72,
     [RegularExpression("^(hr_interview|technical_interview)$")] string RequiredCapabilityCode = "technical_interview");
-public sealed record InterviewInvitation(Guid InterviewId, string Token, DateTimeOffset ExpiresAtUtc, string CandidateRoute);
+public sealed record InterviewInvitation(Guid InterviewId, string Token, DateTimeOffset ExpiresAtUtc, string CandidateRoute,
+    string? AccessCode = null, string? InterviewUrl = null);
+public sealed record InterviewAccessDetails(Guid InterviewId, string InterviewUrl, string? AccessCode,
+    DateTimeOffset ExpiresAtUtc, bool CanResend, string AccessStatus);
+public sealed record InterviewAccessStatus(string Status, string? Code = null, string? Message = null);
 public sealed record InterviewProgress(int AnsweredQuestions, int MaxQuestions, int RemainingSeconds);
 public sealed record CandidateQuestionDto(Guid Id, string Text, string? AudioUrl, bool AudioAvailable, string? InteractionMessage = null);
 public sealed record CandidateAnswerDto(Guid Id, Guid QuestionId, string Status, bool CanRetry, string? ErrorCode,
     string? Transcript = null, string? ClientTurnId = null, DateTimeOffset? SubmittedAtUtc = null,
-    DateTimeOffset? LastSpeechEndUtc = null, int? DurationSeconds = null, bool VideoAvailable = false);
+    DateTimeOffset? LastSpeechEndUtc = null, int? DurationSeconds = null, bool VideoAvailable = false,
+    string? FailureStage = null, string? FailureCode = null);
 public sealed record InterviewMediaCapabilities(bool VideoAnswers, long MaxAudioBytes, long MaxVideoBytes, int MaxAnswerSeconds);
 public sealed record CandidateMessageDto(string Id, Guid? QuestionId, Guid? AnswerId, string Role, string? Text,
     DateTimeOffset CreatedAtUtc, string? Status = null, string? Stage = null);
@@ -31,7 +36,8 @@ public sealed record CandidateInterviewDto(Guid InterviewId, string Status, bool
     string? WelcomeMessage = null, string? GoodbyeMessage = null, InterviewMediaCapabilities? MediaCapabilities = null,
     string Stage = "Questions", string? StageMessage = null, bool CandidateIntroductionEnabled = false,
     bool CompanyIntroductionEnabled = false, int RecoveryAttempts = 0, bool BackgroundRetryPending = false,
-    string? StageAudioUrl = null, CandidateIntroductionDto? Introduction = null);
+    string? StageAudioUrl = null, CandidateIntroductionDto? Introduction = null,
+    string ProcessingState = "idle", string? ProcessingMessage = null, DateTimeOffset? NextRecoveryAtUtc = null);
 public sealed record AdvanceInterviewStageRequest([Required] string Stage, [StringLength(32000)] string? Introduction = null);
 public sealed record HrAnswerDto(Guid Id, Guid QuestionId, string Status, string? Transcript, string? SelectionSource,
     string? FailureStage, string? FailureCode, string AudioUrl, string? VideoUrl = null,

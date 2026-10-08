@@ -1,3 +1,11 @@
+## ADR-027 — دعوت شش‌رقمی و جایگزینی جلسه (2026-10-08)
+
+دعوت تازه کد شش‌رقمی CSPRNG دارد؛ بررسی به Guid مسیر وابسته است. Data Protection وابسته به جلسه برای نمایش مجدد کد استفاده می‌شود و AccessTokenHash fingerprint ciphertext است تا enumeration آفلاین hash شش‌رقمی ممکن نباشد. دعوت قدیمی hash-only بدون backfill پشتیبانی می‌شود؛ پنل کد قدیمی را بازیابی نمی‌کند. پنج شکست در پانزده دقیقه قفل پانزده‌دقیقه‌ای می‌دهد و limiter IP قبل از authentication است. کلیدهای DP موجود باید پایدار بمانند.
+
+Resend جلسه جدید با snapshot قبلی و بدون داده پاسخ/نمره می‌سازد، تحت همان قفل/transaction سازمان جلسه قبلی را supersede/revoke و رزرو را طبق پاسخ‌های پذیرفته‌شده تسویه می‌کند. FK مرکب سازمانی و unique replacement، رابطه بین سازمان‌ها/جایگزینی دوباره را منع می‌کنند. پایان جلسه ورود دوباره را 410 می‌کند؛ فقط ack/audio مراحل پایانی نتیجه جاری تا Finished استثنا هستند. وضعیت عمومی بدون داده حساس برای صفحه منقضی موجود است. جزئیات در [INTERVIEW_INVITATIONS_API](INTERVIEW_INVITATIONS_API.md).
+
+STT صریح JSON درخواست می‌کند؛ متن نامعتبر fallback ساختگی ندارد و shape diagnostics فقط reason ثابت و اندازه بایت را ثبت می‌کند. DTO پاسخ FailureStage/FailureCode و وضعیت نمایشی processing را عرضه می‌کند. رزرو بسته از recovery پاسخ سؤال حذف می‌شود؛ در current پردازش/retry/pending خاموش و خطای قابل نمایش است، بدون حذف صوت/تغییر امتیاز. این تغییر اثبات علت بسته‌شدن رزرو روی سرور کاربر نیست؛ لاگ موجود فقط خطای transcript پس از HTTP 200 را اثبات می‌کند.
+
 ## ADR-025 — معرفی صوتی مستقل و رسانه مرحله جاری (2026-10-07)
 
 براساس قرارداد فرانت، معرفی صوتی موجودیت InterviewIntroduction مستقل از پاسخ سؤال دارد: unique جلسه، clientTurnId الزامی، فایل صوت/ویدیو خصوصی و transcript/status، RowVersion و lease/recovery مستقل. FK مرکب سازمان/جلسه مانع رابطه بین سازمان‌ها است؛ Application فقط EF abstraction و provider/storage موجود را مصرف می‌کند. فایل/network بیرون transaction، پذیرش/claim/ثبت نتیجه زیر قفل کوتاه سازمان با reload و recheck دسترسی/billing است. replay همان نوبت STT تازه ندارد؛ فایل بازنده رقابت پاک می‌شود. worker موجود معرفی را هم با state DB بازیابی می‌کند؛ زیرساخت توزیع‌شده یا Repository جدید نیست.

@@ -94,7 +94,7 @@ public sealed partial class PanelWizardTests
         Assert.Equal(HttpStatusCode.OK, (await c.GetAsync(completed.StageAudioUrl)).StatusCode); Assert.Equal(tts, f.InterviewAi.TtsCalls);
         using var unauthenticated = f.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await unauthenticated.GetAsync(completed.StageAudioUrl)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/candidate/interviews/{Guid.NewGuid()}/stages/CompanyIntroduction/audio")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync($"/api/candidate/interviews/{Guid.NewGuid()}/stages/CompanyIntroduction/audio")).StatusCode);
         var goodbye = await ReadState(await c.PostAsJsonAsync(route + "/stage/advance", new AdvanceInterviewStageRequest("CompanyIntroduction")));
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync(completed.StageAudioUrl)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await c.GetAsync(goodbye.StageAudioUrl)).StatusCode);

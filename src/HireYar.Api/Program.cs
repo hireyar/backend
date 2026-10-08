@@ -83,7 +83,7 @@ builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.N
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
-    o.AddPolicy("candidate", context => RateLimitPartition.GetFixedWindowLimiter(context.User.FindFirst("interview")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    o.AddPolicy("candidate", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("CandidateRateLimit:PermitLimit") ?? 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("AuthRateLimit:PermitLimit") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
@@ -91,7 +91,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
     doc.Info.Title = "HireYar API"; doc.Info.Version = "v1"; doc.Info.Description = OpenApiText.Introduction;
     doc.Components ??= new(); doc.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
     doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
-    doc.Components.SecuritySchemes["InterviewToken"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", Description = "Opaque token scoped to one candidate interview; cannot access HR endpoints." };
+    doc.Components.SecuritySchemes["InterviewToken"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", Description = "Six ASCII digit access code scoped to the interview ID in the route. Legacy opaque invitation tokens remain supported. Cannot access HR endpoints." };
     return Task.CompletedTask;
 }).AddOperationTransformer(async (operation, context, ct) =>
 {
@@ -151,8 +151,8 @@ if (!app.Environment.IsDevelopment()) { app.UseHsts(); app.UseHttpsRedirection()
 app.Use(async (context, next) => { context.Response.Headers.CacheControl = "no-store"; context.Response.Headers.XContentTypeOptions = "nosniff"; await next(); });
 // Swagger UI is middleware, so serve it before fallback authorization in every environment.
 app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
-// Endpoint authentication (including the candidate scheme) must run before selecting the limiter partition.
-app.UseRouting(); app.UseCors(); app.UseAuthentication(); app.UseAuthorization(); app.UseRateLimiter();
+// IP limits also cover failed candidate authentication attempts.
+app.UseRouting(); app.UseCors(); app.UseRateLimiter(); app.UseAuthentication(); app.UseAuthorization();
 app.MapControllers(); app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapOpenApi().AllowAnonymous();
 app.Run();

@@ -98,6 +98,7 @@ public sealed class InterviewProviderTests
             Assert.EndsWith("/audio/transcriptions", request.RequestUri!.AbsolutePath);
             Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
             var body = await request.Content!.ReadAsStringAsync(ct); Assert.Contains("gpt-transcribe", body); Assert.Contains("fa", body);
+            Assert.Contains("response_format", body); Assert.Contains("json", body);
             return new(HttpStatusCode.OK) { Content = new StringContent("{\"text\":\"پاسخ آزمایشی\"}", Encoding.UTF8, "application/json") };
         });
         var result = await Client(handler).TranscribeAsync(new MemoryStream(new byte[16]), "a.wav", "audio/wav", default);
@@ -108,6 +109,20 @@ public sealed class InterviewProviderTests
     {
         var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) }));
         Assert.Equal("stt_invalid_response", (await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(Client(handler), "stt"))).Code);
+    }
+    [Theory]
+    [InlineData("not-json-sensitive", "invalid_json")]
+    [InlineData("{}", "missing_text")]
+    [InlineData("{\"text\":null}", "text_not_string")]
+    [InlineData("{\"text\":\" \"}", "empty_text")]
+    public async Task Stt_shape_diagnostics_exclude_response_content(string body, string reason)
+    {
+        var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) }));
+        var logger = new CaptureLogger();
+        var client = new NetArzClient(new HttpClient(handler), Options.Create(new NetArzOptions { ApiKey = "synthetic-secret" }), logger);
+        Assert.Equal("stt_invalid_response", (await Assert.ThrowsAsync<InterviewProviderException>(() => Invoke(client, "stt"))).Code);
+        Assert.Contains(logger.Lines, x => x.Contains("reason=" + reason));
+        Assert.DoesNotContain(logger.Lines, x => x.Contains("synthetic-secret") || x.Contains("not-json-sensitive"));
     }
     [Fact]
     public async Task Llm_extracts_message_content_and_sends_versioned_prompt()

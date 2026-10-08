@@ -56,6 +56,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("Security:FrontendUrl", Production ? "https://localhost:4200" : "http://localhost:4200"); b.UseSetting("Security:AllowedOrigins:0", Production ? "https://localhost:4200" : "http://localhost:4200");
         b.UseSetting("Security:DataProtectionPath", Path.Combine(Path.GetTempPath(), database));
         b.UseSetting("AuthRateLimit:PermitLimit", "1000");
+        b.UseSetting("CandidateRateLimit:PermitLimit", "10000");
         b.UseSetting("AI:Provider", "Disabled");
         b.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
         b.UseSetting("AI:NetArz:ApiKey", "");

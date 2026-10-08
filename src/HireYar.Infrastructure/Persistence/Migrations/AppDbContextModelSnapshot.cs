@@ -1430,6 +1430,15 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AccessFailedAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("AccessFailureWindowAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("AccessLockedUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("AccessRevokedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1543,6 +1552,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProcessingRevision")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ProtectedAccessCode")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
                     b.Property<DateTimeOffset?>("QuestionReadyAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1579,6 +1592,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<Guid?>("SupersededByInterviewId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("TemplateTitleSnapshot")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -1594,6 +1610,12 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CandidateApplicationId");
 
+                    b.HasIndex("SupersededByInterviewId")
+                        .IsUnique()
+                        .HasFilter("\"SupersededByInterviewId\" IS NOT NULL");
+
+                    b.HasIndex("OrganizationId", "SupersededByInterviewId");
+
                     b.HasIndex("OrganizationId", "JobPositionId", "CandidateApplicationId");
 
                     b.HasIndex("OrganizationId", "JobPositionId", "InterviewTemplateId");
@@ -1604,6 +1626,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("InterviewSessions", t =>
                         {
+                            t.HasCheckConstraint("CK_Interview_AccessAttempts", "\"AccessFailedAttempts\" BETWEEN 0 AND 5");
+
                             t.HasCheckConstraint("CK_Interview_Capability", "\"RequiredCapabilityCode\" IN ('hr_interview','technical_interview')");
 
                             t.HasCheckConstraint("CK_Interview_Interactions", "\"MaxInteractionsPerQuestion\" BETWEEN 0 AND 3");
@@ -1611,6 +1635,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Interview_Limits", "\"MaxQuestionCount\" BETWEEN 1 AND 30 AND \"MaxDurationSeconds\" BETWEEN 300 AND 3600");
 
                             t.HasCheckConstraint("CK_Interview_Recovery", "\"RecoveryAttempts\" >= 0");
+
+                            t.HasCheckConstraint("CK_Interview_Replacement", "\"SupersededByInterviewId\" IS NULL OR (\"SupersededByInterviewId\" <> \"Id\" AND \"AccessRevokedAtUtc\" IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_Interview_Stage", "\"Stage\" IN ('Welcome','CandidateIntroduction','Questions','CompanyIntroduction','Goodbye','Finished')");
 
@@ -2552,6 +2578,12 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HireYar.Domain.Interviews.InterviewSession", b =>
                 {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "SupersededByInterviewId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("HireYar.Domain.Interviews.CandidateApplication", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId", "JobPositionId", "CandidateApplicationId")

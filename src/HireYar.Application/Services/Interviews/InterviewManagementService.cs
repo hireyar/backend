@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 public sealed class InterviewManagementService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
-    ISubscriptionEntitlementService entitlements, InterviewBillingService billing, IInterviewAudioStorage storage)
+    ISubscriptionEntitlementService entitlements, InterviewBillingService billing, IInterviewAudioStorage storage, IInterviewInvitationSecurity invitationSecurity)
 {
     private async Task CheckJob(Guid id, CancellationToken ct)
     { if (!await db.JobPositions.AnyAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)) throw AppException.NotFound(); }
@@ -83,7 +83,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         if (skills.Count == 0 || skills.Count > 30 || questions.Count == 0 || skills.Any(s => s.IsRequired && questions.All(q => q.SkillId != s.SkillId)))
             throw AppException.Invalid("interview_plan_incomplete");
         var now = time.GetUtcNow();
-        var token = InterviewTokens.Create();
+        var token = invitationSecurity.CreateCode();
         var session = new InterviewSession(user.OrganizationId, jobId, applicationId, template.Id, questions, skills,
             r.MaxQuestionCount, template.DurationMinutes * 60, now, now.AddHours(r.ExpiresInHours));
         session.SetRequiredCapability(r.RequiredCapabilityCode);
@@ -92,9 +92,10 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
         session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, null, template.Language,
             template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
-        session.SetAccessTokenHash(InterviewTokens.Hash(token)); db.InterviewSessions.Add(session);
+        var encrypted = invitationSecurity.Protect(session.Id, token);
+        session.SetProtectedAccessCode(encrypted, InterviewTokens.Hash(encrypted)); db.InterviewSessions.Add(session);
         await db.SaveChangesAsync(ct);
-        return new(session.Id, token, session.ExpiresAtUtc, $"/api/candidate/interviews/{session.Id}");
+        return new(session.Id, token, session.ExpiresAtUtc, $"/api/candidate/interviews/{session.Id}", token, invitationSecurity.Link(session.Id));
     }
     public async Task<HrInterviewDto> GetAsync(Guid id, CancellationToken ct)
     {
