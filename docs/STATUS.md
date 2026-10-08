@@ -1,3 +1,9 @@
+## تست میکروفون ویزارد داوطلب — 2026-10-08
+
+روی dev از Git پاک، POST `/api/candidate/interviews/{id}/audio-check` با فرم audio و durationSeconds اختیاری اضافه شد. دسترسی دعوت/Created، اندازه/امضای فایل، طول کامل upload و recheck دسترسی پس از STT دارد؛ خروجی transcript/audioReceived/receivedBytes/speechRecognized/clarityVerified/message و OpenAPI صریح عرضه می‌شود. تست هیچ پاسخ، معرفی، زمان یا داده storage/DB ایجاد نمی‌کند. [INTERVIEW_AUDIO_CHECK_API](INTERVIEW_AUDIO_CHECK_API.md) قرارداد است؛ کیفیت صوت واقعی و Angular هنوز بررسی/پیاده نشده‌اند.
+
+اعتبارسنجی نهایی: build صفر warning/error و **۲۲۲ تست موفق، صفر شکست/Skip** روی PostgreSQL 18.3 اختصاصی loopback:55467، provider جعلی؛ TRX در tests/HireYar.Tests/TestResults/audio-check-verified.trx. دو تست تازه scoped/transient/failure/Created و ابطال دسترسی حین STT را بررسی کردند. سرور آزمایشی پس از suite متوقف شد. یک اجرای قبلی suite به علت قطع سرور آزمایشی شکست خورد؛ اجرای پایدار بعدی یک assertion شمارنده تجمعی fixture داشت که به delta اصلاح و suite کامل بازاجرا شد. کد provider و تنظیمات/کلیدها تغییر نکردند؛ migration/push/deploy انجام نشد. صوت واقعی/provider و Angular تأیید نشده‌اند.
+
 ## آخرین تکمیل: دعوت شش‌رقمی و تشخیص توقف پاسخ صوتی — 2026-10-08
 
 روی dev: کد شش‌رقمی با ذخیره رمز‌شده و قفل پنج تلاش، مشاهده لینک/کد در پنل، دعوت مجدد با جلسه تازه و حفظ تاریخچه، انقضای لینک Completed/جایگزین‌شده با پیام فارسی و status عمومی پیاده شد. مدل گزارش مستقل قبلی حفظ شد. STT صریح JSON و shape warning امن دارد؛ DTO خطای واقعی/وضعیت retry را عرضه می‌کند و رزرو بسته دیگر spinner/recovery پاسخ سؤال را فعال نگه نمی‌دارد. [INTERVIEW_INVITATIONS_API](INTERVIEW_INVITATIONS_API.md) قرارداد فرانت است.

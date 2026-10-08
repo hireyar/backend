@@ -67,6 +67,7 @@ internal static class OpenApiText
         ("Interviews", "IntroductionVideo") => "دریافت خصوصی ویدیوی معرفی کارجو برای سازمان جاری",
         ("Interviews", "QuestionAudio") => "دریافت خصوصی صوت سؤال مصاحبه",
         ("CandidateInterviews", "Start") => "شروع مصاحبه با توکن داوطلب",
+        ("CandidateInterviews", "CheckAudio") => "تست میکروفون پیش از شروع مصاحبه و تبدیل گفتار به متن",
         ("CandidateInterviews", "Current") => "وضعیت جاری مصاحبه داوطلب",
         ("CandidateInterviews", "AdvanceStage") => "ادامه مرحله مصاحبه و ثبت معرفی کارجو؛ با حفظ ترتیب سرور",
         ("CandidateInterviews", "Introduction") => "ثبت معرفی صوتی کارجو با شناسه یکتای نوبت و ویدیوی اختیاری؛ بدون شناسه سؤال",
