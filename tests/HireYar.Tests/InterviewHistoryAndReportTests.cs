@@ -88,6 +88,70 @@ public sealed class InterviewHistoryAndReportTests
         Assert.Throws<InterviewProviderException>(() => InterviewReportValidator.Validate(Report(context), interaction));
     }
 
+    [Fact]
+    public void Detailed_report_rejects_missing_duplicate_out_of_range_and_fabricated_assessments()
+    {
+        var context = ReportContext();
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var content = JsonSerializer.Deserialize<InterviewReportContent>(Report(context), options)! with {
+            QuestionEvaluations = [new(context.Answers[0].AnswerId, 4, 0.8m, "توضیح پاسخ", "explicit locking", ["قفل صریح"], [])],
+            NextRoundFocus = ["بررسی تراکنش"]
+        };
+        Assert.Single(InterviewReportValidator.Validate(JsonSerializer.Serialize(content, options), context, true).QuestionEvaluations!);
+        var evaluation = content.QuestionEvaluations[0];
+        foreach (var bad in new[] {
+            content with { QuestionEvaluations = null }, content with { QuestionEvaluations = [] },
+            content with { QuestionEvaluations = [evaluation, evaluation] },
+            content with { QuestionEvaluations = [evaluation with { AnswerId = Guid.NewGuid() }] },
+            content with { QuestionEvaluations = [evaluation with { Score = 6 }] },
+            content with { QuestionEvaluations = [evaluation with { Confidence = -0.1m }] },
+            content with { QuestionEvaluations = [evaluation with { Quote = "fabricated" }] },
+            content with { QuestionEvaluations = [evaluation with { Gaps = null! }] },
+            content with { NextRoundFocus = null }
+        }) Assert.Throws<InterviewProviderException>(() => InterviewReportValidator.Validate(JsonSerializer.Serialize(bad, options), context, true));
+        Assert.Throws<InterviewProviderException>(() => InterviewReportValidator.Validate(Report(context), context, true));
+    }
+
+    [Fact]
+    public void Report_aggregates_only_actual_final_answers_and_keeps_unanswered_questions_unscored()
+    {
+        var (session, answer) = History();
+        session.FinishAnswer(answer.Id, [], [], "Test", "v2", Now.AddSeconds(83));
+        var evaluations = session.Answers.Where(a => !a.IsInteraction).Select((a, i) =>
+            new InterviewQuestionEvaluation(a.Id, i == 0 ? 1 : i == 1 ? 5 : 3, 0.8m, "توضیح", a.Transcript!, [], [])).ToArray();
+        var content = new InterviewReportContent { Summary = "خلاصه", Findings = [], Limitations = ["محدودیت"], QuestionEvaluations = evaluations, NextRoundFocus = [] };
+        var result = InterviewReportDetailsBuilder.Build(content, session).Details!;
+        Assert.Equal(8, result.EvaluatedCount); Assert.Equal(60m, result.OverallScore);
+        Assert.Equal(1, result.ExcellentCount); Assert.Equal(6, result.GoodCount); Assert.Equal(1, result.WeakCount);
+        Assert.Equal(87.5m, result.AboveThresholdPercent); Assert.False(result.RequiresHumanReview);
+        Assert.DoesNotContain(result.Questions, q => q.AnswerId == session.Answers.Single(a => a.IsInteraction).Id);
+        Assert.Equal(40m, result.Topics.Single(t => t.Topic == "locking").Score);
+        Assert.Equal(3, result.Topics.Single(t => t.Topic == "locking").ReachedDifficulty);
+        Assert.True(InterviewReportDetailsBuilder.Build(content with {
+            QuestionEvaluations = evaluations.Select(e => e with { Confidence = 0.5m }).ToArray()
+        }, session).Details!.RequiresHumanReview);
+    }
+
+    [Fact]
+    public void Empty_general_report_has_no_invented_scores_and_omits_unasked_bank_questions()
+    {
+        var skill = Guid.NewGuid();
+        var asked = new InterviewQuestionSnapshot(Guid.NewGuid(), skill, "Teamwork", "teamwork", 3, true, 1);
+        var unasked = new InterviewQuestionSnapshot(Guid.NewGuid(), skill, "Hard teamwork", "teamwork", 5, true, 2);
+        var session = new InterviewSession(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            [asked, unasked], [new(skill, "teamwork", false, 10)], 2, 1800, Now, Now.AddDays(1));
+        session.SetRequiredCapability("hr_interview"); session.Start(asked.QuestionId, Now);
+        session.Complete(InterviewCompletionReason.Manual, Now.AddSeconds(1));
+        var result = InterviewReportDetailsBuilder.Build(new InterviewReportContent {
+            Summary = "شواهد کافی نیست", Findings = [], Limitations = ["پاسخی نیست"], QuestionEvaluations = [], NextRoundFocus = []
+        }, session).Details!;
+        Assert.Equal("general", result.InterviewType); Assert.Single(result.Questions);
+        Assert.Equal(2, result.BankCount); Assert.Equal(0, result.EvaluatedCount);
+        Assert.Null(result.OverallScore); Assert.Null(result.Confidence); Assert.Null(result.AboveThresholdPercent);
+        Assert.Null(result.Questions[0].Score); Assert.Null(result.Questions[0].AudioUrl);
+        Assert.True(result.RequiresHumanReview); Assert.Equal(3, result.Topics[0].ReachedDifficulty);
+    }
+
     private sealed class Handler : HttpMessageHandler
     {
         public List<string> Models { get; } = [];

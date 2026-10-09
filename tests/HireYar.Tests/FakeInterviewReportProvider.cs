@@ -21,7 +21,10 @@ public sealed class FakeInterviewReportProvider : IInterviewReportProvider
         var answer = context.Answers.FirstOrDefault(a => !a.IsInteraction && a.Transcript is not null);
         var content = new InterviewReportContent { Summary = "Synthetic job-relevant evaluation for human review.",
             Findings = answer is null ? [] : [new() { AnswerId = answer.AnswerId, Quote = answer.Transcript![..Math.Min(100, answer.Transcript!.Length)], Observation = "Observed answer", Kind = "strength" }],
-            Limitations = ["Synthetic limited evidence; final decision requires human review."] };
+            Limitations = ["Synthetic limited evidence; final decision requires human review."],
+            QuestionEvaluations = context.Answers.Where(a => !a.IsInteraction).Select(a => new InterviewQuestionEvaluation(a.AnswerId,
+                3, 0.8m, "ارزیابی آزمایشی پاسخ", a.Transcript![..Math.Min(100, a.Transcript!.Length)], ["شاهد آزمایشی"], [])).ToArray(),
+            NextRoundFocus = ["بررسی بیشتر شواهد"] };
         return new(JsonSerializer.Serialize(content, new JsonSerializerOptions(JsonSerializerDefaults.Web)), "Test", "openai/gpt-6-luna");
     }
 }

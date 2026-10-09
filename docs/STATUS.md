@@ -1,3 +1,9 @@
+## گزارش سؤال‌محور مطابق HTML — 2026-10-09
+
+روی dev با Git شروع پاک، report-v2 به مسیر موجود اضافه شد: ارزیابی ۰–۵ هر پاسخ نهایی، confidence/feedback/quote/highlights/gaps و nextRoundFocus؛ جزئیات پرسیده‌شده، موضوع/سطح واقعی، نمره کل/توزیع/پوشش و رسانه احرازشده را سرور محاسبه می‌کند. یک تماس مدل، JSONB/claim موجود، بدون migration/جدول/worker تازه. v1 cached محفوظ، نمرات زنده/مالی دست‌نخورده. عمومی بدون رزومه/معرفی؛ سؤال بی‌پاسخ نمره null؛ وزن JD/fit score/شاخص HR حدسی/تصمیم استخدام/رویداد دستگاه ساخته نمی‌شوند. [INTERVIEW_EVALUATION_API](INTERVIEW_EVALUATION_API.md) قرارداد جاری است.
+
+build نهایی صفر warning/error؛ ۱۴ تست مرتبط موفق، صفر شکست/Skip، روی PostgreSQL 18.3 محلی loopback:55469 با provider مصنوعی؛ report-v2-verified.trx. اجرای اولیه integration به علت قطع سرور آزمایشی connection refused داشت؛ پس از اجرای پایدار سرور و تست در یک فرمان، همه موفق شدند و cluster متوقف شد. آزمون واقعی مدل/کیفیت فارسی و Angular/PDF/اشتراک انجام نشده‌اند؛ production/push/deploy/secret/config تغییری نکردند.
+
 ## بررسی 503 گزارش ارزیابی — 2026-10-08
 
 بررسی خواندنی روی dev پاک: appsettings مشترک AI:Provider=Liara، EvaluationModel=openai/gpt-6-luna و EvaluationTimeoutSeconds=90؛ مدل زنده فعلی google/gemini-2.5-flash-lite است و گزارش مستقل است. override محلی Development موجود Provider=NetArz دارد؛ overrideهای مقصد/محیط سرور بررسی نشده‌اند. GET models اتصال مشترک Liara پاسخ 200 و حضور هر دو مدل را تأیید کرد؛ مستند رسمی https://docs.liara.ir/ai/openai/ نیز مدل گزارش را فهرست می‌کند. GET models تنظیمات مؤثر توسعه NetArz پاسخ 404 داشت؛ این نتیجه موفقیت/شکست chat/completions را اثبات نمی‌کند.
