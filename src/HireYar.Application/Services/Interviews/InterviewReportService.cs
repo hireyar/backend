@@ -51,9 +51,11 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
                     .Select(a => new InterviewReportAnswer(a.Id, a.QuestionId, session.Questions.Single(q => q.QuestionId == a.QuestionId).Text, a.Transcript, a.IsInteraction, a.AssistantMessage, a.SelectionSource)).ToArray(),
                 session.Evidence.Select(e => new HrEvidenceDto(e.InterviewAnswerId, e.QuestionId, e.SkillId, e.ScoreBefore, e.ScoreAfter, e.Delta, e.Confidence, e.Evidence, e.CreatedAtUtc)).ToArray(),
                 session.SkillStates.Select(s => new HrSkillStateDto(s.SkillId, s.CurrentScore, s.EvidenceCount, s.Confidence)).ToArray(),
-                session.Questions.Select(q => new HrQuestionDto(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty)).ToArray());
+                session.Questions.Where(q => q.AskedAtUtc is not null || session.Answers.Any(a => a.QuestionId == q.QuestionId)).Select(q => new HrQuestionDto(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty)).ToArray(),
+                session.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized");
+            if (context.InterviewType == "general") context = context with { Resume = null, Introduction = null };
             var generated = await provider.GenerateReportAsync(context, ct);
-            var content = InterviewReportValidator.Validate(generated.Json, context);
+            var content = InterviewReportDetailsBuilder.Build(InterviewReportValidator.Validate(generated.Json, context, true), session);
             return await db.WithOrganizationBillingLockAsync(user.OrganizationId, async () => {
                 await db.ReloadInterviewAsync(session, ct);
                 if (session.DeletedAtUtc is not null) throw AppException.NotFound();

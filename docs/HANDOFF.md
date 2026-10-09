@@ -1,3 +1,11 @@
+## تحویل گزارش سؤال‌محور — 2026-10-09
+
+روی dev از Git پاک؛ تغییرات working tree حاضر، بدون commit/push/deploy. [INTERVIEW_EVALUATION_API](INTERVIEW_EVALUATION_API.md) قرارداد report-v2 و Angular جداست. یک تماس مدل، ارزیابی یک‌به‌یک پاسخ‌های نهایی با نقل‌قول معتبر و پیشنهاد محور مصاحبه بعدی؛ سرور نمره کل/موضوع/توزیع و سؤال‌های واقعاً پرسیده‌شده و URL رسانه خصوصی را در همان JSONB ذخیره می‌کند. گزارش‌های قبلی cached بازنویسی نمی‌شوند و details جدید nullable است. migration/تنظیمات تازه ندارد؛ مدل/provider/timeout موجود حفظ شده‌اند.
+
+build نهایی صفر warning/error و ۱۴ تست مرتبط موفق، صفر شکست/Skip، PostgreSQL 18.3 اختصاصی loopback:55469، provider مصنوعی؛ tests/HireYar.Tests/TestResults/report-v2-verified.trx. محاسبات، نبود نمره حدسی، حذف تعامل از نمره، schema/quote/ID/پوشش، scoping/cache/persist/رقابت/lease/حذف و constraintهای DB بررسی شدند. اجرای اول integration connection refused از قطع cluster داشت؛ اجرای پایدار بعدی همه موفق بود؛ cluster متوقف شد. suite کامل دوباره اجرا نشد و AI واقعی/کیفیت فارسی تأیید نشده است.
+
+امتیاز کل میانگین ساده ×۲۰ است؛ وزن JD و rubric اختصاصی snapshot فعلی نیستند. عمومی فقط موضوعات واقعاً سنجیده‌شده دارد و رزومه/معرفی به مدل گزارش نمی‌روند. تصمیم عبور/رد، fit score، رتبه‌بندی معتبر، هشدار دستگاه/رضایت، PDF/اشتراک و offset ویدیو ساخته نشدند. برای جزئیات نام/موقعیت/مدت از HR موجود استفاده شود. false بودن requiresHumanReview به معنی تأیید استخدام نیست؛ رسانه Bearer/retention موجود دارد. داده نمونه HTML در Git کپی نشده است.
+
 ## تحویل بررسی خطای evaluation-report — 2026-10-08
 
 روی dev پاک بررسی شد؛ کد و همه appsettings/secretها محفوظ‌اند. shared config گزارش=Liara/openai/gpt-6-luna، timeout=90؛ LlmModel زنده google/gemini-2.5-flash-lite است و برای گزارش استفاده نمی‌شود. local Development provider را به NetArz override می‌کند؛ تنظیمات مؤثر مقصد کاربر در دست نیست. Liara GET models پاسخ 200 و مدل گزارش موجود؛ smoke واقعی فقط با داده مصنوعی و همان report-v1 HTTP 200 حدود ۹٫۳ ثانیه و JSON با fields مورد انتظار داشت. متن خروجی/credential/داده واقعی persist نشده‌اند؛ smoke بدون final answer و جایگزین آزمون validator روی داده واقعی نیست. NetArz GET models در config مؤثر توسعه 404 بود، نه اثبات شکست report.

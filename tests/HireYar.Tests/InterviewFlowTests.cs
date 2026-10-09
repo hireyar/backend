@@ -216,10 +216,17 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
         var response = await hr.Client.Send(HttpMethod.Post, url); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var report = (await response.Content.ReadFromJsonAsync<InterviewReportDto>())!;
         Assert.Equal("openai/gpt-6-luna", report.Model); Assert.Single(report.Content.Findings); Assert.Single(f.ReportAi.LastContext!.Answers);
-        Assert.Equal(3, f.ReportAi.LastContext.Questions.Count);
+        Assert.Equal(2, f.ReportAi.LastContext.Questions.Count); // Answered question and next asked, unanswered question.
+        var details = report.Content.Details!;
+        Assert.Equal("report-v2", report.PromptVersion);
+        Assert.Equal(3, details.BankCount); Assert.Equal(2, details.AskedCount); Assert.Equal(1, details.EvaluatedCount);
+        Assert.Equal(60m, details.OverallScore); Assert.True(details.RequiresHumanReview);
+        Assert.Single(details.Questions, q => q.Score is null);
+        Assert.Contains(details.Questions, q => q.AudioUrl == $"/api/interviews/{invite.InterviewId}/answers/{q.AnswerId}/audio");
         var again = (await (await hr.Client.Send(HttpMethod.Post, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
         var stored = (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
         Assert.Equal(report.CreatedAtUtc, again.CreatedAtUtc); Assert.Equal(report.CreatedAtUtc, stored.CreatedAtUtc); Assert.Equal(1, f.ReportAi.Calls);
+        Assert.Equal(JsonSerializer.Serialize(report.Content), JsonSerializer.Serialize(stored.Content));
         var stranger = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, url)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Post, url)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(url)).StatusCode);
