@@ -1581,6 +1581,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<int>("MaxQuestionCount")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("MediumFirstTopicQuestions")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTimeOffset?>("NextRecoveryAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1688,6 +1691,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Interview_Interactions", "\"MaxInteractionsPerQuestion\" BETWEEN 0 AND 3");
 
                             t.HasCheckConstraint("CK_Interview_Limits", "\"MaxQuestionCount\" BETWEEN 1 AND 30 AND \"MaxDurationSeconds\" BETWEEN 300 AND 3600");
+
+                            t.HasCheckConstraint("CK_Interview_MediumFirst", "NOT \"MediumFirstTopicQuestions\" OR (\"ProgressiveTopicQuestions\" AND \"MaxQuestionCount\" BETWEEN 10 AND 20 AND \"MaxQuestionCount\" % 2 = 0)");
 
                             t.HasCheckConstraint("CK_Interview_Recovery", "\"RecoveryAttempts\" >= 0");
 

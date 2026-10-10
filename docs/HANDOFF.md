@@ -1,4 +1,12 @@
-## تحویل پیشروی موضوعی — 2026-10-10
+## تحویل اصلاح دو سؤال در هر موضوع — 2026-10-10
+
+تصحیح کاربر اجرا شد: دعوت تازه متوسط را اول می‌پرسد؛ grade معتبر >=۰٫۷ با اطمینان >=۰٫۶ → سخت، پاسخ ناقص/ضعیف/unknown → آسان همان موضوع. پس از سؤال دوم هیچ سؤال سومی نیست و موضوع تازه از متوسط شروع می‌شود. بانک سه سطح محفوظ؛ سقف جلسه و interviewQuestionCount پیشنهاد/قالب ۲×موضوع (۱۰..۲۰). تعامل‌ها جزو دو سؤال اصلی نیستند؛ زمان و billing ثابت.
+
+`MediumFirstTopicQuestions` با default=false در migration `20261010085424_AddMediumFirstTopicQuestions`، وابسته به ProgressiveTopicQuestions و سقف زوج ۱۰..۲۰ است؛ Down دارای جلسه جدید رد می‌شود. جلسه‌های پیشین یک‌سؤالی و مسیر سه‌سطحی قبلی، همراه resend، snapshot خود را حفظ می‌کنند. نسخه prompt تازه `v4-medium-first`؛ [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md)، [INTERVIEW_CONTEXT_API](INTERVIEW_CONTEXT_API.md)، ADR-033. قبل کد مقصد migration لازم است؛ مقصد اعمال نشده.
+
+روی dev از Git پاک شروع شد و تغییرات فعلی commit/push/deploy نشده‌اند. build صفر warning/error؛ **۲۶۸/۲۶۸ موفق، صفر Skip** با PostgreSQL 18 اختصاصی و provider جعلی، TRX `tests/HireYar.Tests/TestResults/medium-first-verified.trx`. SQL idempotent کامل `artifacts/medium-first-migrations.sql` دو بار روی scratch با یک history entry موفق؛ fixture DB صفر، scratch پاک و cluster متوقف. drift=false، rollback خالی و guard دارای داده واقعی مصنوعی بررسی شدند. AI واقعی و Angular جدا آزموده نشده‌اند. تحویل پایین سابقه نسخه قبلی است.
+
+## تحویل پیشروی موضوعی — 2026-10-10 (نسخه قبلی)
 
 روی dev از Git پاک، درخواست پیشروی آسان/متوسط/سخت در همان موضوع کامل شد. تغییرات commit/push/deploy نشده‌اند. دعوت موضوعی تازه `ProgressiveTopicQuestions=true`، سقف ۳×موضوع و prompt `v3-topic-ladder` دارد؛ grade و confidence پاسخ نهایی در DB nullable مستقل از score مهارت‌اند. حد عبور ۰٫۷/۰٫۶؛ شکست/unknown به موضوع تازه از آسان می‌رود. تکمیل زمان/سقف پابرجا و coverage/sufficient evidence برای این مسیر کنار گذاشته شده‌اند. جلسه legacy و resend آن تبدیل نمی‌شوند؛ بانک ساده محفوظ است.
 

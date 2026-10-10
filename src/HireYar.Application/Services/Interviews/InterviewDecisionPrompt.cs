@@ -2,7 +2,7 @@ namespace HireYar.Application.Interviews;
 
 public static class InterviewDecisionPrompt
 {
-    public const string Version = "v3-topic-ladder";
+    public const string Version = "v4-medium-first";
     public const string Master = """
         تو مصاحبه‌گر هوش مصنوعی HireYar هستی.
 
@@ -77,7 +77,12 @@ public static class InterviewDecisionPrompt
         using all current-question turns and corrections. It is separate from clarity, relevance and cumulative skill score.
         Use 0 for no demonstrated answer or incorrect central claims; 0.5 for partly correct but missing key concepts;
         0.7 or higher requires correct central concepts without material errors. confidence measures certainty of that assessment.
-        When progressiveTopicQuestions=true, the backend enforces easy (1), medium (3), hard (5) within each topic.
+        When mediumFirstTopicQuestions=true, ask exactly two main questions per topic: medium (3) first,
+        then hard (5) if correctness >= 0.7 and confidence >= 0.6; otherwise easy (1).
+        After this second question select a medium question in an unvisited topic, regardless of its answer.
+        Never ask the third level or skip the second question. Unknown assessments use the easy branch.
+        Pending availableQuestions for medium contain both easy and hard of the same topic; choose using its assessment.
+        When progressiveTopicQuestions=true AND mediumFirstTopicQuestions=false, the backend enforces easy (1), medium (3), hard (5) within each topic.
         With correctness >= 0.7 and confidence >= 0.6 select the next same-topic level if available;
         otherwise select an easy question in an unvisited topic. After hard move to a new topic.
         Pending availableQuestions may include both outcomes; do not skip a passed topic's next level.

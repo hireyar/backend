@@ -7,14 +7,14 @@ namespace HireYar.Tests;
 public sealed class ProgressiveTopicRulesTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 10, 0, 0, 0, TimeSpan.Zero);
-    private static InterviewSession Plan(bool progressive = true)
+    private static InterviewSession Plan(bool progressive = true, bool mediumFirst = false)
     {
         var skills = Enumerable.Range(1, 5).Select(i => new InterviewSkill(Guid.NewGuid(), $"topic-{i}", true, 100, 3)).ToArray();
         var questions = skills.SelectMany((s, i) => new[] { 1, 3, 5 }.Select((d, j) =>
             new InterviewQuestionSnapshot(Guid.NewGuid(), s.SkillId, $"question-{i}-{d}", s.Name, d, true, i * 3 + j))).ToArray();
         var session = new InterviewSession(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            questions, skills, progressive ? 15 : 5, 3600, Now, Now.AddDays(1));
-        if (progressive) session.EnableProgressiveTopicQuestions(); else session.EnableTopicQuestions();
+            questions, skills, progressive ? (mediumFirst ? 10 : 15) : 5, 3600, Now, Now.AddDays(1));
+        if (progressive) session.EnableProgressiveTopicQuestions(mediumFirst); else session.EnableTopicQuestions();
         return session;
     }
     private static InterviewAnswer Pending(InterviewSession s)
@@ -22,6 +22,22 @@ public sealed class ProgressiveTopicRulesTests
         var a = s.SubmitAnswer(s.CurrentQuestionId!.Value, "synthetic", "audio/webm", 100, Now);
         s.BeginTranscription(a.Id); s.SetTranscript(a.Id, "Synthetic answer", "Test", "Test"); s.BeginEvaluation(a.Id);
         return a;
+    }
+    [Theory]
+    [InlineData(0.7, 0.6, 5)] [InlineData(0.69, 1d, 1)] [InlineData(1d, 0.59, 1)] [InlineData(null, null, 1)]
+    public void Medium_first_asks_exactly_one_branch_then_closes_topic(double? score, double? confidence, int difficulty)
+    {
+        var s = Plan(mediumFirst: true); var p = new InterviewPolicy();
+        Assert.All(p.GetAllowedQuestions(s, Now), q => Assert.Equal(3, q.Difficulty));
+        Assert.Throws<InterviewRuleException>(() => s.Start(s.Questions[0].QuestionId, Now));
+        s.Start(s.Questions[1].QuestionId, Now); Grade(s, (decimal?)score, (decimal?)confidence);
+        var next = Assert.Single(p.GetAllowedQuestions(s, Now)); Assert.Equal(difficulty, next.Difficulty);
+        Assert.Throws<InterviewRuleException>(() => s.AskNext(s.Questions[4].QuestionId, Now));
+        s.AskNext(next.QuestionId, Now); Grade(s, 1, 1);
+        Assert.All(p.GetAllowedQuestions(s, Now), q => { Assert.Equal(3, q.Difficulty); Assert.NotEqual(next.Topic, q.Topic); });
+        var unused = s.Questions.Single(q => q.Topic == next.Topic && q.Difficulty != 3 && q.QuestionId != next.QuestionId);
+        Assert.Throws<InterviewRuleException>(() => s.AskNext(unused.QuestionId, Now));
+        Assert.Equal(2, s.AnsweredQuestionCount);
     }
     private static void Grade(InterviewSession s, decimal? score, decimal? confidence)
     {

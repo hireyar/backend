@@ -31,6 +31,6 @@ public sealed class QuestionSuggestionService(IApplicationDbContext db, ICurrent
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or NotSupportedException)
         { throw new AppException(502, "question_suggestions_invalid", "ساختار پیشنهاد AI معتبر نیست؛ دوباره تولید کنید."); }
         // Suggestions are transient. Only the explicit wizard save persists the user-approved bank.
-        return new(jobId, topics, topics.Count, topics.Count * 3, topics.Count * 3);
+        return new(jobId, topics, topics.Count, topics.Count * 3, topics.Count * 2);
     }
 }

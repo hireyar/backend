@@ -72,7 +72,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
             var response = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new QuestionSuggestionRequest(job.Id, count));
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var dto = (await response.Content.ReadFromJsonAsync<QuestionSuggestionsDto>())!;
-            Assert.Equal(count ?? 7, dto.TopicCount); Assert.Equal(dto.TopicCount * 3, dto.BankQuestionCount); Assert.Equal(dto.BankQuestionCount, dto.InterviewQuestionCount);
+            Assert.Equal(count ?? 7, dto.TopicCount); Assert.Equal(dto.TopicCount * 3, dto.BankQuestionCount); Assert.Equal(dto.TopicCount * 2, dto.InterviewQuestionCount);
             Assert.Equal(job.Description, f.QuestionAi.Last!.PositionDescription);
         }
         var one = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions/topic", new TopicSuggestionRequest(job.Id, "SQL"));
@@ -123,7 +123,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         var levels = Template(job.Id); levels.Topics![0].Questions[2] = levels.Topics[0].Questions[0];
         Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", levels)).StatusCode);
         var saved = await Save(owner, Template(job.Id));
-        Assert.True(saved.UseTopicQuestions); Assert.Equal(21, saved.Questions.Count); Assert.Equal(21, saved.InterviewQuestionCount);
+        Assert.True(saved.UseTopicQuestions); Assert.Equal(21, saved.Questions.Count); Assert.Equal(14, saved.InterviewQuestionCount);
         var update = Template(job.Id, 5); update.Topics![0].Questions[0] = new("easy", "ویرایش کاربر");
         var response = await owner.Client.Send(HttpMethod.Put, $"/api/panel-wizard/templates/{saved.Id}", new UpdateWizardTemplateRequest(update, saved.RowVersion));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -131,7 +131,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         Assert.Equal("ویرایش کاربر", edited.Topics![0].Questions[0].Text); Assert.Equal(15, edited.Questions.Count);
         Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Put, $"/api/panel-wizard/templates/{saved.Id}", new UpdateWizardTemplateRequest(update, saved.RowVersion))).StatusCode);
         var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/interview-templates")).Content.ReadFromJsonAsync<HireYar.Application.Common.Page<TemplateListDto>>(BillingJson.Options))!;
-        Assert.Equal(15, Assert.Single(list.Items).InterviewQuestionCount);
+        Assert.Equal(10, Assert.Single(list.Items).InterviewQuestionCount);
     }
     [PostgresFact]
     public Task Specialized_topic_session_progresses_through_levels() => VerifyProgression("specialized");
@@ -143,23 +143,23 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         var other = (await (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("موقعیت دوم", "شرح دوم"))).Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
         var issued = await Invite(owner, other.Id, template.Id, type); var id = issued.Invitation.InterviewId;
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Put, $"/api/panel-wizard/templates/{template.Id}", new UpdateWizardTemplateRequest(Template(job.Id, 7), template.RowVersion))).StatusCode);
-        await f.Db(async db => { var s = await db.InterviewSessions.SingleAsync(s => s.Id == id); Assert.False(s.AskOneQuestionPerTopic); Assert.True(s.ProgressiveTopicQuestions); Assert.Equal(15, s.MaxQuestionCount); Assert.Equal(15, s.Questions.Count); Assert.NotEqual(template.Id, s.InterviewTemplateId); Assert.Equal(5, s.Skills.Count); });
+        await f.Db(async db => { var s = await db.InterviewSessions.SingleAsync(s => s.Id == id); Assert.False(s.AskOneQuestionPerTopic); Assert.True(s.MediumFirstTopicQuestions); Assert.Equal(10, s.MaxQuestionCount); Assert.Equal(15, s.Questions.Count); Assert.NotEqual(template.Id, s.InterviewTemplateId); Assert.Equal(5, s.Skills.Count); });
         using var candidate = f.CreateClient(); candidate.DefaultRequestHeaders.Authorization = new("Bearer", issued.Invitation.Token);
         var start = await candidate.PostAsync($"/api/candidate/interviews/{id}/start", null);
         Assert.Equal(HttpStatusCode.OK, start.StatusCode);
         var current = (await start.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
         var asked = new List<Guid>();
-        for (var i = 0; i < 15; i++)
+        for (var i = 0; i < 10; i++)
         {
             Assert.NotNull(current.Question); asked.Add(current.Question!.Id);
-            Assert.Contains(new[] { "easy", "medium", "hard" }[i % 3], current.Question.Text);
+            Assert.Contains(new[] { "medium", "hard" }[i % 2], current.Question.Text);
             using var form = new MultipartFormDataContent(); form.Add(new StringContent(current.Question.Id.ToString()), "questionId");
             var data = new ByteArrayContent(new byte[] { 0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }); data.Headers.ContentType = new("audio/webm"); form.Add(data, "audio", "answer.webm");
             var answer = await candidate.PostAsync($"/api/candidate/interviews/{id}/answers", form);
             Assert.Equal(HttpStatusCode.OK, answer.StatusCode); current = (await answer.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
         }
         Assert.Equal("Completed", current.Status); Assert.Null(current.Question);
-        await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == id); Assert.Equal(15, s.AnsweredQuestionCount); Assert.Equal(5, s.Questions.Where(q => asked.Contains(q.QuestionId)).Select(q => q.Topic).Distinct().Count()); Assert.Equal(1, s.Questions.Single(q => q.QuestionId == asked[0]).Difficulty); Assert.All(s.Answers, a => Assert.Equal(0.8m, a.Correctness)); });
+        await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == id); Assert.Equal(10, s.AnsweredQuestionCount); Assert.Equal(5, s.Questions.Where(q => asked.Contains(q.QuestionId)).Select(q => q.Topic).Distinct().Count()); Assert.Equal(3, s.Questions.Single(q => q.QuestionId == asked[0]).Difficulty); Assert.All(s.Answers, a => Assert.Equal(0.8m, a.Correctness)); });
     }
     [PostgresFact]
     public async Task Topic_grades_survive_reload_and_enforce_same_topic_then_close_failed_topics()
@@ -182,25 +182,29 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
             f.InterviewAi.InteractionAction = "clarify"; await Submit();
             Assert.Equal(first, current.Question!.Id); Assert.Equal(0, current.Progress.AnsweredQuestions);
             f.InterviewAi.InteractionAction = null;
-            // The model attempts to skip a passed topic; the server must force medium.
+            // The model proposes easy despite a passed medium; the server must force hard.
             await f.Db(async db => { var s = await db.InterviewSessions.SingleAsync(s => s.Id == id);
                 f.InterviewAi.ProposedQuestionId = s.Questions.Where(q => q.Difficulty == 1 && q.QuestionId != first).OrderBy(q => q.Order).First().QuestionId; });
-            await Submit(); Assert.Equal("سؤال 1 medium", current.Question!.Text);
+            await Submit(); Assert.Equal("سؤال 1 hard", current.Question!.Text);
             Assert.True(f.InterviewAi.LastContext!.ProgressiveTopicQuestions);
+            Assert.True(f.InterviewAi.LastContext.MediumFirstTopicQuestions);
             f.InterviewAi.ProposedQuestionId = null; f.InterviewAi.Correctness = 0.3m;
+            await Submit(); Assert.Equal("سؤال 2 medium", current.Question!.Text);
             await Submit(); Assert.Equal("سؤال 2 easy", current.Question!.Text);
+            f.InterviewAi.Correctness = 1; await Submit(); Assert.Equal("سؤال 3 medium", current.Question!.Text);
             f.InterviewAi.InvalidLlm = true; await Submit(); Assert.Equal("سؤال 3 easy", current.Question!.Text);
-            f.InterviewAi.InvalidLlm = false; f.InterviewAi.Correctness = 1; f.InterviewAi.AssessmentConfidence = 0.5m;
-            await Submit(); Assert.Equal("سؤال 4 easy", current.Question!.Text);
+            f.InterviewAi.InvalidLlm = false; await Submit(); Assert.Equal("سؤال 4 medium", current.Question!.Text);
+            f.InterviewAi.AssessmentConfidence = 0.5m; await Submit(); Assert.Equal("سؤال 4 easy", current.Question!.Text);
+            await Submit(); Assert.Equal("سؤال 5 medium", current.Question!.Text);
             f.InterviewAi.Correctness = 0.1m; f.InterviewAi.AssessmentConfidence = 1;
             await Submit(); Assert.Equal("سؤال 5 easy", current.Question!.Text);
-            await Submit(); Assert.Equal("Completed", current.Status); Assert.Equal(6, current.Progress.AnsweredQuestions);
+            await Submit(); Assert.Equal("Completed", current.Status); Assert.Equal(10, current.Progress.AnsweredQuestions);
             await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == id);
-                Assert.Equal(InterviewCompletionReason.NoQuestions, s.CompletionReason);
+                Assert.Equal(InterviewCompletionReason.QuestionLimit, s.CompletionReason);
                 Assert.Equal(0.8m, s.Answers.Single(a => a.QuestionId == first && !a.IsInteraction).Correctness);
                 Assert.Null(s.Answers.Single(a => a.IsInteraction).Correctness);
                 Assert.Null(s.Answers.Single(a => a.FailureCode == "decision_invalid").Correctness);
-                Assert.DoesNotContain(s.Questions.Where(q => q.AskedAtUtc is not null), q => q.Difficulty == 5);
+                Assert.Single(s.Questions, q => q.AskedAtUtc is not null && q.Difficulty == 5);
                 var gradeError = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
                     $"UPDATE \"InterviewAnswers\" SET \"Correctness\" = 1.1 WHERE \"InterviewSessionId\" = {id} AND NOT \"IsInteraction\""));
                 Assert.Equal("23514", gradeError.SqlState);
@@ -210,12 +214,12 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
                 var downgrade = await Assert.ThrowsAsync<Npgsql.PostgresException>(() =>
                     db.GetService<IMigrator>().MigrateAsync("20261010054552_AddInterviewReportReview"));
                 Assert.Equal("P0001", downgrade.SqlState); Assert.Contains("persisted answer assessments", downgrade.MessageText);
-                Assert.Contains("20261010075455_AddProgressiveTopicQuestions", await db.Database.GetAppliedMigrationsAsync()); });
+                Assert.Contains("20261010085424_AddMediumFirstTopicQuestions", await db.Database.GetAppliedMigrationsAsync()); });
             var replacement = await owner.Client.Send(HttpMethod.Post, $"/api/interviews/{id}/resend", new ResendInterviewRequest(3, false, false));
             Assert.Equal(HttpStatusCode.OK, replacement.StatusCode);
             var freshId = (await replacement.Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation.InterviewId;
             await f.Db(async db => { var s = await db.InterviewSessions.SingleAsync(s => s.Id == freshId);
-                Assert.True(s.ProgressiveTopicQuestions); Assert.Equal(15, s.MaxQuestionCount); Assert.Empty(s.Answers); });
+                Assert.True(s.MediumFirstTopicQuestions); Assert.Equal(10, s.MaxQuestionCount); Assert.Empty(s.Answers); });
         }
         finally { f.InterviewAi.Reset(); }
     }
