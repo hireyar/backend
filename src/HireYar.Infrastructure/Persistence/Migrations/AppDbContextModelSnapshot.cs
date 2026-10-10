@@ -1076,6 +1076,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("AssessmentConfidence")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("AssistantMessage")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -1099,6 +1102,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<string>("ClientTurnId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<decimal?>("Correctness")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("DecisionModel")
                         .HasMaxLength(100)
@@ -1181,6 +1187,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("InterviewAnswers", t =>
                         {
+                            t.HasCheckConstraint("CK_Answer_Assessment", "(\"Correctness\" IS NULL AND \"AssessmentConfidence\" IS NULL) OR (\"Correctness\" IS NOT NULL AND \"AssessmentConfidence\" IS NOT NULL AND \"Correctness\" BETWEEN 0 AND 1 AND \"AssessmentConfidence\" BETWEEN 0 AND 1 AND \"Status\" = 'Processed' AND NOT \"IsInteraction\")");
+
                             t.HasCheckConstraint("CK_Answer_BillableSeconds", "\"BillableSeconds\" BETWEEN 0 AND 120");
 
                             t.HasCheckConstraint("CK_Answer_Interaction", "(NOT \"IsInteraction\" AND \"AssistantMessage\" IS NULL) OR (\"IsInteraction\" AND \"Status\" = 'Processed' AND \"AssistantMessage\" IS NOT NULL AND length(btrim(\"AssistantMessage\")) > 0)");
@@ -1596,6 +1604,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProcessingRevision")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("ProgressiveTopicQuestions")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("ProtectedAccessCode")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
@@ -1685,6 +1696,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Interview_Stage", "\"Stage\" IN ('Welcome','CandidateIntroduction','Questions','CompanyIntroduction','Goodbye','Finished')");
 
                             t.HasCheckConstraint("CK_Interview_Status", "\"Status\" IN ('Created','WaitingForAnswer','ProcessingAnswer','Completed','Cancelled')");
+
+                            t.HasCheckConstraint("CK_Interview_TopicPolicy", "NOT (\"AskOneQuestionPerTopic\" AND \"ProgressiveTopicQuestions\")");
                         });
                 });
 

@@ -13,6 +13,20 @@ public sealed class InterviewPolicy
             return [];
         var asked = session.Answers.Select(x => x.QuestionId).ToHashSet();
         if (session.CurrentQuestionId is { } current) asked.Add(current);
+        if (session.ProgressiveTopicQuestions)
+        {
+            var progressive = session.GetProgressiveQuestions().Where(q => !asked.Contains(q.QuestionId))
+                .OrderByDescending(q => session.CurrentQuestionId is { } id &&
+                    session.Questions.Single(x => x.QuestionId == id).Topic == q.Topic)
+                .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).IsRequired)
+                .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).Priority)
+                .ThenBy(q => q.Order).ThenBy(q => q.QuestionId);
+            // Keep both pass/fail branches during evaluation; HR topic order is fixed.
+            return (session.RequiredCapabilityCode == "hr_interview"
+                ? progressive.Where(q => q.Topic == progressive.FirstOrDefault()?.Topic || q.Difficulty == 1)
+                    .GroupBy(q => q.Difficulty == 1).Select(g => g.First())
+                : progressive).Take(shortlistLimit).ToArray();
+        }
         if (session.RequiredCapabilityCode == "hr_interview")
             return session.Questions.Where(q => q.IsActive && !asked.Contains(q.QuestionId) &&
                 (!session.AskOneQuestionPerTopic || q.Difficulty == 3 && !session.Questions.Any(a => asked.Contains(a.QuestionId) && a.Topic == q.Topic)))
@@ -42,7 +56,7 @@ public sealed class InterviewPolicy
         if (session.RemainingSeconds(now) == 0) return InterviewCompletionReason.DurationLimit;
         if (session.AnsweredQuestionCount >= session.MaxQuestionCount) return InterviewCompletionReason.QuestionLimit;
         var required = session.Skills.Where(x => x.IsRequired).ToArray();
-        if (session.RequiredCapabilityCode != "hr_interview" && required.Length > 0 && required.All(s => session.SkillStates.Any(x => x.SkillId == s.SkillId &&
+        if (!session.ProgressiveTopicQuestions && session.RequiredCapabilityCode != "hr_interview" && required.Length > 0 && required.All(s => session.SkillStates.Any(x => x.SkillId == s.SkillId &&
                 x.EvidenceCount >= minimumEvidenceCount && x.Confidence >= confidenceThreshold)))
             return InterviewCompletionReason.SufficientEvidence;
         return GetAllowedQuestions(session, now).Count == 0 ? InterviewCompletionReason.NoQuestions : null;

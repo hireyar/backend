@@ -1,3 +1,11 @@
+## تحویل پیشروی موضوعی — 2026-10-10
+
+روی dev از Git پاک، درخواست پیشروی آسان/متوسط/سخت در همان موضوع کامل شد. تغییرات commit/push/deploy نشده‌اند. دعوت موضوعی تازه `ProgressiveTopicQuestions=true`، سقف ۳×موضوع و prompt `v3-topic-ladder` دارد؛ grade و confidence پاسخ نهایی در DB nullable مستقل از score مهارت‌اند. حد عبور ۰٫۷/۰٫۶؛ شکست/unknown به موضوع تازه از آسان می‌رود. تکمیل زمان/سقف پابرجا و coverage/sufficient evidence برای این مسیر کنار گذاشته شده‌اند. جلسه legacy و resend آن تبدیل نمی‌شوند؛ بانک ساده محفوظ است.
+
+build صفر warning/error؛ **۲۶۴/۲۶۴ موفق، صفر Skip** روی PostgreSQL 18 اختصاصی و AI مصنوعی؛ `tests/HireYar.Tests/TestResults/topic-ladder-verified.trx`. مسیر عمومی/تخصصی کامل، ضعف/اطمینان پایین/unknown، clarify، پرش AI، persistence/resend، legacy و SQL/migration آزموده شدند. drift=false؛ SQL idempotent دو بار روی scratch یک history entry؛ scratch و DB fixture پاک، cluster متوقف شد. جزئیات اصلاح آزمون‌های میانی و override محیط tooling در STATUS آمده‌اند؛ نتیجه نهایی پس از اصلاح‌هاست.
+
+Migration مقصد لازم `20261010075455_AddProgressiveTopicQuestions` است؛ SQL محلی ignored: `artifacts/topic-ladder-migrations.sql`. قبل کد مقصد schema را ارتقا دهید. Down دارای جلسه progressive یا grade ذخیره‌شده، حذف داده را رد می‌کند؛ مقصد این نوبت اعمال نشده. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md) شمارنده جدید و معیار پیشروی، [INTERVIEW_CONTEXT_API](INTERVIEW_CONTEXT_API.md) قرارداد مدل و ADR-032 تصمیم را توضیح می‌دهند. کیفیت واقعی تشخیص درست/غلط و UI Angular جدا بررسی نشده‌اند. secret/provider/billing/config مقصد تغییر نکردند.
+
 ## تحویل تکمیل بک‌اند گزارش HTML — 2026-10-10
 
 نتیجه نهایی واقعی: tool restore/restore موفق، build صفر warning/error و **۲۵۰/۲۵۰ تست PostgreSQL 18 اختصاصی موفق، صفر شکست/Skip**؛ `tests/HireYar.Tests/TestResults/report-v3-verified.trx`. drift=false؛ اجرای دوباره script idempotent روی scratch تصادفی یک entry از migration تازه داشت، scratch/DBهای fixture صفر باقی و cluster متوقف شد. محافظ Down با سوابق واقعی مصنوعی و rollback transaction آزموده شد. providerها مصنوعی بودند؛ کیفیت فارسی مدل یا ضبط واقعی/مرورگر از این نتیجه اثبات نمی‌شوند. شکست‌های میانی و اصلاح پیش‌فرض وزن، ordering JSONB و ترتیب EF navigation در STATUS ثبت شدند.

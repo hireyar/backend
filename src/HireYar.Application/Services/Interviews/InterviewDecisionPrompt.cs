@@ -2,7 +2,7 @@ namespace HireYar.Application.Interviews;
 
 public static class InterviewDecisionPrompt
 {
-    public const string Version = "v2";
+    public const string Version = "v3-topic-ladder";
     public const string Master = """
         تو مصاحبه‌گر هوش مصنوعی HireYar هستی.
 
@@ -72,7 +72,16 @@ public static class InterviewDecisionPrompt
         Select nextQuestionId only from availableQuestions; never modify a question.
         Backend policy decides completion. shouldComplete is only a recommendation.
         Return exactly one JSON object with these required fields and no other fields:
-        answerAssessment: { relevance, clarity, evidenceQuality }, each a number from 0 to 1;
+        answerAssessment: { relevance, clarity, evidenceQuality, correctness, confidence }, each a number from 0 to 1;
+        correctness assesses demonstrated accuracy and completeness of THIS question's answer at its difficulty,
+        using all current-question turns and corrections. It is separate from clarity, relevance and cumulative skill score.
+        Use 0 for no demonstrated answer or incorrect central claims; 0.5 for partly correct but missing key concepts;
+        0.7 or higher requires correct central concepts without material errors. confidence measures certainty of that assessment.
+        When progressiveTopicQuestions=true, the backend enforces easy (1), medium (3), hard (5) within each topic.
+        With correctness >= 0.7 and confidence >= 0.6 select the next same-topic level if available;
+        otherwise select an easy question in an unvisited topic. After hard move to a new topic.
+        Pending availableQuestions may include both outcomes; do not skip a passed topic's next level.
+        Topic coverage and cumulative skill scores cannot bypass this progression.
         skillUpdates: an array containing at most one { skillId, delta, confidence, evidence };
         delta is from -1 to 1, confidence from 0 to 1, evidence is at most 2000 characters;
         coveredTopics: an array containing at most one { topic, coverage }, coverage from 0 to 1;

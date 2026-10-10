@@ -1,3 +1,9 @@
+## پیشروی سه‌سطحی موضوع — درخواست مستقل 2026-10-10: Verified محلی
+
+دعوت موضوعی تازه با آسان ← متوسط ← سخت پس از پاسخ قابل‌قبول، grade persisted مستقل، سرور کنترل‌کننده سطح و مدل انتخاب‌کننده موضوع تازه پیاده شد. نسخه قبلی جلسه/resend محفوظ؛ سقف counters برابر ۳×موضوع، عمومی به ترتیب قالب و تخصصی shortlist. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md)، ADR-032 و migration `20261010075455_AddProgressiveTopicQuestions`.
+
+build صفر warning/error و suite کامل **۲۶۴ موفق، صفر شکست/Skip** با PostgreSQL 18 محلی، script idempotent دوبار، drift=false و محافظ rollback واقعی تأیید شدند. باقی برای مقصد: اجرای migration قبل از کد، تطبیق نمایش counters/زمان در Angular جدا، ارزیابی واقعی کیفیت تشخیص پاسخ فارسی و آستانه ۰٫۷/۰٫۶. این باقی‌مانده مجوز انتشار یا تماس واقعی provider نیست؛ ارزیابی خودکار تصمیم استخدام ایجاد نمی‌کند.
+
 ## HY-301 — تکمیل بک‌اند طرح گزارش HTML (2026-10-10)
 
 Verification محلی تکمیل: build صفر warning/error؛ suite کامل PostgreSQL **۲۵۰ موفق، صفر Failed/Skipped**؛ `report-v3-verified.trx`. migration واقعی، tenant FK و محافظ downgrade بررسی شدند؛ script idempotent دو بار روی scratch تصادفی موفق بود، یک history entry. frontend/AI واقعی/مقصد و اشتراکِ نیازمند مجوز، تکمیل‌شده محسوب نمی‌شوند.

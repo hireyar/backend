@@ -19,6 +19,9 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
     public InterviewDecisionContext? LastContext;
     public string? InteractionAction;
     public string? SttText;
+    public decimal? Correctness = 0.8m;
+    public decimal? AssessmentConfidence = 0.8m;
+    public Guid? ProposedQuestionId;
     public TaskCompletionSource? SttEntered; public TaskCompletionSource? SttRelease;
     public TaskCompletionSource? Entered; public TaskCompletionSource? Release;
     public SpeechProfile Profile => new("fake-tts", "fake-voice", 1m);
@@ -43,9 +46,9 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
                 SkillUpdates = [], CoveredTopics = [], NextQuestionId = null, ShouldComplete = false,
                 Reason = "Clarification needed", Action = action, CandidateMessage = "لطفاً درباره همان موضوع بیشتر توضیح بدین."
             }, new JsonSerializerOptions(JsonSerializerDefaults.Web)), "Test", "fake-llm");
-        var result = new InterviewDecision { AnswerAssessment = new() { Relevance = 0.8m, Clarity = 0.8m, EvidenceQuality = 0.8m },
+        var result = new InterviewDecision { AnswerAssessment = new() { Relevance = 0.8m, Clarity = 0.8m, EvidenceQuality = 0.8m, Correctness = Correctness, Confidence = AssessmentConfidence },
             SkillUpdates = [new() { SkillId = context.Question.SkillId, Delta = 0.1m, Confidence = 0.6m, Evidence = "Synthetic observable evidence" }],
-            CoveredTopics = [], NextQuestionId = context.AvailableQuestions.FirstOrDefault()?.QuestionId,
+            CoveredTopics = [], NextQuestionId = ProposedQuestionId ?? context.AvailableQuestions.FirstOrDefault()?.QuestionId,
             ShouldComplete = false, Reason = "More evidence needed." };
         return new(JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web)), "Test", "fake-llm");
     }
@@ -54,7 +57,7 @@ public sealed class FakeInterviewProvider : ISpeechToTextService, IInterviewDeci
         Interlocked.Increment(ref TtsCalls); if (FailTts) throw new InterviewProviderException("tts_http_500");
         return Task.FromResult(new TextToSpeechResult("ID3-synthetic-audio"u8.ToArray(), "audio/mpeg"));
     }
-    public void Reset() { FailStt = FailLlm = InvalidLlm = FailTts = false; Entered = Release = SttEntered = SttRelease = null; LastContext = null; InteractionAction = SttText = null; }
+    public void Reset() { FailStt = FailLlm = InvalidLlm = FailTts = false; Entered = Release = SttEntered = SttRelease = null; LastContext = null; InteractionAction = SttText = null; Correctness = AssessmentConfidence = 0.8m; ProposedQuestionId = null; }
 }
 [Collection("Postgres")]
 public sealed partial class InterviewFlowTests(ApiFixture f)

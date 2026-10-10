@@ -37,6 +37,10 @@ public sealed class InterviewAnswer
     public string? TranscriptModel { get; private set; }
     public string? DecisionModel { get; private set; }
     public string? PromptVersion { get; private set; }
+    public decimal? Correctness { get; private set; }
+    public decimal? AssessmentConfidence { get; private set; }
+    internal void SetAssessment(decimal? correctness, decimal? confidence)
+    { Correctness = correctness; AssessmentConfidence = confidence; }
     public bool IsInteraction { get; private set; }
     public string? AssistantMessage { get; private set; }
     internal void FinishInteraction(string message, string model, string promptVersion, DateTimeOffset now)

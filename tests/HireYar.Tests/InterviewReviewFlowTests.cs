@@ -14,16 +14,22 @@ public sealed partial class InterviewFlowTests
     [PostgresFact]
     public async Task Review_migration_refuses_downgrade_that_would_discard_existing_history()
     {
-        var (_, invite) = await Invite(); using var candidate = Candidate(invite);
-        Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsJsonAsync($"/api/candidate/interviews/{invite.InterviewId}/events",
-            new InterviewEventRequest(Guid.NewGuid(), "consent_accepted", DateTimeOffset.UtcNow, "consent-v1"))).StatusCode);
-        await f.Db(async db => {
-            var exception = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261008135241_AddShortInterviewInvitations"));
-            Assert.Equal("P0001", exception.SqlState);
-            Assert.Contains("downgrade is unsafe", exception.MessageText);
-            Assert.Contains("20261010054552_AddInterviewReportReview", await db.Database.GetAppliedMigrationsAsync());
-            Assert.True(await db.InterviewReviewEntries.AnyAsync(e => e.InterviewSessionId == invite.InterviewId));
-        });
+        var isolated = new ApiFixture(); await isolated.InitializeAsync();
+        try
+        {
+            var flow = new InterviewFlowTests(isolated);
+            var (_, invite) = await flow.Invite(); using var candidate = flow.Candidate(invite);
+            Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsJsonAsync($"/api/candidate/interviews/{invite.InterviewId}/events",
+                new InterviewEventRequest(Guid.NewGuid(), "consent_accepted", DateTimeOffset.UtcNow, "consent-v1"))).StatusCode);
+            await isolated.Db(async db => {
+                var exception = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261008135241_AddShortInterviewInvitations"));
+                Assert.Equal("P0001", exception.SqlState);
+                Assert.Contains("downgrade is unsafe", exception.MessageText);
+                Assert.Contains("20261010054552_AddInterviewReportReview", await db.Database.GetAppliedMigrationsAsync());
+                Assert.True(await db.InterviewReviewEntries.AnyAsync(e => e.InterviewSessionId == invite.InterviewId));
+            });
+        }
+        finally { await ((IAsyncLifetime)isolated).DisposeAsync(); }
     }
     [PostgresFact]
     public async Task Review_events_and_human_decisions_are_scoped_idempotent_and_preserve_history()

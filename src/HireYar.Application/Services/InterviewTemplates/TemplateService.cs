@@ -12,14 +12,14 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         x.Questions.OrderBy(q => q.Order).Select(q => new QuestionDto(q.Id, q.Text, q.Order, q.Competency, q.EvaluationGuidance)).ToArray(), x.InterviewType, x.WelcomeMessage, x.GoodbyeMessage, x.UseTopicQuestions,
         x.UseTopicQuestions ? x.Questions.GroupBy(q => q.TopicOrder).OrderBy(g => g.Key).Select(g => new QuestionTopicRequest(g.First().TopicName!,
             g.OrderBy(q => q.Difficulty).Select(q => new TopicQuestionRequest(QuestionTopicRules.Level(q.Difficulty), q.Text)).ToList())).ToArray() : null,
-        x.UseTopicQuestions ? x.Questions.Select(q => q.TopicOrder).Distinct().Count() : x.Questions.Count,
+        x.Questions.Count,
         x.CandidateIntroductionEnabled, x.CandidateIntroductionMessage, x.CompanyIntroductionEnabled, x.CompanyIntroductionMessage);
     public async Task<Page<TemplateListDto>> ListAsync(PageQuery page, Guid? jobPositionId, CancellationToken ct)
     {
         var query = Scoped.AsNoTracking(); if (jobPositionId.HasValue) query = query.Where(x => x.JobPositionId == jobPositionId);
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.CreatedAtUtc).ThenBy(x => x.Id).Skip(page.Skip).Take(page.PageSize)
-            .Select(x => new TemplateListDto(x.Id, x.JobPositionId, x.Title, x.Language, x.DurationMinutes, x.IsArchived, x.RowVersion, x.InterviewType, x.Questions.Count, x.UseTopicQuestions, x.UseTopicQuestions ? x.Questions.Select(q => q.TopicOrder).Distinct().Count() : x.Questions.Count)).ToListAsync(ct);
+            .Select(x => new TemplateListDto(x.Id, x.JobPositionId, x.Title, x.Language, x.DurationMinutes, x.IsArchived, x.RowVersion, x.InterviewType, x.Questions.Count, x.UseTopicQuestions, x.Questions.Count)).ToListAsync(ct);
         return new(rows, total, page.Page, page.PageSize);
     }
     public async Task<TemplateDto> GetAsync(Guid id, CancellationToken ct) => Map(await Scoped.AsNoTracking().Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound());
