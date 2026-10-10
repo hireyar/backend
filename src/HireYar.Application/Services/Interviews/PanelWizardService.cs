@@ -52,9 +52,9 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             x.Text, template.UseTopicQuestions ? x.TopicName! : $"question-{x.Order}", x.Difficulty, true, x.Order)).ToArray();
         var session = new InterviewSession(user.OrganizationId, job.Id, application.Id, template.Id,
             questions, template.UseTopicQuestions ? topicSkills.Values : [new InterviewSkill(skillId, "ارزیابی شغلی", true, 100, 3)],
-            questions.Length,
+            template.UseTopicQuestions ? topicSkills.Count * 2 : questions.Length,
             template.DurationMinutes * 60, now, now.AddDays(r.DeadlineDays));
-        if (template.UseTopicQuestions) session.EnableProgressiveTopicQuestions();
+        if (template.UseTopicQuestions) session.EnableProgressiveTopicQuestions(mediumFirst: true);
         session.SetRequiredCapability(capability);
         session.SetInteractionLimit(2);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
@@ -126,7 +126,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                 session.Questions.Select(q => new InterviewQuestionSnapshot(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty, q.IsActive, q.Order)),
                 session.Skills, session.MaxQuestionCount, session.MaxDurationSeconds, now, now.AddDays(r.DeadlineDays));
             if (session.AskOneQuestionPerTopic) fresh.EnableTopicQuestions();
-            if (session.ProgressiveTopicQuestions) fresh.EnableProgressiveTopicQuestions();
+            if (session.ProgressiveTopicQuestions) fresh.EnableProgressiveTopicQuestions(session.MediumFirstTopicQuestions);
             fresh.SetRequiredCapability(session.RequiredCapabilityCode); fresh.SetInteractionLimit(session.MaxInteractionsPerQuestion);
             fresh.SetPanelSnapshot(session.PositionTitleSnapshot ?? job.Title, session.PositionDescriptionSnapshot ?? job.Description,
                 session.TemplateTitleSnapshot ?? template.Title, session.WelcomeMessage ?? template.WelcomeMessage, session.GoodbyeMessage ?? template.GoodbyeMessage);

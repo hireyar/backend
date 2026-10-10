@@ -211,7 +211,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                     shortlist.Append(question).DistinctBy(q => q.QuestionId).ToArray(), history.Turns,
                     s.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, s.RemainingInteractions, history.TotalTurns, history.IsPartial,
                     s.Evidence.Select(e => new HrEvidenceDto(e.InterviewAnswerId, e.QuestionId, e.SkillId, e.ScoreBefore, e.ScoreAfter,
-                        e.Delta, e.Confidence, e.Evidence, e.CreatedAtUtc)).ToArray(), s.ProgressiveTopicQuestions), ct);
+                        e.Delta, e.Confidence, e.Evidence, e.CreatedAtUtc)).ToArray(), s.ProgressiveTopicQuestions, s.MediumFirstTopicQuestions), ct);
                 else InterviewTrace.Emit("provider", "llm", "skipped", "قابلیت ارزیابی AI در قرارداد این جلسه فعال نیست؛ تصمیم بک‌اند اجرا می‌شود");
             }
             catch (InterviewProviderException e)

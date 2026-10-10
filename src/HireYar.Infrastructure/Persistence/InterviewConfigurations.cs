@@ -104,6 +104,7 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.ToTable(t => {
             t.HasCheckConstraint("CK_Interview_Stage", "\"Stage\" IN ('Welcome','CandidateIntroduction','Questions','CompanyIntroduction','Goodbye','Finished')");
             t.HasCheckConstraint("CK_Interview_TopicPolicy", "NOT (\"AskOneQuestionPerTopic\" AND \"ProgressiveTopicQuestions\")");
+            t.HasCheckConstraint("CK_Interview_MediumFirst", "NOT \"MediumFirstTopicQuestions\" OR (\"ProgressiveTopicQuestions\" AND \"MaxQuestionCount\" BETWEEN 10 AND 20 AND \"MaxQuestionCount\" % 2 = 0)");
             t.HasCheckConstraint("CK_Interview_Recovery", "\"RecoveryAttempts\" >= 0");
             t.HasCheckConstraint("CK_Interview_AccessAttempts", "\"AccessFailedAttempts\" BETWEEN 0 AND 5");
             t.HasCheckConstraint("CK_Interview_Replacement", "\"SupersededByInterviewId\" IS NULL OR (\"SupersededByInterviewId\" <> \"Id\" AND \"AccessRevokedAtUtc\" IS NOT NULL)");

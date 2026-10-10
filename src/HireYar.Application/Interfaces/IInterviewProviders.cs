@@ -16,7 +16,7 @@ public sealed record InterviewDecisionContext(string PositionTitle, Guid Current
     IReadOnlyList<InterviewDialogueTurn>? PreviousAnswers = null,
     string? MasterPrompt = null, int RemainingInteractions = 0,
     int TotalPreviousAnswers = 0, bool HistoryIsPartial = false,
-    IReadOnlyList<HrEvidenceDto>? PreviousEvidence = null, bool ProgressiveTopicQuestions = false);
+    IReadOnlyList<HrEvidenceDto>? PreviousEvidence = null, bool ProgressiveTopicQuestions = false, bool MediumFirstTopicQuestions = false);
 public sealed record InterviewDialogueTurn(Guid QuestionId, string Question, string? Answer, string? AssistantReply = null);
 public interface IResumeTextExtractor
 {

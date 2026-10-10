@@ -1,4 +1,10 @@
-## پیشروی سه‌سطحی موضوع — درخواست مستقل 2026-10-10: Verified محلی
+## مسیر متوسط و دو سؤال در هر موضوع — اصلاح صریح 2026-10-10: Verified محلی
+
+متوسط اول؛ پاسخ درست → سخت، پاسخ ناقص/ضعیف/unknown → آسان؛ پس از سؤال دوم موضوع بسته می‌شود. سقف ۲×موضوع و بانک سه‌سطحی، policy snapshot مستقل و سازگاری جلسه/resend قبلی پیاده شدند. ADR-033 و [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). build صفر warning/error و **۲۶۸ موفق، صفر شکست/Skip** با PostgreSQL واقعی محلی؛ migration/up/down/guard و SQL idempotent دوبار تأیید شدند.
+
+باقی مقصد: migration `20261010085424_AddMediumFirstTopicQuestions` پیش از کد، نمایش سقف ۱۰..۲۰ سؤال اصلی در Angular جدا و سنجش کیفیت پاسخ‌سنجی فارسی مدل واقعی. مجوز انتشار یا تماس واقعی provider صادر نشده؛ بخش سه‌سطحی زیر سابقه نسخه قبلی است.
+
+## پیشروی سه‌سطحی موضوع — درخواست مستقل 2026-10-10: Verified محلی (نسخه قبلی)
 
 دعوت موضوعی تازه با آسان ← متوسط ← سخت پس از پاسخ قابل‌قبول، grade persisted مستقل، سرور کنترل‌کننده سطح و مدل انتخاب‌کننده موضوع تازه پیاده شد. نسخه قبلی جلسه/resend محفوظ؛ سقف counters برابر ۳×موضوع، عمومی به ترتیب قالب و تخصصی shortlist. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md)، ADR-032 و migration `20261010075455_AddProgressiveTopicQuestions`.
 

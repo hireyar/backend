@@ -1,4 +1,10 @@
-## پیشروی آسان تا سخت در همان موضوع — 2026-10-10
+## اصلاح مسیر به متوسط و یک شاخه — 2026-10-10
+
+طبق تصحیح صریح کاربر، دعوت موضوعی تازه فقط دو سؤال اصلی در هر موضوع دارد: متوسط، سپس سخت اگر درستی >=۰٫۷ و confidence >=۰٫۶؛ در غیر این صورت آسان. پاسخ سؤال دوم مستقل از نمره به موضوع تازه از متوسط می‌رود. بانک سه سؤال دارد ولی سقف جلسه/قالب/پیشنهاد ۲×موضوع (۱۰..۲۰) است. clarify/followUp جزو سؤال اصلی نیستند. `MediumFirstTopicQuestions` و prompt `v4-medium-first` سیاست جدید را snapshot می‌کنند؛ جلسه قدیمی و resend آن تغییر مسیر نمی‌دهند. ADR-033 و [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md) قرارداد جاری‌اند؛ بخش قبلی زیر، نتیجه نسخه پیشین است.
+
+اعتبارسنجی واقعی نهایی: build صفر warning/error، **۲۶۸/۲۶۸ تست موفق، صفر شکست/Skip** روی PostgreSQL 18 اختصاصی loopback:55481 و AI مصنوعی؛ `tests/HireYar.Tests/TestResults/medium-first-verified.trx`. هر دو نوع عمومی/تخصصی، دو شاخه، unknown/low confidence، تعامل، منع سؤال سوم حتی پس از پاسخ صحیح آسان، persisted grade و resend تأیید شدند. migration جدید `20261010085424_AddMediumFirstTopicQuestions`؛ drift=false، Down دارای داده رد و رفت‌وبرگشت schema خالی موفق، script idempotent کامل دوبار و یک history entry. DBهای fixture صفر باقی؛ scratch پاک و cluster متوقف شد. فقط خطای analyzer تست Assert.Single پیش از اجرا اصلاح شد. مقصد/AI واقعی/Angular/push/deploy این نوبت انجام نشده‌اند.
+
+## پیشروی آسان تا سخت در همان موضوع — 2026-10-10 (نسخه قبلی)
 
 درخواست تازه کاربر روی dev از Git پاک پیاده شد: دعوت موضوعی تازهٔ عمومی/تخصصی از آسان آغاز و با درستی >=۰٫۷ و اطمینان >=۰٫۶ به متوسط و سخت همان موضوع می‌رود. پاسخ ضعیف/unknown، سپس موضوع تازه؛ grade پاسخ نهایی مستقل از امتیاز مهارت ذخیره می‌شود. سرور و Domain پرش سطح/بازگشت به موضوع بسته را منع می‌کنند؛ پوشش و sufficient evidence سؤال سخت را حذف نمی‌کنند. دعوت قبلی و resend آن سیاست قدیمی را حفظ می‌کنند. سقف API قالب/پیشنهاد و جلسه ۳×موضوع (۱۵..۳۰) است؛ زمان و billing قبلی حفظ شدند. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md)، ADR-032.
 

@@ -15,6 +15,13 @@ public sealed class InterviewPolicy
         if (session.CurrentQuestionId is { } current) asked.Add(current);
         if (session.ProgressiveTopicQuestions)
         {
+            if (session.MediumFirstTopicQuestions)
+            {
+                var allowed = session.GetProgressiveQuestions().OrderBy(q => q.Order).ThenBy(q => q.QuestionId);
+                var pendingMedium = session.CurrentQuestionId is { } medium && session.Questions.Single(q => q.QuestionId == medium).Difficulty == 3 &&
+                    !session.Answers.Any(a => a.QuestionId == medium && a.Status == AnswerStatus.Processed && !a.IsInteraction);
+                return allowed.Take(session.RequiredCapabilityCode == "hr_interview" && !pendingMedium ? 1 : shortlistLimit).ToArray();
+            }
             var progressive = session.GetProgressiveQuestions().Where(q => !asked.Contains(q.QuestionId))
                 .OrderByDescending(q => session.CurrentQuestionId is { } id &&
                     session.Questions.Single(x => x.QuestionId == id).Topic == q.Topic)
