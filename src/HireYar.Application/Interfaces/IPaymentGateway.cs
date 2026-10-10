@@ -12,6 +12,7 @@ public interface IPaymentGateway
 }
 public interface ISubscriptionEntitlementService
 {
+    Task<SubscriptionDto> MapAsync(HireYar.Domain.Billing.OrganizationSubscription subscription, string status, CancellationToken ct);
     Task<SubscriptionDto?> CurrentAsync(Guid organizationId, CancellationToken ct);
     Task<SubscriptionDto> RequireAsync(Guid organizationId, IEnumerable<string> capabilities, CancellationToken ct);
 }

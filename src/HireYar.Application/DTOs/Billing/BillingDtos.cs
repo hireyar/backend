@@ -32,7 +32,7 @@ public sealed record CreditPackageDto(Guid Id, string Name, decimal CreditAmount
     bool IsActive, bool IsPublic, int SortOrder, byte[] RowVersion);
 public sealed record EntitlementDto(string Code, string Name, FeatureDataType DataType, string? Value);
 public sealed record SubscriptionDto(Guid Id, string PackageCode, string PackageName, string Status, DateTimeOffset StartedAtUtc,
-    DateTimeOffset ExpiresAtUtc, decimal AiRatePerMinuteUsd, int RetentionDays, IReadOnlyList<EntitlementDto> Features);
+    DateTimeOffset ExpiresAtUtc, decimal AiRatePerMinuteUsd, int RetentionDays, IReadOnlyList<EntitlementDto> Features, bool IsTrial = false);
 public sealed record WalletDto(string Currency, decimal Balance, decimal ReservedCredit, decimal AvailableCredit);
 public sealed record TransactionDto(Guid Id, CreditTransactionType Type, decimal Amount, decimal BalanceBefore, decimal BalanceAfter,
     string ReferenceType, Guid ReferenceId, string? Description, DateTimeOffset CreatedAtUtc);

@@ -1,3 +1,13 @@
+## دوره آزمایشی ثبت‌نام — 2026-10-10
+
+روی dev از Git پاک، ثبت‌نام Owner/سازمان تازه در OTP یک trial دقیق ۷۲ساعته و یک دلار PromotionalCredit می‌سازد؛ اجتماع قابلیت‌های پکیج‌های فعال عمومی، نرخ/retention snapshot و IsTrial در DB/API موجودند. ورود دوباره/refresh هدیه یا مهلت تازه نمی‌دهد و حساب قدیمی backfill نمی‌شود. مانده هدیه بعد انقضا می‌ماند ولی دسترسی تازه به اشتراک نیاز دارد؛ خرید عادی بعد trial صف می‌شود، upgrade trial رد می‌شود. [REGISTRATION_TRIAL_API](REGISTRATION_TRIAL_API.md)، ADR-034.
+
+Migration `20261010132215_AddRegistrationTrial`، FK مرکب، unique یک trial/سازمان، immutable و guard تکمیل grant/ledger و Down دارای داده اضافه شدند. build صفر warning/error؛ suite نهایی **۲۷۵/۲۷۵ موفق، صفر شکست/Skip** روی PostgreSQL 18 اختصاصی loopback:55483 و AI/درگاه مصنوعی؛ `tests/HireYar.Tests/TestResults/registration-trial-complete.trx`. هفت تست تازه signup/credit/capabilities/expiry/queue/concurrency/rollback و مصاحبه/guard دارند. SQL idempotent کامل `artifacts/registration-trial-migrations.sql` دوبار روی scratch تصادفی با یک history entry موفق بود؛ drift=false و rollback خالی/محافظ دارای داده در آزمون واقعی بررسی شدند. DBهای fixture و scratch حذف و cluster اختصاصی متوقف شد.
+
+خطاهای میانی تست: صدور JWT با clock سه روز جلو آزمون wallet را نامعتبر کرد؛ بررسی service با TimeProvider اصلاح شد. تست OTP واقعی از fixture مشترک جدا شد تا تاریخچه trial محافظ downgrade قبلی را نپوشاند. تست قدیمی downgrade اکنون migrationهای جدیدتر برگشت‌پذیر را پس از رد محافظ قدیمی دوباره apply می‌کند تا schema fixture مشترک با مدل فعلی منطبق بماند. این تغییر assertion یا محافظ قدیمی را حذف نمی‌کند. sandbox exec راه‌اندازی نمی‌شد؛ اجرای مجاز خارج sandbox روی loopback اختصاصی انجام شد.
+
+Angular، DB مقصد/production، درگاه و AI واقعی و commit/push/deploy انجام نشده‌اند؛ تنظیمات و secretها محفوظ‌اند. پیش از اجرای نسخه جدید مقصد migration لازم است.
+
 ## اصلاح مسیر به متوسط و یک شاخه — 2026-10-10
 
 طبق تصحیح صریح کاربر، دعوت موضوعی تازه فقط دو سؤال اصلی در هر موضوع دارد: متوسط، سپس سخت اگر درستی >=۰٫۷ و confidence >=۰٫۶؛ در غیر این صورت آسان. پاسخ سؤال دوم مستقل از نمره به موضوع تازه از متوسط می‌رود. بانک سه سؤال دارد ولی سقف جلسه/قالب/پیشنهاد ۲×موضوع (۱۰..۲۰) است. clarify/followUp جزو سؤال اصلی نیستند. `MediumFirstTopicQuestions` و prompt `v4-medium-first` سیاست جدید را snapshot می‌کنند؛ جلسه قدیمی و resend آن تغییر مسیر نمی‌دهند. ADR-033 و [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md) قرارداد جاری‌اند؛ بخش قبلی زیر، نتیجه نسخه پیشین است.

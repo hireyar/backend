@@ -333,6 +333,11 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsTrial")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -342,7 +347,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PackagePeriodId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("PaymentId")
+                    b.Property<Guid?>("PaymentId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("StartedAtUtc")
@@ -354,6 +359,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId")
+                        .IsUnique()
+                        .HasFilter("\"IsTrial\"");
 
                     b.HasIndex("PaymentId")
                         .IsUnique();
@@ -368,6 +377,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("OrganizationSubscriptions", t =>
                         {
+                            t.HasCheckConstraint("CK_Subscription_Source", "(\"IsTrial\" AND \"PaymentId\" IS NULL AND \"ExpiresAtUtc\" = \"StartedAtUtc\" + interval '72 hours') OR (NOT \"IsTrial\" AND \"PaymentId\" IS NOT NULL)");
+
                             t.HasCheckConstraint("CK_Subscription_Values", "\"ExpiresAtUtc\" > \"StartedAtUtc\" AND \"Status\" IN ('Scheduled','Active','Expired','Cancelled','Suspended')");
                         });
                 });
@@ -601,6 +612,71 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_Package_Values", "\"AiPricePerMinuteUsd\" > 0 AND \"InterviewRetentionDays\" BETWEEN 1 AND 3650");
                         });
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.RegistrationTrial", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AiPricePerMinuteUsd")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("CreditAmountUsd")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RetentionDays")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id");
+
+                    b.HasIndex("OrganizationId")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "CreatedAtUtc", "Id");
+
+                    b.ToTable("RegistrationTrials", t =>
+                        {
+                            t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountUsd\" = 1 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650");
+                        });
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.RegistrationTrialEntitlement", b =>
+                {
+                    b.Property<Guid>("TrialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Value")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("TrialId", "Code");
+
+                    b.ToTable("RegistrationTrialEntitlement");
                 });
 
             modelBuilder.Entity("HireYar.Domain.Billing.SubscriptionEntitlement", b =>
@@ -2452,8 +2528,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OrganizationId", "PaymentId")
                         .HasPrincipalKey("OrganizationId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("HireYar.Domain.Billing.PackagePeriod", null)
                         .WithMany()
@@ -2499,6 +2574,31 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Organizations.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.RegistrationTrial", b =>
+                {
+                    b.HasOne("HireYar.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Billing.OrganizationSubscription", null)
+                        .WithOne()
+                        .HasForeignKey("HireYar.Domain.Billing.RegistrationTrial", "OrganizationId", "Id")
+                        .HasPrincipalKey("HireYar.Domain.Billing.OrganizationSubscription", "OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.RegistrationTrialEntitlement", b =>
+                {
+                    b.HasOne("HireYar.Domain.Billing.RegistrationTrial", null)
+                        .WithMany("Entitlements")
+                        .HasForeignKey("TrialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -2894,6 +2994,11 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Navigation("Features");
 
                     b.Navigation("Periods");
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.RegistrationTrial", b =>
+                {
+                    b.Navigation("Entitlements");
                 });
 
             modelBuilder.Entity("HireYar.Domain.Billing.SubscriptionPurchase", b =>

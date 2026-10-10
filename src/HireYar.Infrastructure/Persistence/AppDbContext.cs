@@ -13,6 +13,7 @@ namespace HireYar.Infrastructure.Persistence;
 
 public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options), IApplicationDbContext
 {
+    public DbSet<RegistrationTrial> RegistrationTrials => Set<RegistrationTrial>();
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<JobPosition> JobPositions => Set<JobPosition>();
     public DbSet<InterviewTemplate> InterviewTemplates => Set<InterviewTemplate>();

@@ -68,6 +68,16 @@ internal static class BillingConfigurations
         sub.HasOne<PackagePeriod>().WithMany().HasForeignKey(x => new { x.PackageId, x.PackagePeriodId }).HasPrincipalKey(x => new { x.PackageId, x.Id });
         sub.HasIndex(x => new { x.OrganizationId, x.StartedAtUtc, x.ExpiresAtUtc });
         sub.ToTable(t => t.HasCheckConstraint("CK_Subscription_Values", "\"ExpiresAtUtc\" > \"StartedAtUtc\" AND \"Status\" IN ('Scheduled','Active','Expired','Cancelled','Suspended')"));
+        sub.Property(x => x.IsTrial).HasDefaultValue(false);
+        sub.HasIndex(x => x.OrganizationId).IsUnique().HasFilter("\"IsTrial\"");
+        sub.ToTable(t => t.HasCheckConstraint("CK_Subscription_Source", "(\"IsTrial\" AND \"PaymentId\" IS NULL AND \"ExpiresAtUtc\" = \"StartedAtUtc\" + interval '72 hours') OR (NOT \"IsTrial\" AND \"PaymentId\" IS NOT NULL)"));
+        var trial = m.Entity<RegistrationTrial>(); Tenant(trial); trial.HasIndex(x => x.OrganizationId).IsUnique();
+        trial.HasOne<OrganizationSubscription>().WithOne().HasForeignKey<RegistrationTrial>(x => new { x.OrganizationId, x.Id }).HasPrincipalKey<OrganizationSubscription>(x => new { x.OrganizationId, x.Id });
+        Money(trial, nameof(RegistrationTrial.CreditAmountUsd)); Money(trial, nameof(RegistrationTrial.AiPricePerMinuteUsd));
+        trial.ToTable(t => t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountUsd\" = 1 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650"));
+        trial.HasMany(x => x.Entitlements).WithOne().HasForeignKey(x => x.TrialId);
+        var te = m.Entity<RegistrationTrialEntitlement>(); te.HasKey(x => new { x.TrialId, x.Code });
+        te.Property(x => x.Code).HasMaxLength(64); te.Property(x => x.Name).HasMaxLength(200); te.Property(x => x.Value).HasMaxLength(1000); te.Property(x => x.DataType).HasConversion<string>().HasMaxLength(20);
         var replacement = m.Entity<SubscriptionReplacement>(); Tenant(replacement);
         replacement.HasIndex(x => x.SubscriptionId).IsUnique(); replacement.HasIndex(x => x.PaymentId).IsUnique();
         replacement.HasOne<OrganizationSubscription>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.SubscriptionId }).HasPrincipalKey(x => new { x.OrganizationId, x.Id });

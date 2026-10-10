@@ -102,9 +102,21 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         browser.AccessToken = (await response.Content.ReadFromJsonAsync<AccessResponse>())!.AccessToken;
         return response;
     }
-    public async Task<Account> RegisterOwner()
+    public async Task<Account> RegisterOwner(bool signupTrial = false)
     {
         var browser = Browser(); var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
+        // Existing-account scenarios keep an empty billing baseline. Signup-specific tests
+        // opt into the real new-account OTP flow and its trial instead.
+        if (!signupTrial)
+        {
+            await using var scope = Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var now = Clock.GetUtcNow(); var org = new HireYar.Domain.Organizations.Organization { Name = "سازمان من", CreatedAtUtc = now, UpdatedAtUtc = now };
+            db.Organizations.Add(org); await db.SaveChangesAsync();
+            var result = await scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<HireYar.Infrastructure.Auth.ApplicationUser>>()
+                .CreateAsync(new() { Id = Guid.NewGuid(), UserName = mobile, PhoneNumber = mobile, PhoneNumberConfirmed = true,
+                    FullName = "کاربر", OrganizationId = org.Id, Role = HireYar.Domain.Organizations.OrganizationRole.Owner, CreatedAtUtc = now, UpdatedAtUtc = now });
+            Assert.True(result.Succeeded);
+        }
         await SignInAsync(browser, mobile);
         var me = (await (await browser.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
         return new(browser, mobile, me.Id);

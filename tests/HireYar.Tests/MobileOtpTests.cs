@@ -7,8 +7,13 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Tests;
 
 [Collection("Postgres")]
-public sealed class MobileOtpTests(ApiFixture fixture)
+public sealed class MobileOtpTests : IAsyncLifetime
 {
+    // Real signup creates trial history, whose downgrade guard must not affect
+    // older shared-fixture tests that intentionally roll back other migrations.
+    private readonly ApiFixture fixture = new();
+    public Task InitializeAsync() => fixture.InitializeAsync();
+    public Task DisposeAsync() => ((IAsyncLifetime)fixture).DisposeAsync();
     [PostgresFact]
     public async Task Fixed_otp_mode_skips_sms_and_accepts_configured_code_once()
     {

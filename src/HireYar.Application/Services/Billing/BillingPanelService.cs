@@ -22,8 +22,7 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
                 !db.SubscriptionReplacements.Any(r => r.OrganizationId == org && r.SubscriptionId == x.Id)).OrderByDescending(x => x.ExpiresAtUtc).FirstOrDefaultAsync(ct);
             if (previous is not null)
             {
-                var p = await db.SubscriptionPurchases.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == org && x.PaymentId == previous.PaymentId, ct);
-                expired = SubscriptionEntitlementService.Map(previous, p, "Expired");
+                expired = await entitlements.MapAsync(previous, "Expired", ct);
             }
         }
         var current = subscriptions.Current; decimal? minutes = current is null ? null : decimal.Floor((w.Balance - reserved) / current.AiRatePerMinuteUsd * 60m) / 60m;
@@ -46,6 +45,7 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
         if (r.Operation == "upgrade")
         {
             if (source is null) throw AppException.Conflict();
+            if (source.IsTrial) throw AppException.Invalid("trial_requires_purchase");
             var purchase = await db.SubscriptionPurchases.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == org && x.PaymentId == source.PaymentId, ct);
             var target = package.Features.Where(x => x.IsEnabled).ToDictionary(x => x.Feature.Code);
             var preserves = purchase.Entitlements.All(x => target.TryGetValue(x.Code, out var f) && f.Feature.DataType == x.DataType &&
