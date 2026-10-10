@@ -51,9 +51,37 @@ public sealed class InterviewSession
         ProcessingLeaseId = null; ProcessingLeaseExpiresAtUtc = null; ProcessingRevision = Guid.NewGuid();
     }
     public bool AskOneQuestionPerTopic { get; private set; }
+    public bool ProgressiveTopicQuestions { get; private set; }
+    public void EnableProgressiveTopicQuestions()
+    {
+        InterviewRules.Require(Status == InterviewStatus.Created && !AskOneQuestionPerTopic &&
+            skills.Count is >= 5 and <= 10 && MaxQuestionCount == skills.Count * 3 &&
+            questions.GroupBy(q => q.Topic).Count() == skills.Count && questions.GroupBy(q => q.Topic).All(g =>
+                g.Count() == 3 && g.All(q => q.IsActive) &&
+                g.Select(q => q.Difficulty).Order().SequenceEqual(new[] { 1, 3, 5 }) &&
+                g.Select(q => q.SkillId).Distinct().Count() == 1) &&
+            questions.Select(q => q.SkillId).Distinct().Count() == skills.Count, "invalid_topic_plan");
+        ProgressiveTopicQuestions = true;
+    }
+
+    // While evaluation is pending, offer both outcomes to the model. After grading,
+    // only the next level of a passed topic or easy questions of unvisited topics remain.
+    public IReadOnlyList<InterviewQuestionSnapshot> GetProgressiveQuestions()
+    {
+        var asked = questions.Where(q => q.AskedAtUtc is not null || q.QuestionId == CurrentQuestionId ||
+            answers.Any(a => a.QuestionId == q.QuestionId)).ToArray();
+        var unvisited = questions.Where(q => q.IsActive && q.Difficulty == 1 && asked.All(a => a.Topic != q.Topic)).ToArray();
+        var current = questions.SingleOrDefault(q => q.QuestionId == CurrentQuestionId);
+        if (current is null) return unvisited;
+        var next = questions.SingleOrDefault(q => q.IsActive && q.Topic == current.Topic && q.Difficulty == current.Difficulty + 2);
+        var final = answers.SingleOrDefault(a => a.QuestionId == current.QuestionId && a.Status == AnswerStatus.Processed && !a.IsInteraction);
+        if (next is null) return unvisited;
+        if (final is null) return new[] { next }.Concat(unvisited).ToArray();
+        return final.Correctness >= 0.7m && final.AssessmentConfidence >= 0.6m ? [next] : unvisited;
+    }
     public void EnableTopicQuestions()
     {
-        InterviewRules.Require(Status == InterviewStatus.Created && MaxQuestionCount is >= 5 and <= 10 && skills.Count == MaxQuestionCount &&
+        InterviewRules.Require(Status == InterviewStatus.Created && !ProgressiveTopicQuestions && MaxQuestionCount is >= 5 and <= 10 && skills.Count == MaxQuestionCount &&
             questions.GroupBy(q => q.Topic).Count() == MaxQuestionCount && questions.GroupBy(q => q.Topic).All(g =>
                 g.Count() == 3 && g.Select(q => q.Difficulty).Order().SequenceEqual(new[] { 1, 3, 5 }) && g.Select(q => q.SkillId).Distinct().Count() == 1), "invalid_topic_plan");
         AskOneQuestionPerTopic = true;
@@ -256,10 +284,14 @@ public sealed class InterviewSession
     }
 
     public void FinishAnswer(Guid answerId, IReadOnlyList<SkillAssessment> updates,
-        IReadOnlyList<TopicAssessment> topics, string model, string promptVersion, DateTimeOffset now)
+        IReadOnlyList<TopicAssessment> topics, string model, string promptVersion, DateTimeOffset now,
+        decimal? correctness = null, decimal? assessmentConfidence = null)
     {
         CheckTime(now); var answer = Processing(answerId);
         InterviewRules.Require(answer.Status == AnswerStatus.Evaluating, "invalid_answer_state");
+        InterviewRules.Require((correctness is null) == (assessmentConfidence is null), "invalid_answer_assessment");
+        if (correctness is { } score) InterviewRules.Unit(score);
+        if (assessmentConfidence is { } confidence) InterviewRules.Unit(confidence);
         var safeModel = InterviewRules.Text(model, 100); var safeVersion = InterviewRules.Text(promptVersion, 100);
         InterviewRules.Require(updates.Count <= Skills.Count && updates.Select(x => x.SkillId).Distinct().Count() == updates.Count,
             "duplicate_skill_update");
@@ -285,6 +317,7 @@ public sealed class InterviewSession
             if (state is null) { state = new(topic.SkillId, topic.Topic) { InterviewSessionId = Id }; coveredTopics.Add(state); }
             state.Apply(topic.Coverage, now);
         }
+        answer.SetAssessment(correctness, assessmentConfidence);
         answer.Finish(safeModel, safeVersion, now);
     }
 
@@ -330,7 +363,8 @@ public sealed class InterviewSession
     }
 
     private void CheckQuestion(Guid questionId) => InterviewRules.Require(Questions.Any(x => x.QuestionId == questionId && x.IsActive) &&
-        answers.All(x => x.QuestionId != questionId) && (!AskOneQuestionPerTopic ||
+        answers.All(x => x.QuestionId != questionId) && (!ProgressiveTopicQuestions ||
+            GetProgressiveQuestions().Any(q => q.QuestionId == questionId)) && (!AskOneQuestionPerTopic ||
             answers.All(a => questions.Single(q => q.QuestionId == a.QuestionId).Topic != questions.Single(q => q.QuestionId == questionId).Topic)), "question_not_allowed");
 
     private void CheckTime(DateTimeOffset now)

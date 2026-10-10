@@ -52,9 +52,9 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             x.Text, template.UseTopicQuestions ? x.TopicName! : $"question-{x.Order}", x.Difficulty, true, x.Order)).ToArray();
         var session = new InterviewSession(user.OrganizationId, job.Id, application.Id, template.Id,
             questions, template.UseTopicQuestions ? topicSkills.Values : [new InterviewSkill(skillId, "ارزیابی شغلی", true, 100, 3)],
-            template.UseTopicQuestions ? topicSkills.Count : questions.Length,
+            questions.Length,
             template.DurationMinutes * 60, now, now.AddDays(r.DeadlineDays));
-        if (template.UseTopicQuestions) session.EnableTopicQuestions();
+        if (template.UseTopicQuestions) session.EnableProgressiveTopicQuestions();
         session.SetRequiredCapability(capability);
         session.SetInteractionLimit(2);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
@@ -117,7 +117,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             if (session.SupersededByInterviewId is not null) throw new AppException(409, "invitation_already_replaced", "برای این مصاحبه دعوت جدیدی ساخته شده است.");
             var job = await db.JobPositions.AsNoTracking().SingleOrDefaultAsync(j => j.Id == session.JobPositionId && j.OrganizationId == user.OrganizationId && j.DeletedAtUtc == null && j.Status != HireYar.Domain.JobPositions.JobStatus.Archived, ct) ?? throw AppException.NotFound();
             var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(t => t.Id == session.InterviewTemplateId && t.OrganizationId == user.OrganizationId && t.DeletedAtUtc == null && !t.IsArchived, ct) ?? throw AppException.NotFound();
-            await entitlements.RequireAsync(user.OrganizationId, session.AskOneQuestionPerTopic
+            await entitlements.RequireAsync(user.OrganizationId, session.AskOneQuestionPerTopic || session.ProgressiveTopicQuestions
                 ? [session.RequiredCapabilityCode, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
                 : [session.RequiredCapabilityCode, "ai_interview"], ct);
             await db.InterviewAnswers.Where(a => a.InterviewSessionId == session.Id).ToListAsync(ct);
@@ -126,6 +126,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                 session.Questions.Select(q => new InterviewQuestionSnapshot(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty, q.IsActive, q.Order)),
                 session.Skills, session.MaxQuestionCount, session.MaxDurationSeconds, now, now.AddDays(r.DeadlineDays));
             if (session.AskOneQuestionPerTopic) fresh.EnableTopicQuestions();
+            if (session.ProgressiveTopicQuestions) fresh.EnableProgressiveTopicQuestions();
             fresh.SetRequiredCapability(session.RequiredCapabilityCode); fresh.SetInteractionLimit(session.MaxInteractionsPerQuestion);
             fresh.SetPanelSnapshot(session.PositionTitleSnapshot ?? job.Title, session.PositionDescriptionSnapshot ?? job.Description,
                 session.TemplateTitleSnapshot ?? template.Title, session.WelcomeMessage ?? template.WelcomeMessage, session.GoodbyeMessage ?? template.GoodbyeMessage);

@@ -211,7 +211,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                     shortlist.Append(question).DistinctBy(q => q.QuestionId).ToArray(), history.Turns,
                     s.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, s.RemainingInteractions, history.TotalTurns, history.IsPartial,
                     s.Evidence.Select(e => new HrEvidenceDto(e.InterviewAnswerId, e.QuestionId, e.SkillId, e.ScoreBefore, e.ScoreAfter,
-                        e.Delta, e.Confidence, e.Evidence, e.CreatedAtUtc)).ToArray()), ct);
+                        e.Delta, e.Confidence, e.Evidence, e.CreatedAtUtc)).ToArray(), s.ProgressiveTopicQuestions), ct);
                 else InterviewTrace.Emit("provider", "llm", "skipped", "قابلیت ارزیابی AI در قرارداد این جلسه فعال نیست؛ تصمیم بک‌اند اجرا می‌شود");
             }
             catch (InterviewProviderException e)
@@ -238,7 +238,8 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                 return await Map(s, true, ct);
             }
             s.FinishAnswer(answer.Id, capabilities.Contains("answer_analysis") ? result.SkillUpdates : [],
-                capabilities.Contains("avoid_repeated_topics") ? result.CoveredTopics : [], decision?.Model ?? "backend-fallback", s.MasterPromptVersion ?? InterviewDecisionPrompt.Version, time.GetUtcNow());
+                capabilities.Contains("avoid_repeated_topics") ? result.CoveredTopics : [], decision?.Model ?? "backend-fallback", s.MasterPromptVersion ?? InterviewDecisionPrompt.Version, time.GetUtcNow(),
+                result.Correctness, result.AssessmentConfidence);
             var sourceName = result.UsedFallback ? "Fallback" : "AI";
             answer.SetDiagnostics(result.UsedFallback ? "Evaluating" : null, result.UsedFallback ? failureCode ?? "decision_invalid" : null, sourceName);
             var completion = policy.GetCompletionReason(s, time.GetUtcNow());

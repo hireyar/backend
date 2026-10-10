@@ -22,6 +22,8 @@ public sealed record AnswerAssessment
     public required decimal Relevance { get; init; }
     public required decimal Clarity { get; init; }
     public required decimal EvidenceQuality { get; init; }
+    public decimal? Correctness { get; init; }
+    public decimal? Confidence { get; init; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -42,4 +44,5 @@ public sealed record TopicDecision
 
 public sealed record ValidatedInterviewDecision(IReadOnlyList<SkillAssessment> SkillUpdates,
     IReadOnlyList<TopicAssessment> CoveredTopics, Guid? NextQuestionId, bool UsedFallback,
-    InterviewCompletionReason? CompletionReason, string Action = "advance", string? CandidateMessage = null);
+    InterviewCompletionReason? CompletionReason, string Action = "advance", string? CandidateMessage = null,
+    decimal? Correctness = null, decimal? AssessmentConfidence = null);

@@ -87,7 +87,7 @@ public sealed partial class PanelWizardTests(ApiFixture f)
             Assert.Equal("Goodbye", goodbye.Stage); Assert.Equal(changed.GoodbyeMessage, goodbye.StageMessage);
             await f.Db(async db => { var s = await db.InterviewSessions.Include(s => s.Answers).SingleAsync(s => s.Id == invite.InterviewId);
                 Assert.Equal(5, s.Questions.Count); Assert.Equal(5, s.AnsweredQuestionCount); Assert.Equal(6, s.Answers.Count); Assert.Single(s.Answers, a => a.IsInteraction);
-                Assert.Equal(InterviewDecisionPrompt.Master, s.MasterPromptSnapshot); Assert.Equal("v2", s.MasterPromptVersion); Assert.False(db.Database.HasPendingModelChanges()); });
+                Assert.Equal(InterviewDecisionPrompt.Master, s.MasterPromptSnapshot); Assert.Equal(InterviewDecisionPrompt.Version, s.MasterPromptVersion); Assert.False(db.Database.HasPendingModelChanges()); });
         }
         finally { f.InterviewAi.Reset(); }
     }

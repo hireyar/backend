@@ -103,6 +103,7 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.HasIndex(x => x.CandidateApplicationId);
         b.ToTable(t => {
             t.HasCheckConstraint("CK_Interview_Stage", "\"Stage\" IN ('Welcome','CandidateIntroduction','Questions','CompanyIntroduction','Goodbye','Finished')");
+            t.HasCheckConstraint("CK_Interview_TopicPolicy", "NOT (\"AskOneQuestionPerTopic\" AND \"ProgressiveTopicQuestions\")");
             t.HasCheckConstraint("CK_Interview_Recovery", "\"RecoveryAttempts\" >= 0");
             t.HasCheckConstraint("CK_Interview_AccessAttempts", "\"AccessFailedAttempts\" BETWEEN 0 AND 5");
             t.HasCheckConstraint("CK_Interview_Replacement", "\"SupersededByInterviewId\" IS NULL OR (\"SupersededByInterviewId\" <> \"Id\" AND \"AccessRevokedAtUtc\" IS NOT NULL)");
@@ -145,6 +146,7 @@ public sealed class InterviewAnswerConfiguration : IEntityTypeConfiguration<Inte
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         b.ToTable(t => {
             t.HasCheckConstraint("CK_Answer_Status", "\"Status\" IN ('Uploaded','Transcribing','Transcribed','Evaluating','Processed','Failed')");
+            t.HasCheckConstraint("CK_Answer_Assessment", "(\"Correctness\" IS NULL AND \"AssessmentConfidence\" IS NULL) OR (\"Correctness\" IS NOT NULL AND \"AssessmentConfidence\" IS NOT NULL AND \"Correctness\" BETWEEN 0 AND 1 AND \"AssessmentConfidence\" BETWEEN 0 AND 1 AND \"Status\" = 'Processed' AND NOT \"IsInteraction\")");
             t.HasCheckConstraint("CK_Answer_Interaction", "(NOT \"IsInteraction\" AND \"AssistantMessage\" IS NULL) OR (\"IsInteraction\" AND \"Status\" = 'Processed' AND \"AssistantMessage\" IS NOT NULL AND length(btrim(\"AssistantMessage\")) > 0)");
             t.HasCheckConstraint("CK_Answer_Size", "\"AudioSizeBytes\" > 0");
             t.HasCheckConstraint("CK_Answer_Video", "(\"VideoStorageKey\" IS NULL AND \"VideoContentType\" IS NULL AND \"VideoSizeBytes\" IS NULL) OR (\"VideoStorageKey\" IS NOT NULL AND \"VideoContentType\" IS NOT NULL AND \"VideoSizeBytes\" IS NOT NULL AND \"VideoSizeBytes\" > 0)");

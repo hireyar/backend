@@ -40,10 +40,15 @@ public sealed class InterviewDecisionValidator(InterviewPolicy policy)
             return new([], [], null, false, null, decision.Action, decision.CandidateMessage);
         }
         if (decision.CandidateMessage is not null) return fallback;
-        if (completion is null && decision.NextQuestionId is null) return fallback;
+        var assessment = decision.AnswerAssessment;
+        if ((assessment.Correctness is null) != (assessment.Confidence is null) ||
+            assessment.Correctness is { } score && !Unit(score) || assessment.Confidence is { } confidence && !Unit(confidence) ||
+            session.ProgressiveTopicQuestions && assessment.Correctness is null) return fallback;
+        if (completion is null && decision.NextQuestionId is null && !session.ProgressiveTopicQuestions) return fallback;
         return new(decision.SkillUpdates.Select(x => new SkillAssessment(x.SkillId, x.Delta, x.Confidence, x.Evidence)).ToArray(),
             decision.CoveredTopics.Select(x => new TopicAssessment(question.SkillId, x.Topic, x.Coverage)).ToArray(),
-            completion is null ? decision.NextQuestionId : null, false, completion);
+            completion is null ? decision.NextQuestionId : null, false, completion,
+            Correctness: assessment.Correctness, AssessmentConfidence: assessment.Confidence);
     }
 
     private static bool Unit(decimal value) => value is >= 0 and <= 1;
