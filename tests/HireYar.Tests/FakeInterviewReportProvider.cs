@@ -24,7 +24,9 @@ public sealed class FakeInterviewReportProvider : IInterviewReportProvider
             Limitations = ["Synthetic limited evidence; final decision requires human review."],
             QuestionEvaluations = context.Answers.Where(a => !a.IsInteraction).Select(a => new InterviewQuestionEvaluation(a.AnswerId,
                 3, 0.8m, "ارزیابی آزمایشی پاسخ", a.Transcript![..Math.Min(100, a.Transcript!.Length)], ["شاهد آزمایشی"], [])).ToArray(),
-            NextRoundFocus = ["بررسی بیشتر شواهد"] };
+            NextRoundFocus = ["بررسی بیشتر شواهد"],
+            Metrics = InterviewReportMetricCatalog.Codes(context.InterviewType).Select(code => new InterviewReportMetric(code, null, null,
+                "شواهد کافی نیست", [])).ToArray() };
         return new(JsonSerializer.Serialize(content, new JsonSerializerOptions(JsonSerializerDefaults.Web)), "Test", "openai/gpt-6-luna");
     }
 }

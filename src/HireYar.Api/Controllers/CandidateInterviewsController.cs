@@ -31,8 +31,20 @@ public sealed class IntroductionUpload
 [ApiController, Route("api/candidate/interviews/{interviewId:guid}")]
 [Authorize(AuthenticationSchemes = InterviewAuthenticationHandler.SchemeName)]
 [EnableRateLimiting("candidate")]
-public sealed class CandidateInterviewsController(CandidateInterviewService service, InterviewAccessStatusService accessStatus) : ControllerBase
+public sealed class CandidateInterviewsController(CandidateInterviewService service, InterviewAccessStatusService accessStatus, InterviewReviewService reviews) : ControllerBase
 {
+    [HttpPost("events")]
+    public Task<InterviewReviewEntryDto> Event(Guid interviewId, InterviewEventRequest r, CancellationToken ct) => reviews.RecordEventAsync(interviewId, r, ct);
+    [HttpPost("recording"), Consumes("multipart/form-data"), RequestSizeLimit(514L * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 514L * 1024 * 1024)]
+    public async Task<InterviewRecordingDto> Recording(Guid interviewId, [FromForm] SessionRecordingUpload upload, CancellationToken ct)
+    {
+        IReadOnlyList<InterviewRecordingOffset>? timeline;
+        try { timeline = System.Text.Json.JsonSerializer.Deserialize<InterviewRecordingOffset[]>(upload.Timeline, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)); }
+        catch (System.Text.Json.JsonException) { throw HireYar.Application.Common.AppException.Invalid("recording_timeline_invalid"); }
+        await using var stream = upload.Video.OpenReadStream();
+        return await reviews.UploadRecordingAsync(interviewId, upload.UploadId, stream, upload.Video.FileName, upload.Video.ContentType,
+            upload.Video.Length, upload.DurationSeconds, timeline!, ct);
+    }
     [HttpGet("diagnostics"), Produces("text/event-stream")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task Diagnostics(Guid interviewId, CancellationToken ct) => InterviewDiagnosticStream.SendAsync(HttpContext, interviewId, false, ct);
@@ -75,4 +87,12 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
     [HttpPost("complete")] public Task<CandidateInterviewDto> Complete(Guid interviewId, CancellationToken ct) => service.CompleteAsync(interviewId, ct);
     [HttpGet("questions/{questionId:guid}/audio")]
     public async Task<IActionResult> Audio(Guid interviewId, Guid questionId, CancellationToken ct) => File(await service.OpenQuestionAudioAsync(interviewId, questionId, ct), "audio/mpeg", enableRangeProcessing: true);
+}
+
+public sealed class SessionRecordingUpload
+{
+    [Required] public IFormFile Video { get; set; } = null!;
+    public Guid UploadId { get; set; }
+    [Range(1, 14400)] public int DurationSeconds { get; set; }
+    [Required, StringLength(32000)] public string Timeline { get; set; } = "[]";
 }

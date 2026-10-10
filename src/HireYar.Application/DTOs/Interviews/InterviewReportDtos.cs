@@ -11,7 +11,15 @@ public sealed record InterviewReportContent
     public IReadOnlyList<InterviewQuestionEvaluation>? QuestionEvaluations { get; init; }
     public IReadOnlyList<string>? NextRoundFocus { get; init; }
     public InterviewReportDetails? Details { get; init; }
+    public IReadOnlyList<InterviewReportMetric>? Metrics { get; init; }
 }
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record InterviewReportMetric([property: JsonRequired] string Code, [property: JsonRequired] int? Score,
+    [property: JsonRequired] decimal? Confidence, [property: JsonRequired] string Explanation,
+    [property: JsonRequired] IReadOnlyList<InterviewReportCitation> Evidence);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record InterviewReportCitation([property: JsonRequired] Guid AnswerId, [property: JsonRequired] string Quote);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record InterviewQuestionEvaluation([property: JsonRequired] Guid AnswerId,
@@ -22,7 +30,15 @@ public sealed record InterviewQuestionEvaluation([property: JsonRequired] Guid A
 public sealed record InterviewReportDetails(string InterviewType, int AskedCount, int BankCount, int EvaluatedCount,
     decimal? OverallScore, decimal? Confidence, bool RequiresHumanReview, int ExcellentCount, int GoodCount,
     int WeakCount, decimal? AboveThresholdPercent, IReadOnlyList<InterviewReportQuestion> Questions,
-    IReadOnlyList<InterviewReportTopic> Topics, IReadOnlyList<string> Strengths, IReadOnlyList<string> Gaps);
+    IReadOnlyList<InterviewReportTopic> Topics, IReadOnlyList<string> Strengths, IReadOnlyList<string> Gaps)
+{
+    public IReadOnlyList<InterviewReportMetric>? Metrics { get; init; }
+    public decimal? FitScore { get; init; }
+    public decimal? AverageAnswerSeconds { get; init; }
+    public string ScoreFormula { get; init; } = "mean(answerScore)*20";
+    public IReadOnlyDictionary<string, decimal>? TopicWeights { get; init; }
+    public decimal? ReviewThreshold { get; init; }
+}
 public sealed record InterviewReportQuestion(Guid QuestionId, string Text, string Topic, int Difficulty,
     DateTimeOffset? AskedAtUtc, Guid? AnswerId, string? Transcript, int? Score, decimal? Confidence,
     string? Feedback, string? Quote, string? AudioUrl, string? VideoUrl);
@@ -45,3 +61,6 @@ public sealed record InterviewReportContext(string PositionTitle, string? Positi
     string? Introduction, string Language, string? CompletionReason, IReadOnlyList<InterviewReportAnswer> Answers,
     IReadOnlyList<HrEvidenceDto> Evidence, IReadOnlyList<HrSkillStateDto> SkillStates,
     IReadOnlyList<HrQuestionDto> Questions, string InterviewType = "specialized");
+
+public sealed record GenerateInterviewReportRequest(IReadOnlyDictionary<string, decimal>? TopicWeights = null,
+    decimal? ReviewThreshold = null);

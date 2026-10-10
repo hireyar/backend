@@ -25,12 +25,16 @@ public sealed class InterviewAuthenticationHandler(IOptionsMonitor<Authenticatio
         if (!Guid.TryParse(Request.RouteValues["interviewId"]?.ToString(), out var id)) return AuthenticateResult.Fail("Invalid interview access.");
         var s = await db.InterviewSessions.AsNoTracking().Where(x => x.Id == id && x.DeletedAtUtc == null)
             .Select(x => new { x.Id, x.OrganizationId, x.ProtectedAccessCode, x.AccessTokenHash, x.ExpiresAtUtc, x.AccessRevokedAtUtc,
-                x.SupersededByInterviewId, x.Status, x.Stage, x.AccessLockedUntilUtc }).SingleOrDefaultAsync(Context.RequestAborted);
+                x.SupersededByInterviewId, x.Status, x.Stage, x.CompletedAtUtc, x.AccessLockedUntilUtc }).SingleOrDefaultAsync(Context.RequestAborted);
         if (s is null) return AuthenticateResult.Fail("Invalid interview access.");
         failure = InterviewInvitationStatus.Get(s.SupersededByInterviewId, s.AccessRevokedAtUtc, s.Status, s.ExpiresAtUtc, time.GetUtcNow());
         // The final API response already carries company/goodbye stages. Only their acknowledgement/audio can finish playing.
         var closing = s.Status == InterviewStatus.Completed && s.Stage != InterviewStage.Finished && s.SupersededByInterviewId is null && s.AccessRevokedAtUtc is null &&
             s.ExpiresAtUtc > time.GetUtcNow() && (Request.Path.Value!.EndsWith("/stage/advance", StringComparison.Ordinal) || Request.Path.Value.Contains("/stages/", StringComparison.Ordinal));
+        // Final recording upload may follow automatic completion. This grace never permits new answers or starting again.
+        closing |= s.Status == InterviewStatus.Completed && s.CompletedAtUtc > time.GetUtcNow().AddMinutes(-10) &&
+            s.SupersededByInterviewId is null && s.AccessRevokedAtUtc is null && s.ExpiresAtUtc > time.GetUtcNow() &&
+            Request.Method == "POST" && (Request.Path.Value!.EndsWith("/recording", StringComparison.Ordinal) || Request.Path.Value.EndsWith("/events", StringComparison.Ordinal));
         if (failure.Status != "available" && !closing) return AuthenticateResult.Fail("Interview access is no longer available.");
         failure = null;
         if (s.AccessLockedUntilUtc > time.GetUtcNow()) { failure = Locked(); return AuthenticateResult.Fail("Interview access is temporarily locked."); }

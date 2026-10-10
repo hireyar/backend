@@ -5,12 +5,34 @@ using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Authorize(Roles = "Owner")]
-public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel, InterviewReportService reports) : ControllerBase
+public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel, InterviewReportService reports, InterviewReviewService reviews) : ControllerBase
 {
     [HttpPost("api/interviews/{id:guid}/evaluation-report")]
     public Task<InterviewReportDto> GenerateReport(Guid id, CancellationToken ct) => reports.GenerateAsync(id, ct);
     [HttpGet("api/interviews/{id:guid}/evaluation-report")]
     public Task<InterviewReportDto> EvaluationReport(Guid id, CancellationToken ct) => reports.GetAsync(id, ct);
+    [HttpGet("api/interviews/{id:guid}/evaluation-report/print")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> PrintReport(Guid id, CancellationToken ct)
+    {
+        var report = await reports.GetAsync(id, ct);
+        Response.Headers.ContentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return Content(InterviewReportPrint.Render(report, await reviews.GetAsync(id, ct)), "text/html; charset=utf-8");
+    }
+    [HttpPost("api/interviews/{id:guid}/evaluation-report/regenerate")]
+    public Task<InterviewReportDto> RegenerateReport(Guid id, GenerateInterviewReportRequest r, CancellationToken ct) => reports.GenerateAsync(id, ct, true, r);
+    [HttpGet("api/interviews/{id:guid}/review")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<InterviewReviewDto> Review(Guid id, CancellationToken ct) => reviews.GetAsync(id, ct);
+    [HttpPost("api/interviews/{id:guid}/decisions")]
+    public Task<InterviewReviewEntryDto> Decide(Guid id, InterviewHumanDecisionRequest r, CancellationToken ct) => reviews.DecideAsync(id, r, ct);
+    [HttpGet("api/interviews/{id:guid}/recording/video")]
+    public async Task<IActionResult> Recording(Guid id, CancellationToken ct)
+    {
+        var media = await reviews.OpenRecordingAsync(id, ct);
+        return File(media.Content, media.ContentType, enableRangeProcessing: true);
+    }
     [HttpGet("api/interviews")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<Page<PanelInterviewDto>> List([FromQuery] InterviewListQuery query, CancellationToken ct) => panel.ListAsync(query, ct);

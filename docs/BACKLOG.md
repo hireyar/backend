@@ -1,3 +1,17 @@
+## HY-301 — تکمیل بک‌اند طرح گزارش HTML (2026-10-10)
+
+Verification محلی تکمیل: build صفر warning/error؛ suite کامل PostgreSQL **۲۵۰ موفق، صفر Failed/Skipped**؛ `report-v3-verified.trx`. migration واقعی، tenant FK و محافظ downgrade بررسی شدند؛ script idempotent دو بار روی scratch تصادفی موفق بود، یک history entry. frontend/AI واقعی/مقصد و اشتراکِ نیازمند مجوز، تکمیل‌شده محسوب نمی‌شوند.
+
+report-v3، هفت شاخص عمومی/سه بعد تخصصی مستند، وزن/آستانه صریح و regenerate حفظ‌کننده cached، سابقه تصمیم انسانی، consent/device events گزارش‌شده و upload ویدیوی جلسه/timeline خصوصی پیاده‌اند. چاپ HTML/print CSS مسیر PDF مرورگر را فراهم می‌کند. [INTERVIEW_REPORT_V3_API](INTERVIEW_REPORT_V3_API.md) قرارداد همه مسیرها و مقیاس‌هاست؛ ADR-031 جای محدودیت‌های قبلی بک‌اند را برای نسخه جدید روشن می‌کند. وزن پیش‌فرض هر موضوع ۱ و بدون شواهد نمره null است؛ وزن JD حدس زده نمی‌شود.
+
+باقی برای استفاده کامل محصول: اتصال در Angular جدا (metrics/null نمودار، وزن‌ها/regenerate، decision، consent/events، recorder و offset واقعی، fetch رسانه با Bearer، print Blob)، اعمال migration مقصد با مجوز انتشار مستقل، آزمون فارسی واقعی مدل/میکروفون/دوربین/پیوستگی ضبط. آستانه/وزن‌ها از انتخاب HR می‌آیند؛ schema به معنی کیفیت اثبات‌شده مدل نیست. مقایسه آماری معتبر/استخدام خودکار وعده داده نمی‌شود. اشتراک خارج سازمان blocked by automatic approval review است؛ برای endpoint ناشناس توکن‌دار باید مجوز صریح کاربر درباره خروج داده و روش اشتراک گرفته شود. این کار اعمال نشده و بدون مجوز ادامه نمی‌یابد.
+
+## HY-301 — کسری‌های طرح مرجع evaluation-report (2026-10-10): بررسی انجام شد
+
+پس از pull کاربر، endpoint GET/POST /api/interviews/{id}/evaluation-report و report-v2 روی dev=9947b6a بررسی شدند؛ نتیجه نبود endpoint در checkout قدیمی دیگر وضعیت جاری نیست. گزارش سؤال‌محور/موضوعی موجود است ولی پنج مورد فرانت همچنان کم‌اند: سه بعد مستقل و وزن‌ها، هفت شاخص ثابت HR، ثبت رضایت/قطعی و معیار کامل‌بودن ضبط، ویدیوی پیوسته با offset، و API تصمیم انسانی. تطبیق کد و داده موجود در STATUS ثبت شد؛ ADR-030/INTERVIEW_EVALUATION_API نیز محدودیت‌ها را تأیید می‌کنند.
+
+ادامه پیاده‌سازی مطابق طرح نیازمند نام/تعریف/مقیاس هفت شاخص و وزن‌های ارزیابی است؛ HTML مرجع در Git نیست. ضبط پیوسته و telemetry جلسه به قرارداد دریافت داده از فرانت نیاز دارند؛ unknown تاریخی نباید با وضعیت/امتیاز فرضی backfill شود. برای گزارش cached باید سازگاری v1/v2 و سیاست بازتولید تعیین شود. runtime/schema این نوبت تغییر نکردند. build موفق؛ 9 تست report/history موفق و 3 API PostgreSQL Skip؛ نتیجه DB ادعا نشده. push/deploy/production تغییر نکردند.
+
 ## گزارش مطابق HTML — 2026-10-09
 
 بک‌اند report-v2 و قرارداد [INTERVIEW_EVALUATION_API](INTERVIEW_EVALUATION_API.md) آماده؛ build و ۱۴ تست مرتبط PostgreSQL واقعی موفق. فرانت جدا باید details nullable برای v1، نمودار topics واقعی، نمره null برای سؤال بی‌پاسخ، confidence/بررسی انسانی، transcript/feedback و رسانه با Bearer مالک را مصرف کند. میانگین ساده/آستانه پاسخ ۳ را روشن نمایش دهد؛ fit score/رتبه‌بندی معتبر/شاخص‌های HR بدون شواهد/رضایت و هشدار دستگاه را از نمونه ثابت کپی نکند. وزن شغلی/rubric اختصاصی در snapshot موجود نیست. PDF، اشتراک، بازتولید v1 و بررسی کیفیت واقعی مدل نیازمند درخواست مستقل‌اند؛ این فهرست مجوز اجرای خودکار آن‌ها نیست.

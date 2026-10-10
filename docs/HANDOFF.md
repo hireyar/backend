@@ -1,3 +1,23 @@
+## تحویل تکمیل بک‌اند گزارش HTML — 2026-10-10
+
+نتیجه نهایی واقعی: tool restore/restore موفق، build صفر warning/error و **۲۵۰/۲۵۰ تست PostgreSQL 18 اختصاصی موفق، صفر شکست/Skip**؛ `tests/HireYar.Tests/TestResults/report-v3-verified.trx`. drift=false؛ اجرای دوباره script idempotent روی scratch تصادفی یک entry از migration تازه داشت، scratch/DBهای fixture صفر باقی و cluster متوقف شد. محافظ Down با سوابق واقعی مصنوعی و rollback transaction آزموده شد. providerها مصنوعی بودند؛ کیفیت فارسی مدل یا ضبط واقعی/مرورگر از این نتیجه اثبات نمی‌شوند. شکست‌های میانی و اصلاح پیش‌فرض وزن، ordering JSONB و ترتیب EF navigation در STATUS ثبت شدند.
+
+تغییرات روی dev حاضر و commit/push/deploy نشده‌اند؛ تغییرات قبلی کاربر در سه مستند حفظ شدند. [INTERVIEW_REPORT_V3_API](INTERVIEW_REPORT_V3_API.md) را برای قرارداد دقیق بخوانید؛ پرامپت داخل HTML صرفاً پیشنهاد بود و معماری یک تماس گزارش/JSONB قبلی حفظ شد. نسخه تازه v3، metrics مستند یا null، وزن/آستانه انسانی، regenerate با حفظ گزارش قدیمی در شکست و lease، review/events/decisions، ضبط خصوصی session/timeline و چاپ HTML فارسی دارد. v1/v2 cached محفوظ‌اند؛ مسیر regenerate صریح نتیجه جاری را جایگزین می‌کند.
+
+Migration لازم `20261010054552_AddInterviewReportReview` و SQL idempotent محلی `artifacts/report-review-migrations.sql` است؛ FKهای مرکب سازمان، unique request replay، دو جدول کوچک و بازکردن constraint نتیجه گزارش برای lease بازتولید دارد. Down در حضور سابقه/ضبط یا بازتولید فعال، برای جلوگیری از حذف داده رد می‌شود. SQL مقصد این نوبت اعمال نشد؛ artefact SQL ignored است و قبل rollout باید از همین source دوباره تولید/بررسی شود. تنظیمات/کلیدها/provider/نمرات زنده/مالی محفوظ‌اند.
+
+Angular در ریپوی جدا باقی است: دکمه‌ها و charts/null، telemetry با UUID ثابت/نسخه رضایت، recorder پیوسته با offset نسبت به فایل، آپلود پایان و فرصت ده‌دقیقه‌ای Completed فقط برای recording/events، پخش با Bearer/retention و print Blob. Signature/file presence/telemetry کلاینت به معنی سلامت کامل یا بی‌قطعی بودن ضبط نیست؛ unknown تاریخی بازنویسی نمی‌شود. مدل واقعی و کیفیت فارسی یا رسانه واقعی هنوز آزموده نشده‌اند.
+
+اشتراک بیرون سازمان با anonymous bearer-token endpoint توسط automatic approval review رد شد: داده حساس و نبود مجوز صریح خروج/مخاطب/روش. هیچ فایل share/service/controller/schema آن اعمال نشده است؛ برای ادامه باید از کاربر مجوز صریح بگیرید. این مانع با مسیر دیگر دور زده نشده است. Print داخلی با احراز Owner فعال است؛ گزینه Save as PDF مرورگر انتخاب شده و backend PDF renderer/storage جدید نیست.
+
+## تحویل بررسی evaluation-report پس از pull — 2026-10-10
+
+بررسی اول روی dev قدیمی b2e9b87 بود؛ کاربر نسخه جدید را pull کرد و HEAD=9947b6a شامل HR reports شد. نتیجه اولیه نبود endpoint با بازبینی جدید جایگزین شد؛ اکنون GET/POST /api/interviews/{id}/evaluation-report در InterviewsController و InterviewReportService موجودند. تغییرات pull و تمام تنظیمات/secretهای کاربر حفظ شدند.
+
+InterviewReportDtos، DetailsBuilder، Prompt، Validator، Service و INTERVIEW_EVALUATION_API/ADR-030 خوانده شدند. report-v2 سؤال‌محور با یک score، confidence و evidence، میانگین ساده کل/موضوع، رسانه پاسخ و nextRoundFocus موجود است. هر پنج کسری فرانت تأیید شد؛ جدول شواهد در STATUS است. تعریف هفت شاخص ثابت HR و وزن‌ها در ریپو نیست و HTML مرجع در Git کپی نشده؛ سؤال مطرح‌شده درباره مسیر با pull پاسخ داده شد، تعریف شاخص/وزن هنوز لازم است. ویدیوی پیوسته و رضایت/قطعی صرفاً با DTO گزارش حل نمی‌شوند و ورودی جدید از فرانت می‌خواهند. تصمیم انسانی نیز API/history مستقل می‌خواهد؛ revoke/cancel جایگزین آن نیست.
+
+فقط STATUS/BACKLOG/HANDOFF این بررسی به‌روز شدند؛ runtime/schema یا تصمیم معماری تازه نداریم. build نسخه جدید صفر warning/error؛ تست InterviewHistoryAndReportTests و Evaluation_report API: 9 موفق، 0 شکست، 3 Skip به علت نبود HIREYAR_TEST_POSTGRES؛ tests/HireYar.Tests/TestResults/evaluation-report-review-current.trx. نتیجه 93 تست پیش از pull به نسخه جدید تعمیم داده نمی‌شود. PostgreSQL/AI/مرورگر واقعی این نوبت بررسی نشدند؛ commit/push/deploy/production انجام نشدند.
+
 ## تحویل گزارش سؤال‌محور — 2026-10-09
 
 روی dev از Git پاک؛ تغییرات working tree حاضر، بدون commit/push/deploy. [INTERVIEW_EVALUATION_API](INTERVIEW_EVALUATION_API.md) قرارداد report-v2 و Angular جداست. یک تماس مدل، ارزیابی یک‌به‌یک پاسخ‌های نهایی با نقل‌قول معتبر و پیشنهاد محور مصاحبه بعدی؛ سرور نمره کل/موضوع/توزیع و سؤال‌های واقعاً پرسیده‌شده و URL رسانه خصوصی را در همان JSONB ذخیره می‌کند. گزارش‌های قبلی cached بازنویسی نمی‌شوند و details جدید nullable است. migration/تنظیمات تازه ندارد؛ مدل/provider/timeout موجود حفظ شده‌اند.

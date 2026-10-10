@@ -209,7 +209,10 @@ public sealed partial class PanelWizardTests(ApiFixture f)
             Assert.Equal(InterviewStatus.Completed, previous.Status); Assert.Equal(fresh.InterviewId, previous.SupersededByInterviewId);
             Assert.Equal(InterviewStatus.Created, next.Status); Assert.Null(next.StartedAtUtc); Assert.Null(next.CandidateIntroductionTranscript);
             Assert.Empty(next.Answers); Assert.Empty(next.Evidence); Assert.All(next.Questions, q => Assert.Null(q.AskedAtUtc));
-            Assert.Equal(previous.Questions.Select(q => q.Text), next.Questions.Select(q => q.Text)); Assert.Equal(previous.ResumeTextSnapshot, next.ResumeTextSnapshot);
+            // EF navigation materialization order is not the persisted question order.
+            Assert.Equal(previous.Questions.OrderBy(q => q.Order).Select(q => (q.Order, q.Text)),
+                next.Questions.OrderBy(q => q.Order).Select(q => (q.Order, q.Text)));
+            Assert.Equal(previous.ResumeTextSnapshot, next.ResumeTextSnapshot);
         });
     }
 
