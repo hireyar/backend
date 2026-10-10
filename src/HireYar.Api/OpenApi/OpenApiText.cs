@@ -15,6 +15,13 @@ internal static class OpenApiText
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("CandidateInterviews", "Event") => "ثبت رضایت یا رویداد دستگاه گزارش‌شده توسط داوطلب",
+        ("CandidateInterviews", "Recording") => "آپلود خصوصی ویدیوی جلسه و زمان‌بندی پاسخ‌ها",
+        ("Interviews", "RegenerateReport") => "بازتولید صریح گزارش با وزن موضوعات و آستانه بررسی انسانی",
+        ("Interviews", "PrintReport") => "دریافت نسخه چاپی گزارش برای ذخیره PDF در مرورگر",
+        ("Interviews", "Review") => "مشاهده سابقه تصمیم انسانی، رضایت و رویدادهای ضبط",
+        ("Interviews", "Decide") => "ثبت تصمیم انسانی مرحله بعد، بررسی یا رد با حفظ سابقه",
+        ("Interviews", "Recording") => "دریافت خصوصی ویدیوی کامل آپلودشده جلسه",
         ("InterviewDiagnostics", "Stream") => "لاگ زنده موقت مصاحبه و پرامپت واقعی؛ فقط مالک سازمان",
         ("CandidateInterviews", "Diagnostics") => "لاگ زنده موقت مراحل مصاحبه بدون محتوای پرامپت",
         ("Auth", "Csrf") => "۱. دریافت توکن CSRF",

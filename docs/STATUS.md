@@ -1,3 +1,33 @@
+## تکمیل بک‌اند گزارش HTML — 2026-10-10
+
+اعتبارسنجی نهایی: tool restore و restore موفق؛ build صفر warning/error؛ **۲۵۰/۲۵۰ تست suite کامل موفق، صفر شکست/Skip** روی PostgreSQL 18 اختصاصی loopback:55481 و provider مصنوعی. TRX: `tests/HireYar.Tests/TestResults/report-v3-verified.trx`. هفت تست تازه metrics/citation/unknown/پرینت امن/وزن‌ها، review/تصمیم/replay/tenant FK، recording/offset/replay/media scope، regenerate/failure/رقابت/cached و محافظ واقعی downgrade را پوشش می‌دهند؛ EF HasPendingModelChanges=false است. SQL idempotent کامل دو بار روی scratch تصادفی موفق و migration جدید دقیقاً یک history entry داشت؛ scratch/DBهای fixture حذف و cluster متوقف شد.
+
+اجرای‌های میانی نهایی محسوب نمی‌شوند: متن summary فارسی OpenAPI و assertion هدر چاپ اصلاح شدند؛ تست وزن جزئی مقدار پیش‌فرض صفر را کشف کرد که به ۱ اصلاح شد؛ ترتیب کلیدهای JSONB در Map ثابت شد تا پاسخ اولیه/cached یکسان باشند. تست regenerate اکنون موضوع واقعاً پرسیده‌شده را به‌جای فرض topic-0 انتخاب می‌کند. تست قدیمی resend با Order ذخیره‌شده تطبیق می‌دهد، چون ترتیب materialization navigation EF تضمین ندارد. نتیجه ۲۵۰ موفق پس از تمام این اصلاح‌هاست.
+
+روی dev با حفظ تغییرات موجود کاربر در STATUS/BACKLOG/HANDOFF، HTML ارائه‌شده با کد تطبیق و report-v3 پیاده شد. هفت شاخص عمومی و سه بعد تخصصی با citation پاسخ نهایی یا null، fit مبتنی بر job_alignment، میانگین مدت اعلامی پاسخ و وزن/آستانه انتخاب صریح Owner در regenerate موجودند. یک تماس مدل، JSONB و providerهای موجود حفظ شدند؛ مدل/secret/config/نمرات زنده/صورتحساب تغییر نکردند. POST cached v1/v2 را بازنویسی نمی‌کند؛ regenerate نتیجه قبلی را تا commit موفق حفظ می‌کند.
+
+پنج کسری بک‌اند بررسی قبلی اکنون مسیر عملی دارند: metrics چندبعدی/شاخص‌های HR و وزن‌ها؛ InterviewReviewEntries برای رضایت/رویداد و تصمیم انسانی با replay/caps/FK tenant؛ InterviewSessionRecordings برای آپلود خصوصی فایل جلسه و offsetهای recorder نسبت به فایل. داده ناموجود unknown است؛ وجود فایل یا نبود رویداد سلامت کامل ضبط را اثبات نمی‌کند. تصمیم advance فقط ثبت تصمیم است و دعوت واقعی ارسال نمی‌کند. برای آپلود پس از تکمیل خودکار، فقط POST events/recording تا ده دقیقه با دعوت همچنان معتبر مجازند؛ start/current/answer دوباره باز نمی‌شوند.
+
+نسخه چاپی HTML فارسی با encode/CSP/no-store و print CSS برای Save as PDF مرورگر اضافه شد؛ server-side PDF/storage اضافه نشد. اشتراک ناشناسِ توکن‌دار توسط automatic approval review به دلیل داده حساس و نبود مجوز صریح خروج/مخاطب رد شد؛ هیچ کد/جدول/لینک آن اعمال نشد. Angular در این ریپو نیست؛ اتصال UI/recorder/چاپ باید طبق [INTERVIEW_REPORT_V3_API](INTERVIEW_REPORT_V3_API.md) در ریپوی فرانت انجام شود. AI واقعی/کیفیت فارسی/ضبط واقعی/browser مقصد هنوز تأیید نشده‌اند؛ push/deploy/production یا DB مقصد تغییر نکردند.
+
+## بررسی کسری‌های evaluation-report پس از pull — 2026-10-10
+
+بررسی اولیه روی dev قدیمی b2e9b87 انجام شد. کاربر سپس نسخه جدید را pull کرد؛ بازبینی روی HEAD=9947b6a شامل commit گزارش 7b0c0e3 انجام شد. نتیجه اولیه نبود endpoint با این نسخه جایگزین است: GET/POST /api/interviews/{id}/evaluation-report در InterviewsController موجودند. تغییرات pull کاربر حفظ شدند.
+
+قرارداد report-v2، DTO، builder، prompt، validator و سرویس با فهرست فرانت تطبیق داده شدند. داده موجود: نمره ۰–۵ هر پاسخ نهایی، confidence، نقل‌قول/feedback/highlights/gaps، میانگین کل و موضوع در مقیاس ۱۰۰، توزیع، بررسی انسانی، nextRoundFocus، askedAtUtc و رسانه مستقل هر پاسخ. پنج کسری تأییدشده:
+
+| درخواست فرانت | وضعیت نسخه جدید |
+| --- | --- |
+| عمق دانش، ارتباط، تطابق JD و وزن‌ها | QuestionEvaluations فقط یک Score دارد؛ OverallScore و Topic.Score میانگین ساده‌اند. سه بعد مستقل و وزن ارزیابی persist نمی‌شوند. JD ورودی مدل است ولی fit score مستقل نیست؛ InterviewSkill.Priority اولویت سؤال است. |
+| هفت شاخص ثابت HR | عمومی topics واقعی سؤال‌های پرسیده‌شده را نشان می‌دهد؛ مدل/قرارداد ثابت هفت‌گانه ندارد. نام، تعریف، شواهد لازم، مقیاس و وزن‌ها در ریپو نیست؛ HTML مرجع در Git ذخیره نشده است. |
+| کامل‌بودن ضبط، رضایت و قطعی | رویداد consent/disconnect و معیار کامل‌بودن ضبط وجود ندارد؛ وضعیت Completed، processing failure و وجود فایل اثبات این موارد نیستند. قرارداد دریافت رویداد از فرانت لازم است؛ تاریخچه فاقد شاهد unknown باقی بماند. |
+| ویدیوی پیوسته و offset پاسخ‌ها | AudioUrl/VideoUrl مستقل هر پاسخ و askedAtUtc موجودند؛ فایل جلسه پیوسته و زمان‌بندی نسبت به رسانه وجود ندارند. durationSeconds/lastSpeechEndUtc metadata هستند، offset ویدیوی پیوسته نیستند. نیازمند ضبط/upload و قرارداد timeline با فرانت است. |
+| ثبت تصمیم انسانی | nextRoundFocus پیشنهاد متنی مدل است؛ requiresHumanReview پرچم بررسی است. API رد/مرحله بعد و سابقه تصمیم انسانی وجود ندارد؛ cancel/revoke ابطال دعوت‌اند. |
+
+ADR-030 و INTERVIEW_EVALUATION_API همین محدودیت‌ها را صریح ثبت کرده‌اند؛ نقص فهرست فرانت واقعی است، نه صرفاً فیلد با نام دیگر. کد/schema تغییر نکرد؛ برای پیاده‌سازی مطابق طرح، تعریف هفت شاخص و وزن‌ها/مقیاس از کاربر درخواست شد. سیاست بازتولید گزارش cached v1/v2 نیز هنگام گسترش قرارداد باید تعیین شود؛ POST فعلی cached را بازنویسی نمی‌کند.
+
+اعتبارسنجی نسخه جدید: build موفق، صفر warning/error؛ InterviewHistoryAndReportTests و APIهای Evaluation_report: 9 موفق، صفر شکست، 3 Skip به علت نبود HIREYAR_TEST_POSTGRES. TRX: tests/HireYar.Tests/TestResults/evaluation-report-review-current.trx. نتیجه 93 تست بررسی اولیه متعلق به checkout قبل pull است. PostgreSQL، AI و مرورگر واقعی این نوبت تأیید نشده‌اند؛ فقط STATUS/BACKLOG/HANDOFF تغییر کردند؛ push/deploy/production تغییر نکردند.
+
 ## گزارش سؤال‌محور مطابق HTML — 2026-10-09
 
 روی dev با Git شروع پاک، report-v2 به مسیر موجود اضافه شد: ارزیابی ۰–۵ هر پاسخ نهایی، confidence/feedback/quote/highlights/gaps و nextRoundFocus؛ جزئیات پرسیده‌شده، موضوع/سطح واقعی، نمره کل/توزیع/پوشش و رسانه احرازشده را سرور محاسبه می‌کند. یک تماس مدل، JSONB/claim موجود، بدون migration/جدول/worker تازه. v1 cached محفوظ، نمرات زنده/مالی دست‌نخورده. عمومی بدون رزومه/معرفی؛ سؤال بی‌پاسخ نمره null؛ وزن JD/fit score/شاخص HR حدسی/تصمیم استخدام/رویداد دستگاه ساخته نمی‌شوند. [INTERVIEW_EVALUATION_API](INTERVIEW_EVALUATION_API.md) قرارداد جاری است.

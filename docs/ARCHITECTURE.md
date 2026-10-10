@@ -1,3 +1,15 @@
+## ADR-031 — تکمیل گزارش، سابقه انسانی و ضبط جلسه (2026-10-10)
+
+درخواست صریح تطبیق و تکمیل HTML مرجع، report-v3 را به ADR-030 می‌افزاید. یک تماس مدل و JSONB گزارش موجود حفظ می‌شوند. catalog ثابت هفت شاخص عمومی/سه بعد تخصصی با citation معتبر یا score=null؛ تناسب فقط مهارتِ نشان‌داده‌شده در مقابل JD است و سنجش حدسی شخصیت/شباهت فرهنگی جای خود را به working_practices مرتبط با نقش می‌دهد. وزن‌های مثبت موضوعات و آستانه بررسی انتخاب صریح Owner در regenerate و persist در نتیجه هستند؛ وزن ناموجود=۱، نه استخراج حدسی از JD/Priority. JSON/schema به‌تنهایی صحت معنایی مدل را اثبات نمی‌کند.
+
+بازتولید صریح lease موجود را مصرف و گزارش cached را تا commit معتبر حفظ می‌کند؛ constraint metadata اجازه نتیجه قبلی همراه lease می‌دهد. شکست/رقابت/stale generator نتیجه قبلی را حذف نمی‌کند. v1/v2 در POST عادی محفوظ‌اند؛ regenerate نتیجه جاری را جایگزین می‌کند، آرشیو نسخه گزارش تازه نداریم.
+
+InterviewReviewEntry سابقه append-only تصمیم Owner از هویت سرور و telemetry گزارش‌شده توسط داوطلب است؛ درخواست replay با RequestId و unique composite، serialize زیر قفل کوتاه سازمان. زمان دریافت سرور و رخداد کلاینت جدا، UTC با precision PostgreSQL؛ caps انسانی و داوطلب مستقل‌اند. این داده در prompt ارزیابی یا نمرات منفی خودکار به کار نمی‌رود. نبود شاهد unknown است.
+
+InterviewSessionRecording فایل immutable جلسه در storage خصوصی videos موجود و timeline JSONB اعلامی recorder است؛ FK مرکب tenant، حداکثر ۵۱۲ MiB/چهار ساعت، validation offset/answer/اندازه و signature، upload بیرون transaction و recheck دسترسی/retention زیر قفل. فایل با scope Owner/retention/range عرضه می‌شود؛ فایل بازنده پاک می‌شود. داده timestamp قبلی به offset تبدیل نمی‌شود؛ decode/کامل‌بودن رسانه ادعا نمی‌شود. استثنای احراز دعوت فقط POST recording/events تا ده دقیقه پس از Completed، بدون بازکردن current/start/answers، برای آپلود پس از پایان خودکار است. ابطال/حذف/جایگزینی/expiry همچنان مقدم‌اند.
+
+چاپ HTML فارسی با encode/CSP/no-store و print CSS انتخاب PDF مرورگرِ طرح است؛ سرویس PDF/storage یا provider تازه نداریم. اشتراک بیرون سازمان با endpoint ناشناسِ توکن‌دار توسط بازبینی خودکار ایمنی رد شد و اعمال نشده است؛ ادامه نیازمند مجوز صریح کاربر است. Angular/انتشار مقصد همچنان خارج ریپو هستند. [INTERVIEW_REPORT_V3_API](INTERVIEW_REPORT_V3_API.md) قرارداد دقیق اتصال، مقیاس و محدودیت‌هاست.
+
 ## ADR-028 — تست گذرای میکروفون پیش از مصاحبه (2026-10-08)
 
 POST audio-check در Controller داوطلب، با scheme دعوت موجود و فقط Created، اعتبارسنجی صوت و STT موجود را مصرف می‌کند؛ حداکثر فایل ۲ MiB (یا حد تنظیمی پایین‌تر)، مدت اعلامی کلاینت ۱ تا ۳۰ ثانیه. Application دسترسی و وضعیت را پیش از تماس و پس از reload بررسی می‌کند. فایل/متن در storage/DB/لاگ برنامه ثبت نمی‌شوند؛ state، billing، Answer/Introduction، LLM و TTS تغییر نمی‌کنند. هر ارسال تماس مستقل STT است؛ retry خودکار/cache/idempotency یا migration ندارد. DTO تفکیک دریافت فایل، تشخیص گفتار و clarityVerified=false دارد؛ STT فعلی معیار کیفیت صوت یا قطع‌نشدن جمله نیست. تطبیق متن با جمله آزمایشی و تأیید کاربر در Angular ریپوی جدا انجام می‌شود؛ API شرط اجباری start نیست. [INTERVIEW_AUDIO_CHECK_API](INTERVIEW_AUDIO_CHECK_API.md).

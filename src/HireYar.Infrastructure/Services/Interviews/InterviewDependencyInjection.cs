@@ -49,6 +49,7 @@ public static class InterviewDependencyInjection
                 "InterviewInvitations:CandidateLinkPath must be a relative page path containing {id} without query or fragment.").ValidateOnStart();
         services.AddSingleton<IInterviewInvitationSecurity, ProtectedInterviewInvitationSecurity>();
         services.AddScoped<InterviewReportService>();
+        services.AddScoped<InterviewReviewService>();
         services.AddScoped<InterviewAccessStatusService>();
         services.AddSingleton<IResumeTextExtractor, ResumeTextExtractor>();
         services.AddHostedService<InterviewRecoveryWorker>();

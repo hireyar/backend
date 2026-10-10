@@ -126,6 +126,16 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
         };
         if (action == "Introduction") operation.RequestBody.Content!["multipart/form-data"].Schema!.Properties!.Remove("questionId");
     }
+    if (controller == "CandidateInterviews" && action == "Recording")
+        operation.RequestBody = new OpenApiRequestBody { Required = true, Content = new Dictionary<string, OpenApiMediaType> {
+            ["multipart/form-data"] = new() { Schema = new OpenApiSchema { Type = JsonSchemaType.Object, Required = new HashSet<string> { "video", "uploadId", "durationSeconds", "timeline" },
+                Properties = new Dictionary<string, IOpenApiSchema> {
+                    ["video"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary", Description = "Private session WebM/MP4, maximum 512 MiB; container and completeness are not decoded or verified." },
+                    ["uploadId"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid", Description = "Stable nonempty UUID for transport replay." },
+                    ["durationSeconds"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "Client-reported duration, 1–14400 seconds." },
+                    ["timeline"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = "JSON array of {answerId,startSeconds,endSeconds}; offsets relative to this file. Maximum 200 distinct existing answers." }
+                } } }
+        } };
     if (controller == "CandidateInterviews" && action == "CheckAudio")
         operation.RequestBody = new OpenApiRequestBody { Required = true, Content = new Dictionary<string, OpenApiMediaType> {
             ["multipart/form-data"] = new() { Schema = new OpenApiSchema { Type = JsonSchemaType.Object, Required = new HashSet<string> { "audio" },

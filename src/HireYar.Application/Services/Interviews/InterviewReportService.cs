@@ -21,9 +21,13 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
         return report?.ResultJson is not null ? Map(report) : throw AppException.NotFound();
     }
 
-    public async Task<InterviewReportDto> GenerateAsync(Guid id, CancellationToken ct)
+    public async Task<InterviewReportDto> GenerateAsync(Guid id, CancellationToken ct, bool regenerate = false, GenerateInterviewReportRequest? settings = null)
     {
         var session = await Scoped(id, ct);
+        var topics = session.Questions.Where(q => q.AskedAtUtc is not null || session.Answers.Any(a => a.QuestionId == q.QuestionId)).Select(q => q.Topic).Distinct().ToArray();
+        if (settings?.ReviewThreshold is < 0 or > 100 || settings?.TopicWeights is { } weights &&
+            (weights.Count > topics.Length || weights.Any(w => !topics.Contains(w.Key) || w.Value is <= 0 or > 100)))
+            throw AppException.Invalid("report_settings_invalid");
         var lease = Guid.NewGuid(); InterviewEvaluationReport? row = null;
         var cached = await db.WithOrganizationBillingLockAsync(user.OrganizationId, async () => {
             await db.ReloadInterviewAsync(session, ct);
@@ -32,7 +36,7 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
             if (!(await billing.CapabilitiesAsync(session, ct)).Contains("interview_report"))
                 throw new AppException(403, "feature_unavailable", "The interview contract does not include reports.");
             row = await db.InterviewEvaluationReports.SingleOrDefaultAsync(r => r.InterviewSessionId == id && r.OrganizationId == user.OrganizationId, ct);
-            if (row?.ResultJson is not null) return Map(row);
+            if (row?.ResultJson is not null && !regenerate) return Map(row);
             if (row?.LeaseExpiresAtUtc > time.GetUtcNow()) throw new AppException(409, "report_processing", "The evaluation report is being generated.");
             if (row is null) { row = new() { InterviewSessionId = id, OrganizationId = user.OrganizationId }; db.InterviewEvaluationReports.Add(row); }
             // Provider report timeout is limited to 120 seconds. Expiry allows recovery after process interruption.
@@ -55,7 +59,7 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
                 session.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized");
             if (context.InterviewType == "general") context = context with { Resume = null, Introduction = null };
             var generated = await provider.GenerateReportAsync(context, ct);
-            var content = InterviewReportDetailsBuilder.Build(InterviewReportValidator.Validate(generated.Json, context, true), session);
+            var content = InterviewReportDetailsBuilder.Build(InterviewReportValidator.Validate(generated.Json, context, true, true), session, settings);
             return await db.WithOrganizationBillingLockAsync(user.OrganizationId, async () => {
                 await db.ReloadInterviewAsync(session, ct);
                 if (session.DeletedAtUtc is not null) throw AppException.NotFound();
@@ -90,6 +94,12 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
         }
     }
 
-    private static InterviewReportDto Map(InterviewEvaluationReport row) => new(row.InterviewSessionId, row.Model!, row.Provider!,
-        row.PromptVersion!, row.CreatedAtUtc!.Value, JsonSerializer.Deserialize<InterviewReportContent>(row.ResultJson!, Json)!);
+    private static InterviewReportDto Map(InterviewEvaluationReport row)
+    {
+        var content = JsonSerializer.Deserialize<InterviewReportContent>(row.ResultJson!, Json)!;
+        // JSONB normalizes object-key order. Keep the initial and cached API representations stable.
+        if (content.Details is { TopicWeights: { } weights } details)
+            content = content with { Details = details with { TopicWeights = weights.OrderBy(w => w.Key, StringComparer.Ordinal).ToDictionary(w => w.Key, w => w.Value) } };
+        return new(row.InterviewSessionId, row.Model!, row.Provider!, row.PromptVersion!, row.CreatedAtUtc!.Value, content);
+    }
 }

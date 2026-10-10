@@ -152,6 +152,19 @@ public sealed class InterviewHistoryAndReportTests
         Assert.True(result.RequiresHumanReview); Assert.Equal(3, result.Topics[0].ReachedDifficulty);
     }
 
+    [Fact]
+    public void Explicit_topic_weights_change_only_report_aggregates_and_preserve_live_scores()
+    {
+        var (session, answer) = History(); session.FinishAnswer(answer.Id, [], [], "Test", "v2", Now.AddSeconds(83));
+        var content = new InterviewReportContent { Summary = "خلاصه", Findings = [], Limitations = ["محدودیت"], NextRoundFocus = [],
+            QuestionEvaluations = session.Answers.Where(a => !a.IsInteraction).Select((a, i) =>
+                new InterviewQuestionEvaluation(a.Id, i == 0 ? 1 : i == 1 ? 5 : 3, 0.8m, "توضیح", a.Transcript!, [], [])).ToArray() };
+        var states = session.SkillStates.Select(s => s.CurrentScore).ToArray();
+        var report = InterviewReportDetailsBuilder.Build(content, session, new(new Dictionary<string, decimal> { ["locking"] = 3 }, 60)).Details!;
+        Assert.Equal(53.33m, report.OverallScore); Assert.Equal(40m, report.Topics.Single(t => t.Topic == "locking").Score);
+        Assert.True(report.RequiresHumanReview); Assert.Equal(states, session.SkillStates.Select(s => s.CurrentScore));
+    }
+
     private sealed class Handler : HttpMessageHandler
     {
         public List<string> Models { get; } = [];

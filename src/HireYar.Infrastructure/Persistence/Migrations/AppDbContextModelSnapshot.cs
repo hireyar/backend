@@ -1263,7 +1263,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_Report_Lease", "(\"LeaseId\" IS NULL AND \"LeaseExpiresAtUtc\" IS NULL) OR (\"LeaseId\" IS NOT NULL AND \"LeaseExpiresAtUtc\" IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_Report_Result", "(\"ResultJson\" IS NULL AND \"Model\" IS NULL AND \"Provider\" IS NULL AND \"PromptVersion\" IS NULL AND \"CreatedAtUtc\" IS NULL) OR (\"ResultJson\" IS NOT NULL AND \"Model\" IS NOT NULL AND \"Provider\" IS NOT NULL AND \"PromptVersion\" IS NOT NULL AND \"CreatedAtUtc\" IS NOT NULL AND \"LeaseId\" IS NULL)");
+                            t.HasCheckConstraint("CK_Report_Result", "(\"ResultJson\" IS NULL AND \"Model\" IS NULL AND \"Provider\" IS NULL AND \"PromptVersion\" IS NULL AND \"CreatedAtUtc\" IS NULL) OR (\"ResultJson\" IS NOT NULL AND \"Model\" IS NOT NULL AND \"Provider\" IS NOT NULL AND \"PromptVersion\" IS NOT NULL AND \"CreatedAtUtc\" IS NOT NULL)");
                         });
                 });
 
@@ -1422,6 +1422,50 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasIndex("InterviewSessionId", "SkillId");
 
                     b.ToTable("InterviewQuestionSnapshots", (string)null);
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewReviewEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ClientOccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId", "RequestId")
+                        .IsUnique();
+
+                    b.ToTable("InterviewReviewEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_Review_KindActor", "(\"ActorUserId\" IS NOT NULL AND \"Kind\" IN ('advance','review','reject') AND \"ClientOccurredAtUtc\" IS NULL) OR (\"ActorUserId\" IS NULL AND \"Kind\" IN ('consent_accepted','consent_revoked','microphone_disconnected','camera_disconnected','page_hidden','recording_started','recording_stopped') AND \"ClientOccurredAtUtc\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("HireYar.Domain.Interviews.InterviewSession", b =>
@@ -1641,6 +1685,50 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Interview_Stage", "\"Stage\" IN ('Welcome','CandidateIntroduction','Questions','CompanyIntroduction','Goodbye','Finished')");
 
                             t.HasCheckConstraint("CK_Interview_Status", "\"Status\" IN ('Created','WaitingForAnswer','ProcessingAnswer','Completed','Cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewSessionRecording", b =>
+                {
+                    b.Property<Guid>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("TimelineJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("UploadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UploadedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("InterviewSessionId");
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId");
+
+                    b.ToTable("InterviewSessionRecordings", t =>
+                        {
+                            t.HasCheckConstraint("CK_Recording_Values", "\"DurationSeconds\" BETWEEN 1 AND 14400 AND \"SizeBytes\" > 0 AND \"ContentType\" IN ('video/webm','video/mp4')");
                         });
                 });
 
@@ -2576,6 +2664,16 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewReviewEntry", b =>
+                {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HireYar.Domain.Interviews.InterviewSession", b =>
                 {
                     b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
@@ -2595,6 +2693,16 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OrganizationId", "JobPositionId", "InterviewTemplateId")
                         .HasPrincipalKey("OrganizationId", "JobPositionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewSessionRecording", b =>
+                {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
