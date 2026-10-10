@@ -22,6 +22,12 @@ public sealed class SubscriptionEntitlementService(IApplicationDbContext db, Tim
     }
     public async Task<SubscriptionDto> MapAsync(OrganizationSubscription s, string status, CancellationToken ct)
     {
+        if (s.IsTrial)
+        {
+            var trial = await db.RegistrationTrials.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == s.OrganizationId && x.Id == s.Id, ct);
+            return new(s.Id, "registration_trial", "دوره آزمایشی همه پکیج‌ها", status, s.StartedAtUtc, s.ExpiresAtUtc,
+                trial.AiPricePerMinuteUsd, trial.RetentionDays, trial.Entitlements.OrderBy(x => x.Code).Select(x => new EntitlementDto(x.Code, x.Name, x.DataType, x.Value)).ToArray(), true);
+        }
         var p = await db.SubscriptionPurchases.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == s.OrganizationId && x.PaymentId == s.PaymentId, ct);
         return Map(s, p, status);
     }

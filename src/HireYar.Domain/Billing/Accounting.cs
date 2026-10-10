@@ -41,7 +41,8 @@ public sealed class OrganizationSubscription
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid OrganizationId { get; set; }
-    public Guid PaymentId { get; set; }
+    public Guid? PaymentId { get; set; }
+    public bool IsTrial { get; set; }
     public Guid PackageId { get; set; }
     public Guid PackagePeriodId { get; set; }
     public SubscriptionStatus Status { get; set; }

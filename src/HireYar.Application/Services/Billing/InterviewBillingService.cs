@@ -58,6 +58,9 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
     {
         var billing = await db.InterviewBillings.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == s.Id, ct) ?? throw AppException.NotFound();
         var subscription = await db.OrganizationSubscriptions.AsNoTracking().SingleAsync(x => x.OrganizationId == s.OrganizationId && x.Id == billing.SubscriptionId, ct);
+        if (subscription.IsTrial)
+            return (await db.RegistrationTrials.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == s.OrganizationId && x.Id == subscription.Id, ct))
+                .Entitlements.Select(x => x.Code).ToHashSet(StringComparer.Ordinal);
         var purchase = await db.SubscriptionPurchases.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == s.OrganizationId && x.PaymentId == subscription.PaymentId, ct);
         // An in-flight interview uses its immutable contract even when the subscription expires.
         return purchase.Entitlements.Select(x => x.Code).ToHashSet(StringComparer.Ordinal);

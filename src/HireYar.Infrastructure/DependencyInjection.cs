@@ -42,6 +42,7 @@ public static class DependencyInjection
             new HttpClient { BaseAddress = new Uri("https://api.kavenegar.com/"), Timeout = TimeSpan.FromSeconds(10) },
             s.GetRequiredService<Microsoft.Extensions.Options.IOptions<KavenegarOptions>>()));
         services.AddScoped<IAccounts, Accounts>();
+        services.AddScoped<RegistrationTrialService>();
         services.AddScoped<PricingService>(); services.AddScoped<WalletService>(); services.AddScoped<PaymentService>();
         services.AddOptions<BillingPanelOptions>().Bind(config.GetSection("BillingPanel"))
             .Validate(x => x.SubscriptionTaxPercent is >= 0 and <= 100 && BillingMath.HasPrecision(x.SubscriptionTaxPercent, 2), "BillingPanel tax percent must be between 0 and 100 with at most two decimals.").ValidateOnStart();

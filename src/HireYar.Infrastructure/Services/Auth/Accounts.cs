@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Security.Cryptography;
 using HireYar.Application.Auth;
+using HireYar.Application.Billing;
 using HireYar.Application.Common;
 using HireYar.Domain.Organizations;
 using HireYar.Infrastructure.Persistence;
@@ -13,7 +14,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 namespace HireYar.Infrastructure.Auth;
 
-public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger) : IAccounts
+public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger, RegistrationTrialService trials) : IAccounts
 {
     private SecurityOptions Settings => options.Value;
     private DateTimeOffset Now => time.GetUtcNow();
@@ -73,6 +74,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 PhoneNumberConfirmed = true, FullName = "کاربر", OrganizationId = org.Id, Role = OrganizationRole.Owner,
                 CreatedAtUtc = Now, UpdatedAtUtc = Now };
             Check(await users.CreateAsync(u));
+            await trials.CreateForNewOrganizationAsync(org.Id, org.CreatedAtUtc, ct);
         }
         if (!u.IsActive || u.Role != OrganizationRole.Owner || await users.IsLockedOutAsync(u)) throw AppException.Unauthorized();
         u.PhoneNumberConfirmed = true;

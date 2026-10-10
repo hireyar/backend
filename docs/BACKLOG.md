@@ -1,3 +1,9 @@
+## دوره آزمایشی ثبت‌نام — درخواست 2026-10-10
+
+بک‌اند trial سه‌روزه همه قابلیت‌های فعال عمومی و یک دلار اعتبار هدیه با تشخیص DB/API پیاده شد؛ ورود تکراری و حساب‌های قدیمی هدیه تازه نمی‌گیرند. migration `20261010132215_AddRegistrationTrial` و قرارداد [REGISTRATION_TRIAL_API](REGISTRATION_TRIAL_API.md) آماده‌اند. build بدون warning/error؛ suite کامل **۲۷۵ موفق، صفر شکست/Skip** روی PostgreSQL واقعی، شامل هفت تست جدید؛ guardهای واقعی، drift=false و SQL idempotent دوبار موفق‌اند. TRX: `registration-trial-complete.trx`؛ Verified محلی.
+
+باقی مقصد: اعمال migration پیش از نسخه جدید با مجوز انتشار مربوط؛ Angular جدا برای نمایش isTrial/مهلت/مانده و انتخاب operation=purchase پس از trial قرارداد موجود را مصرف کند. نرخ seed=۰٫۰۵ و یک دلار حداکثر بیست دقیقه رزرو مصاحبه را پوشش می‌دهد؛ وعده اعتبار نامحدود وجود ندارد. این باقی‌مانده مجوز اجرای خودکار انتشار یا تغییر فرانت نیست.
+
 ## مسیر متوسط و دو سؤال در هر موضوع — اصلاح صریح 2026-10-10: Verified محلی
 
 متوسط اول؛ پاسخ درست → سخت، پاسخ ناقص/ضعیف/unknown → آسان؛ پس از سؤال دوم موضوع بسته می‌شود. سقف ۲×موضوع و بانک سه‌سطحی، policy snapshot مستقل و سازگاری جلسه/resend قبلی پیاده شدند. ADR-033 و [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md). build صفر warning/error و **۲۶۸ موفق، صفر شکست/Skip** با PostgreSQL واقعی محلی؛ migration/up/down/guard و SQL idempotent دوبار تأیید شدند.

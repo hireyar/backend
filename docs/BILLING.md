@@ -1,5 +1,7 @@
 # Pricing, Subscription و AI Credit
 
+به‌روزرسانی 2026-10-10: ثبت‌نام تازه trial سه‌روزه همه قابلیت‌های فعال عمومی و یک دلار هدیه مستقل از cash purchase دارد. کیف پول اکنون برای سازمان جدید در ثبت‌نام ایجاد می‌شود؛ lazy creation پایین همچنان برای سازمان‌های قدیمی معتبر است. OrganizationSubscription.PaymentId فقط برای IsTrial=true nullable است و قرارداد trial در RegistrationTrials/RegistrationTrialEntitlement ذخیره می‌شود. [REGISTRATION_TRIAL_API](REGISTRATION_TRIAL_API.md)، ADR-034 و migration `20261010132215_AddRegistrationTrial` مرجع‌اند. درگاه واقعی/اشتراک‌های تاریخی تغییر نکرده‌اند.
+
 به‌روزرسانی 2026-10-05: [SUBSCRIPTION_CREDIT_API](SUBSCRIPTION_CREDIT_API.md) قرارداد صفحه جدید است: overview، quote/checkout مالیات‌دار، ارتقای روزشمار با رکورد جایگزینی مستقل، financial-history و فاکتور JSON اضافه شده‌اند. محدودیت تاریخی «proration/tax نداریم» پایین برای مسیر جدید superseded است؛ مسیرهای قبلی و محاسبه مدت/اعتبار حفظ‌اند. دوره‌های seed دست‌نخورده مطابق HTML تخفیف ۵٪ سه‌ماهه و ۱۰٪ شش‌ماهه می‌گیرند؛ کاتالوگ ویرایش‌شده و snapshot خرید قبلی overwrite نمی‌شوند. نسخه production/درگاه واقعی همچنان آماده نیست.
 
 مرجع قرارداد بک‌اند روی `codex/pricing`، 2026-10-01. این برنچ ابتدا با fast-forward از `origin/dev` در commit `d9d4d72` به‌روز شد؛ ماژول مصاحبهٔ موجود از همین پایه آمده است. Angular یا solution جدید ساخته نشد. پرداخت واقعی هنوز فعال نیست.

@@ -7,6 +7,7 @@ namespace HireYar.Application.Common;
 
 public interface IApplicationDbContext
 {
+    DbSet<HireYar.Domain.Billing.RegistrationTrial> RegistrationTrials { get; }
     DbSet<HireYar.Domain.Billing.PricingPackage> PricingPackages { get; }
     // Infrastructure supplies one SQL statement for contract reads, overriding its split-query default.
     IQueryable<HireYar.Domain.Billing.PricingPackage> PricingCatalog { get; }

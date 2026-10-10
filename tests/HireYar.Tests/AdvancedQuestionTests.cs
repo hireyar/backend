@@ -214,7 +214,11 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
                 var downgrade = await Assert.ThrowsAsync<Npgsql.PostgresException>(() =>
                     db.GetService<IMigrator>().MigrateAsync("20261010054552_AddInterviewReportReview"));
                 Assert.Equal("P0001", downgrade.SqlState); Assert.Contains("persisted answer assessments", downgrade.MessageText);
-                Assert.Contains("20261010085424_AddMediumFirstTopicQuestions", await db.Database.GetAppliedMigrationsAsync()); });
+                Assert.Contains("20261010085424_AddMediumFirstTopicQuestions", await db.Database.GetAppliedMigrationsAsync());
+                // Newer reversible migrations may already have been rolled back before
+                // this older guard rejects downgrade. Restore the shared fixture schema.
+                await db.Database.MigrateAsync();
+                Assert.False(db.Database.HasPendingModelChanges()); });
             var replacement = await owner.Client.Send(HttpMethod.Post, $"/api/interviews/{id}/resend", new ResendInterviewRequest(3, false, false));
             Assert.Equal(HttpStatusCode.OK, replacement.StatusCode);
             var freshId = (await replacement.Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation.InterviewId;

@@ -1,3 +1,15 @@
+## تحویل trial ثبت‌نام — 2026-10-10
+
+روی dev از Git پاک، ثبت‌نام OTP تازه، اشتراک ۷۲ساعته همه features فعال پکیج‌های عمومی و ledger PromotionalCredit یک دلار می‌سازد؛ هیچ پرداخت/خرید نقدی جعلی ایجاد نشده است. DB: OrganizationSubscriptions.IsTrial و RegistrationTrials/RegistrationTrialEntitlement با OrganizationId؛ کاربر از AspNetUsers.OrganizationId join می‌شود. API اشتراک/پنل isTrial و زمان انقضا را می‌دهد. [REGISTRATION_TRIAL_API](REGISTRATION_TRIAL_API.md) قرارداد کامل و query تشخیص کاربران است؛ ADR-034 و BILLING به‌روز شدند.
+
+ساخت حساب/سازمان/trial/ledger/مصرف OTP اتمیک است؛ ورود دوباره و refresh هدیه را تکرار نمی‌کنند و حساب قدیمی backfill ندارد. مانده هدیه منقضی نمی‌شود؛ trial منقضی دسترسی تازه را می‌بندد. قرارداد مصاحبه شروع‌شده immutable می‌ماند؛ خرید عادی از پایان trial صف می‌شود. upgrade trial با trial_requires_purchase رد می‌شود. نرخ اولیه ۰٫۰۵ دلار/دقیقه و سقف رزرو قابل پوشش با هدیه بیست دقیقه است؛ مثال پنج‌دقیقه‌ای واقعاً شروع شد.
+
+build صفر warning/error؛ suite کامل نهایی **۲۷۵/۲۷۵ موفق، صفر شکست/Skip** روی PostgreSQL 18 اختصاصی loopback:55483 و providerهای مصنوعی؛ `tests/HireYar.Tests/TestResults/registration-trial-complete.trx`. هفت تست جدید واقعی موفق؛ SQL کامل ignored `artifacts/registration-trial-migrations.sql` دوبار روی scratch تصادفی با یک history entry موفق. rollback خالی/guard دارای trial، tenant، عدم تکرار/concurrency، rollback و retry ثبت‌نام و snapshot مصاحبه بررسی شدند؛ drift=false. DBهای fixture صفر باقی، scratch حذف و cluster اختصاصی متوقف شد.
+
+آزمون‌های موجود به baseline حساب قبلی بدون trial از helper synthetic مجهز شدند؛ signup حقیقی جدا تست می‌شود. MobileOtpTests و RegistrationTrialTests دیتابیس اختصاصی هر تست دارند. تست downgrade قدیمی بعد از guard migrationهای جدید برگشت‌پذیر را مجدد apply می‌کند تا schema مشترک را ناقص نگذارد؛ assertion محافظ قبلی محفوظ است. JWT آینده با clock مصنوعی در تست انقضا با service query جایگزین شد.
+
+پیش از اجرای کد مقصد migration `20261010132215_AddRegistrationTrial` لازم است؛ مقصد اعمال نشده. Angular، تماس واقعی provider/درگاه، commit/push/deploy/production انجام نشدند؛ appsettings/secret دست‌نخورده‌اند. نتایج اولیه شکست‌های fixture بودند و تکمیل نهایی بر نتیجه بازاجرای کامل متکی است.
+
 ## تحویل اصلاح دو سؤال در هر موضوع — 2026-10-10
 
 تصحیح کاربر اجرا شد: دعوت تازه متوسط را اول می‌پرسد؛ grade معتبر >=۰٫۷ با اطمینان >=۰٫۶ → سخت، پاسخ ناقص/ضعیف/unknown → آسان همان موضوع. پس از سؤال دوم هیچ سؤال سومی نیست و موضوع تازه از متوسط شروع می‌شود. بانک سه سطح محفوظ؛ سقف جلسه و interviewQuestionCount پیشنهاد/قالب ۲×موضوع (۱۰..۲۰). تعامل‌ها جزو دو سؤال اصلی نیستند؛ زمان و billing ثابت.

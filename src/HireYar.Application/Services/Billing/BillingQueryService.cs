@@ -13,7 +13,7 @@ public sealed class BillingQueryService(IApplicationDbContext db, ISubscriptionE
             .OrderBy(x => x.StartedAtUtc).Take(100).ToListAsync(ct);
         var paymentIds = scheduled.Select(x => x.PaymentId).ToArray();
         var purchases = await db.SubscriptionPurchases.AsNoTracking().Include(x => x.Entitlements).Where(x => x.OrganizationId == org && paymentIds.Contains(x.PaymentId)).ToDictionaryAsync(x => x.PaymentId, ct);
-        var items = scheduled.Select(s => SubscriptionEntitlementService.Map(s, purchases[s.PaymentId], "Scheduled")).ToArray();
+        var items = scheduled.Select(s => SubscriptionEntitlementService.Map(s, purchases[s.PaymentId!.Value], "Scheduled")).ToArray();
         return new(current, items);
     }
     public async Task<Page<PaymentDto>> PaymentsAsync(Guid org, PageQuery page, CancellationToken ct)
