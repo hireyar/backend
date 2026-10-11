@@ -377,7 +377,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("OrganizationSubscriptions", t =>
                         {
-                            t.HasCheckConstraint("CK_Subscription_Source", "(\"IsTrial\" AND \"PaymentId\" IS NULL AND \"ExpiresAtUtc\" = \"StartedAtUtc\" + interval '72 hours') OR (NOT \"IsTrial\" AND \"PaymentId\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_Subscription_Source", "(\"IsTrial\" AND \"PaymentId\" IS NULL AND EXTRACT(EPOCH FROM (\"ExpiresAtUtc\" - \"StartedAtUtc\")) BETWEEN 86400 AND 315360000 AND MOD(EXTRACT(EPOCH FROM (\"ExpiresAtUtc\" - \"StartedAtUtc\")), 86400) = 0) OR (NOT \"IsTrial\" AND \"PaymentId\" IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_Subscription_Values", "\"ExpiresAtUtc\" > \"StartedAtUtc\" AND \"Status\" IN ('Scheduled','Active','Expired','Cancelled','Suspended')");
                         });
@@ -647,7 +647,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("RegistrationTrials", t =>
                         {
-                            t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountUsd\" = 1 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650");
+                            t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountUsd\" > 0 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650");
                         });
                 });
 

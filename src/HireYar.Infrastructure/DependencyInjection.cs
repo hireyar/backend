@@ -42,6 +42,11 @@ public static class DependencyInjection
             new HttpClient { BaseAddress = new Uri("https://api.kavenegar.com/"), Timeout = TimeSpan.FromSeconds(10) },
             s.GetRequiredService<Microsoft.Extensions.Options.IOptions<KavenegarOptions>>()));
         services.AddScoped<IAccounts, Accounts>();
+        services.AddOptions<RegistrationTrialOptions>().Bind(config.GetSection("RegistrationTrial"))
+            .Validate(x => x.DurationDays is >= 1 and <= 3650, "RegistrationTrial:DurationDays must be between 1 and 3650.")
+            .Validate(x => x.CreditAmountUsd > 0 && x.CreditAmountUsd < 1_000_000_000_000m && BillingMath.HasPrecision(x.CreditAmountUsd, 6),
+                "RegistrationTrial:CreditAmountUsd must be positive, below 1000000000000 and have at most six decimals.")
+            .ValidateOnStart();
         services.AddScoped<RegistrationTrialService>();
         services.AddScoped<PricingService>(); services.AddScoped<WalletService>(); services.AddScoped<PaymentService>();
         services.AddOptions<BillingPanelOptions>().Bind(config.GetSection("BillingPanel"))
