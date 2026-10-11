@@ -1,4 +1,21 @@
-# دوره آزمایشی ثبت‌نام — 2026-10-10
+# دوره آزمایشی ثبت‌نام — به‌روزرسانی 2026-10-11
+
+## تنظیمات مدت و هدیه
+
+بخش `RegistrationTrial` در `src/HireYar.Api/appsettings.json` مدت و مبلغ ثبت‌نام‌های تازه را تعیین می‌کند؛ پیش‌فرض مشترک ۳ روز و ۱ دلار است. نمونه شارژ نیم‌دلار:
+
+```json
+"RegistrationTrial": {
+  "DurationDays": 3,
+  "CreditAmountUsd": 0.5
+}
+```
+
+در JSON مبلغ به‌صورت `0.5` نوشته شود. DurationDays عدد صحیح از ۱ تا ۳۶۵۰؛ CreditAmountUsd عدد decimal مثبت، کمتر از 1000000000000 و با حداکثر شش رقم اعشار است. مقدار نامعتبر هنگام شروع برنامه رد می‌شود. override محیطی با `RegistrationTrial__DurationDays` و `RegistrationTrial__CreditAmountUsd` ممکن است؛ پس از تغییر تنظیمات برنامه دوباره راه‌اندازی شود.
+
+این مقادیر در زمان ثبت‌نام به تاریخ انقضای اشتراک و CreditAmountUsd و ledger/کیف پول تبدیل و ذخیره می‌شوند. تغییر تنظیمات، حساب‌ها و دوره‌های قبلی را بازنویسی یا شارژ نمی‌کند. مثال با ۲ روز و ۰٫۵ دلار، بازه دقیق ۴۸ ساعت و مانده/ledger دقیق ۰٫۵ دلار دارد. با نرخ اولیه ۰٫۰۵ دلار/دقیقه، نیم‌دلار حداکثر ده دقیقه رزرو را پوشش می‌دهد.
+
+migration جدید `20261011120218_ConfigureRegistrationTrial` پیش از اجرای نسخه جدید لازم است: مبلغ مثبت و مدت صحیح روز جای الزام ثابت یک دلار/۷۲ ساعت را می‌گیرند؛ trigger تطابق ledger با مبلغ snapshot را کنترل می‌کند. سوابق موجود دست‌نخورده‌اند؛ downgrade در حضور مبلغ یا مدت غیراستاندارد قدیمی صریحاً رد می‌شود. توضیح ۷۲ ساعت/یک دلار در ادامه مقدار پیش‌فرض است.
 
 پس از اولین تأیید OTP و ساخت Owner/سازمان، در همان تراکنش ثبت‌نام:
 
@@ -15,11 +32,11 @@
 
 GET `/api/billing/subscription` و `/api/billing/panel` اشتراک آزمایشی را با `isTrial=true`، `packageCode=registration_trial`، زمان شروع/انقضا و همه features عرضه می‌کنند. وضعیت زمانی همان Active/Expired موجود است؛ `isTrial` نوع قرارداد است. پکیج خریداری‌شده `isTrial=false` دارد. GET کیف پول و تراکنش‌ها هدیه و مانده را از مسیرهای قبلی عرضه می‌کنند؛ financial-history هدیه را adjustment/اعتبار هدیه می‌خواند و مبلغ نقدی ندارد.
 
-خرید عادی در طول trial از انتهای ۷۲ ساعت زمان‌بندی می‌شود؛ renewal فقط مطابق مرجع کاتالوگ قبلی پذیرفته می‌شود. upgrade برای trial با 400 و `trial_requires_purchase` رد می‌شود؛ پول پرداخت‌نشده credit روزشمار نمی‌سازد. برای ادامه یکی از پکیج‌ها با operation=purchase انتخاب شود.
+خرید عادی در طول trial از زمان انقضای ذخیره‌شده زمان‌بندی می‌شود؛ renewal فقط مطابق مرجع کاتالوگ قبلی پذیرفته می‌شود. upgrade برای trial با 400 و `trial_requires_purchase` رد می‌شود؛ پول پرداخت‌نشده credit روزشمار نمی‌سازد. برای ادامه یکی از پکیج‌ها با operation=purchase انتخاب شود.
 
 ## تشخیص در دیتابیس
 
-`OrganizationSubscriptions.IsTrial` پیش‌فرض false است؛ فقط trial دارای PaymentId=null و بازه ۷۲ساعته است. `RegistrationTrials` با Id همان اشتراک، OrganizationId unique، مقدار هدیه و snapshot نرخ/retention؛ `RegistrationTrialEntitlement` snapshot تمام قابلیت‌ها را نگه می‌دارد. اتصال AspNetUsers.OrganizationId مشخص می‌کند کدام کاربران این نوع ثبت‌نام را داشته‌اند، حتی پس از انقضا یا خرید اشتراک:
+`OrganizationSubscriptions.IsTrial` پیش‌فرض false است؛ فقط trial دارای PaymentId=null و بازه صحیح روز مطابق تنظیمات زمان ثبت‌نام است. `RegistrationTrials` با Id همان اشتراک، OrganizationId unique، مقدار هدیه و snapshot نرخ/retention؛ `RegistrationTrialEntitlement` snapshot تمام قابلیت‌ها را نگه می‌دارد. اتصال AspNetUsers.OrganizationId مشخص می‌کند کدام کاربران این نوع ثبت‌نام را داشته‌اند، حتی پس از انقضا یا خرید اشتراک:
 
 ```sql
 SELECT u."Id" AS "UserId", u."OrganizationId", s."IsTrial",

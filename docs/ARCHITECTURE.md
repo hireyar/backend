@@ -1,3 +1,9 @@
+## ADR-035 — تنظیمات دوره آزمایشی ثبت‌نام (2026-10-11)
+
+طبق درخواست کاربر، RegistrationTrial:DurationDays و RegistrationTrial:CreditAmountUsd از appsettings با IOptions و ValidateOnStart خوانده می‌شوند؛ پیش‌فرض ۳ روز/۱ دلار، مدت صحیح ۱..۳۶۵۰ روز و مبلغ decimal مثبت کمتر از 10^12 با حداکثر شش اعشار است. IOptions برای تغییر سیاست نیازمند راه‌اندازی مجدد برنامه است. تنظیمات فقط هنگام ثبت‌نام تازه به انقضای UTC و مبلغ snapshot grant/ledger/wallet تبدیل می‌شوند؛ دوره‌های قدیمی و ورود مجدد تغییر ندارند.
+
+migration ConfigureRegistrationTrial بدون بازنویسی داده، الزام ثابت ۷۲ ساعت/۱ دلار ADR-034 را با روز صحیح مثبت و مبلغ مثبت جایگزین می‌کند؛ constraint trigger مبلغ و BalanceAfter را با CreditAmountUsd همان grant تطبیق می‌دهد. FK/immutable/اتمیک‌بودن signup محفوظ‌اند؛ downgrade با تاریخچه دارای مدت/مبلغ متفاوت از defaults قدیمی رد می‌شود. REGISTRATION_TRIAL_API قرارداد تنظیمات است؛ معماری و API درخواست ثبت‌نام تغییر نکرده‌اند.
+
 ## ADR-034 — دوره آزمایشی ثبت‌نام (2026-10-10)
 
 طبق درخواست کاربر، فقط ساخت Owner/سازمان تازه در OTP، یک trial دقیق ۷۲ساعته و یک دلار ledger PromotionalCredit را در تراکنش ثبت‌نام ایجاد می‌کند. اشتراک IsTrial=true و PaymentId nullable برای trial است؛ خریدهای قبلی PaymentId الزامی و IsTrial=false دارند. RegistrationTrials و entitlements قرارداد immutable مستقل از پرداخت‌اند؛ grant پرداخت/خرید جعلی ایجاد نمی‌کند. قابلیت‌ها اجتماع پکیج‌های فعال عمومی هنگام ثبت‌نام، rate از مرجع دارای بیشترین retention و retention بیشینه‌اند؛ Integer بالاتر و Text با ترتیب قطعی snapshot می‌شود. [REGISTRATION_TRIAL_API](REGISTRATION_TRIAL_API.md).

@@ -36,6 +36,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public bool UseFixedOtp { get; init; }
     public bool DisabledPayments { get; init; }
     public bool DiagnosticsEnabled { get; init; }
+    public int TrialDurationDays { get; init; } = 3;
+    public decimal TrialCreditAmountUsd { get; init; } = 1m;
     public FakePaymentGateway PaymentGateway { get; } = new();
     public TestClock Clock { get; } = new();
     public TestPhoneOtp PhoneOtp { get; } = new();
@@ -50,6 +52,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddConsole(); });
         b.UseEnvironment(Production ? "Production" : "Development");
         b.UseSetting("SkipLocalSettings", "true");
+        b.UseSetting("RegistrationTrial:DurationDays", TrialDurationDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        b.UseSetting("RegistrationTrial:CreditAmountUsd", TrialCreditAmountUsd.ToString(System.Globalization.CultureInfo.InvariantCulture));
         b.UseSetting("InterviewDiagnostics:Enabled", DiagnosticsEnabled.ToString());
         b.UseSetting("InterviewDiagnostics:CapturePrompts", "true");
         b.UseSetting("ConnectionStrings:Default", connection!);

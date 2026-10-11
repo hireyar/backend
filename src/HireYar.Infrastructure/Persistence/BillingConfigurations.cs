@@ -70,11 +70,11 @@ internal static class BillingConfigurations
         sub.ToTable(t => t.HasCheckConstraint("CK_Subscription_Values", "\"ExpiresAtUtc\" > \"StartedAtUtc\" AND \"Status\" IN ('Scheduled','Active','Expired','Cancelled','Suspended')"));
         sub.Property(x => x.IsTrial).HasDefaultValue(false);
         sub.HasIndex(x => x.OrganizationId).IsUnique().HasFilter("\"IsTrial\"");
-        sub.ToTable(t => t.HasCheckConstraint("CK_Subscription_Source", "(\"IsTrial\" AND \"PaymentId\" IS NULL AND \"ExpiresAtUtc\" = \"StartedAtUtc\" + interval '72 hours') OR (NOT \"IsTrial\" AND \"PaymentId\" IS NOT NULL)"));
+        sub.ToTable(t => t.HasCheckConstraint("CK_Subscription_Source", "(\"IsTrial\" AND \"PaymentId\" IS NULL AND EXTRACT(EPOCH FROM (\"ExpiresAtUtc\" - \"StartedAtUtc\")) BETWEEN 86400 AND 315360000 AND MOD(EXTRACT(EPOCH FROM (\"ExpiresAtUtc\" - \"StartedAtUtc\")), 86400) = 0) OR (NOT \"IsTrial\" AND \"PaymentId\" IS NOT NULL)"));
         var trial = m.Entity<RegistrationTrial>(); Tenant(trial); trial.HasIndex(x => x.OrganizationId).IsUnique();
         trial.HasOne<OrganizationSubscription>().WithOne().HasForeignKey<RegistrationTrial>(x => new { x.OrganizationId, x.Id }).HasPrincipalKey<OrganizationSubscription>(x => new { x.OrganizationId, x.Id });
         Money(trial, nameof(RegistrationTrial.CreditAmountUsd)); Money(trial, nameof(RegistrationTrial.AiPricePerMinuteUsd));
-        trial.ToTable(t => t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountUsd\" = 1 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650"));
+        trial.ToTable(t => t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountUsd\" > 0 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650"));
         trial.HasMany(x => x.Entitlements).WithOne().HasForeignKey(x => x.TrialId);
         var te = m.Entity<RegistrationTrialEntitlement>(); te.HasKey(x => new { x.TrialId, x.Code });
         te.Property(x => x.Code).HasMaxLength(64); te.Property(x => x.Name).HasMaxLength(200); te.Property(x => x.Value).HasMaxLength(1000); te.Property(x => x.DataType).HasConversion<string>().HasMaxLength(20);

@@ -1,3 +1,5 @@
+به‌روزرسانی 2026-10-11: مدت و شارژ trial از RegistrationTrial در appsettings (DurationDays/CreditAmountUsd) خوانده می‌شوند؛ ۳ روز و ۱ دلار صرفاً پیش‌فرض‌اند. مبلغ اعشاری مانند 0.5 تا شش اعشار پشتیبانی می‌شود؛ مقدار ثبت‌شده هر grant و زمان انقضا مستقل از تنظیمات بعدی محفوظ‌اند. migration ConfigureRegistrationTrial و ADR-035 الزامات ثابت قبلی دیتابیس را جایگزین می‌کنند؛ قرارداد REGISTRATION_TRIAL_API را ببینید.
+
 # Pricing, Subscription و AI Credit
 
 به‌روزرسانی 2026-10-10: ثبت‌نام تازه trial سه‌روزه همه قابلیت‌های فعال عمومی و یک دلار هدیه مستقل از cash purchase دارد. کیف پول اکنون برای سازمان جدید در ثبت‌نام ایجاد می‌شود؛ lazy creation پایین همچنان برای سازمان‌های قدیمی معتبر است. OrganizationSubscription.PaymentId فقط برای IsTrial=true nullable است و قرارداد trial در RegistrationTrials/RegistrationTrialEntitlement ذخیره می‌شود. [REGISTRATION_TRIAL_API](REGISTRATION_TRIAL_API.md)، ADR-034 و migration `20261010132215_AddRegistrationTrial` مرجع‌اند. درگاه واقعی/اشتراک‌های تاریخی تغییر نکرده‌اند.

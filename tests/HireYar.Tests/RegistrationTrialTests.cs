@@ -22,6 +22,67 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
     public Task InitializeAsync() => f.InitializeAsync();
     public Task DisposeAsync() => ((IAsyncLifetime)f).DisposeAsync();
     [PostgresFact]
+    public async Task Configured_half_dollar_and_two_days_are_persisted_and_not_repeated()
+    {
+        var test = new ApiFixture { TrialDurationDays = 2, TrialCreditAmountUsd = 0.5m };
+        await test.InitializeAsync();
+        try
+        {
+            var owner = await test.RegisterOwner(signupTrial: true);
+            await test.SignInAsync(owner.Client, owner.Mobile);
+            await test.Db(async db => {
+                var grant = await db.RegistrationTrials.SingleAsync();
+                var sub = await db.OrganizationSubscriptions.SingleAsync(x => x.Id == grant.Id);
+                Assert.Equal(TimeSpan.FromDays(2), sub.ExpiresAtUtc - sub.StartedAtUtc);
+                Assert.Equal(0.5m, grant.CreditAmountUsd);
+                Assert.Equal(0.5m, (await db.OrganizationAiWallets.SingleAsync()).Balance);
+                var entry = await db.AiCreditTransactions.SingleAsync();
+                Assert.Equal(0.5m, entry.Amount); Assert.Equal(0m, entry.BalanceBefore); Assert.Equal(0.5m, entry.BalanceAfter);
+                var error = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261010132215_AddRegistrationTrial"));
+                Assert.Equal("23514", error.SqlState);
+                Assert.Contains("Cannot downgrade configured registration trial history", error.MessageText);
+                Assert.False(db.Database.HasPendingModelChanges());
+            });
+            var wallet = await (await owner.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<WalletDto>(BillingJson.Options);
+            Assert.Equal(0.5m, wallet!.Balance);
+            test.Clock.Offset = TimeSpan.FromDays(2) + TimeSpan.FromMinutes(1);
+            using var scope = test.Services.CreateScope();
+            var org = (await scope.ServiceProvider.GetRequiredService<HireYar.Infrastructure.Persistence.AppDbContext>().RegistrationTrials.SingleAsync()).OrganizationId;
+            Assert.Null(await scope.ServiceProvider.GetRequiredService<ISubscriptionEntitlementService>().CurrentAsync(org, default));
+            Assert.Equal(0.5m, (await scope.ServiceProvider.GetRequiredService<WalletService>().GetAsync(org, default)).Balance);
+        }
+        finally { await ((IAsyncLifetime)test).DisposeAsync(); }
+    }
+
+    [PostgresFact]
+    public async Task Database_rejects_ledger_that_disagrees_with_configured_credit()
+    {
+        var test = new ApiFixture(); await test.InitializeAsync();
+        try
+        {
+            var owner = await test.RegisterOwner();
+            await test.Db(async db => {
+                var org = (await db.Users.SingleAsync(x => x.Id == owner.Id)).OrganizationId;
+                await using var transaction = await db.Database.BeginTransactionAsync();
+                var service = new RegistrationTrialService(db, Microsoft.Extensions.Options.Options.Create(new RegistrationTrialOptions { DurationDays = 2, CreditAmountUsd = 0.5m }));
+                await service.CreateForNewOrganizationAsync(org, test.Clock.GetUtcNow(), default);
+                var ledger = db.AiCreditTransactions.Local.Single();
+                ledger.Amount = 0.25m; ledger.BalanceAfter = 0.25m;
+                db.OrganizationAiWallets.Local.Single().Balance = 0.25m;
+                await db.SaveChangesAsync();
+                var error = await Assert.ThrowsAsync<PostgresException>(() => transaction.CommitAsync());
+                Assert.Equal("23514", error.SqlState); Assert.Contains("Incomplete registration trial", error.MessageText);
+            });
+            await test.Db(async db => {
+                Assert.False(await db.RegistrationTrials.AnyAsync());
+                Assert.False(await db.OrganizationAiWallets.AnyAsync());
+                Assert.False(await db.AiCreditTransactions.AnyAsync());
+            });
+        }
+        finally { await ((IAsyncLifetime)test).DisposeAsync(); }
+    }
+
+    [PostgresFact]
     public async Task Signup_grants_all_package_features_and_one_dollar_exactly_once()
     {
         var a = await f.RegisterOwner(signupTrial: true);
