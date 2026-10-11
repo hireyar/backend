@@ -1,3 +1,9 @@
+## تأیید دسترسی همه پکیج‌ها در دمو — 2026-10-11
+
+کاربر صریحاً انتخاب کرد همه امکانات باز باشند و مصرف از شارژ هدیه کم شود. بررسی کد نشان داد grant ثبت‌نام اجتماع features فعال پکیج‌های عمومی را ذخیره و RequireAsync/ویزارد/قالب موضوعی/start از همان snapshot استفاده می‌کنند؛ خرید پکیج لازم نیست و تغییر runtime لازم نشد. چهار integration مستقل برای عمومی/تخصصی با قالب عادی/موضوعی پیشرفته، حساب واقعی OTP trial با ۰٫۵ دلار و دو روز، پیشنهاد سؤال، دعوت، start/answer/complete، گزارش، کسر هزینه و رد جلسه شصت‌دقیقه‌ای با insufficient_ai_credit اضافه شدند. هیچ شارژ مصنوعی اضافی یا cash purchase در این سناریوها وجود ندارد.
+
+REGISTRATION_TRIAL_API قرارداد فرانت را صریح می‌کند: current.features در subscription/panel، فعال‌کردن پیشرفته بدون شرط packageCode=advanced، پایان زمانی و پیام شارژ مستقل از خرید پکیج. Angular در ریپوی جداست؛ تغییر UI اینجا انجام نشده. build صفر warning/error؛ چهار تست مرتبط ۴/۴ موفق، صفر Failed/Skipped، روی PostgreSQL 18 اختصاصی loopback:55484 و AI/گزارش مصنوعی. TRX: tests/HireYar.Tests/TestResults/trial-package-access-verified.trx. suite کامل قبلی ۲۸۷ موفق متعلق به درخواست تنظیمات است و این نوبت تکرار نشد. اجرای اولیه فقط assertion مصرف شکست خورد چون clock پس از ثبت پاسخ جلو رفته بود؛ clock پیش از answer جلو رفت تا زمان پاسخ واقعی قابل محاسبه باشد و چهار مسیر کامل دوباره پاس شدند. fixture DB صفر باقی ماند و cluster اختصاصی متوقف شد؛ کیفیت/دسترسی provider واقعی با این تست‌ها اثبات نمی‌شود. push/deploy/production یا migration تازه انجام نشده است.
+
 ## تنظیم مدت و مبلغ trial — 2026-10-11
 
 روی dev، بخش RegistrationTrial با DurationDays=3 و CreditAmountUsd=1.0 به appsettings اضافه شد؛ 0.5 و مبلغ مثبت با حداکثر شش اعشار پشتیبانی می‌شوند. مقدار نامعتبر هنگام startup رد می‌شود. تغییر سیاست با restart فقط ثبت‌نام‌های جدید را تحت تأثیر می‌گذارد؛ snapshot/سوابق قبلی و ورود مجدد دست‌نخورده‌اند. قرارداد REGISTRATION_TRIAL_API و ADR-035 به‌روز شدند.
