@@ -1,3 +1,13 @@
+## ADR-039 — ورود اختصاصی سوپرادمین و کلید مسیر (2026-10-12)
+
+طبق درخواست کاربر روی برنچ مستقل `codex/super-admin` از `dev`، ورود password+CAPTCHA و route فرانت `/admin/{randomkey}` به محدوده افزوده شد. مدل موجود IsSystemAdmin/Identity/یک سازمان حفظ می‌شود؛ مجوز تازه در register/profile یا account عمومی ایجاد نمی‌شود. CLI محلی و تعاملی `--provision-super-admin` فقط حساب Owner موجود و تأییدشده را با رمز hashed و stamp تازه تجهیز می‌کند؛ تغییر حساب در تراکنش و بدون چاپ رمز/شروع HTTP است. روی مقصد اجرا نشده است.
+
+کلید URL-safe تصادفی در SuperAdmin از appsettings خصوصی/environment، نه فایل تحت Git، خوانده می‌شود؛ endpointهای auth با X-Admin-Entry آن را ثابت‌زمان مقایسه و نامعتبر/خاموش را 404 می‌کنند. API کلید صحیح را افشا نمی‌کند. صفحه HTML/route guard در Angular ریپوی جدا باید پیش از نمایش login endpoint entry را بررسی کند؛ این ریپو صفحه فرانت ندارد. کلید مسیر دفاع اضافی است، مجوز به حساب معتبر DB وابسته می‌ماند.
+
+JWT ادمین scheme/audience مستقل، عمر حداکثر۳۰دقیقه، بدون refresh/cookie و بدون org/role دارد؛ SystemAdmin policy فقط این scheme را می‌پذیرد. توکن OTP حسابی که IsSystemAdmin دارد نیز به admin دسترسی نمی‌دهد؛ توکن admin به HR/Candidate دسترسی ندارد. وضعیت DB، stamp، lockout و fingerprint کلید هر درخواست بررسی می‌شوند. حذف مجوز/تغییر رمز/خروج همه‌نشست‌های ادمین فوراً token قدیمی را رد می‌کند. گردش کلید/disable تنظیمات نیازمند restart است. بخش احراز ادمین ADR-018 با این ورود اختصاصی تکمیل/جایگزین می‌شود، snapshot مالی همان تصمیم قبلی است.
+
+CAPTCHA شش‌رقمی PNG فقط BCL در Infrastructure، hash/TTL دودقیقه/مصرف حتی در شکست، حافظه bounded۱۰۲۴ یک process؛ restart challenge را حذف می‌کند. این کپچای ساده تضمین OCR یا سرویس تشخیص انسان نیست. RateLimit پیش از authentication همان IP اتصال را مصرف و پنج رمز اشتباه Identity پانزده دقیقه lockout می‌دهد؛ ثبت شکست/ورود/provision/logout زیر FOR UPDATE کاربر انجام می‌شوند. HttpContext فقط Api؛ Application قرارداد/DTO، Infrastructure Identity/SQL/token/captcha؛ Repository/Domain entity/schema/migration جدید نداریم. [SUPER_ADMIN_API](SUPER_ADMIN_API.md) قرارداد تنظیمات، frontend و API قیمت موجود است.
+
 ## ADR-038 — ویدیوی خصوصی در S3 آروان (2026-10-12)
 
 طبق درخواست کاربر، provider ویدیو ArvanS3 در Infrastructure و SDK رسمی AWSSDK.S3 اضافه شد؛ Domain/Application و قراردادهای فعلی IInterviewAudioStorage/DTO تغییر نکردند. فقط ویدیوهای تازهٔ پاسخ/معرفی/ضبط کامل به S3 با multipart قطعات 8 MiB و ACL=Private می‌روند؛ صوت/رزومه و keyهای تاریخی محلی محفوظ‌اند و migration/انتقال خودکار داده نداریم. کلید s3/... محل storage را مشخص می‌کند؛ provider ناموفق fallback محلی ندارد.

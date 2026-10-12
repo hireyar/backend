@@ -7,6 +7,8 @@ internal static class OpenApiText
 
         **هر سازمان یک حساب مالک دارد؛ ورود فقط با موبایل و OTP است.**
 
+        **سوپرادمین:** ورود مستقل با موبایل/رمز و کپچا در `/api/admin/auth/login`؛ endpointهای auth هدر `X-Admin-Entry` می‌خواهند. توکن SuperAdmin کوتاه‌مدت و مستقل از توکن پنل سازمان است؛ قرارداد `docs/SUPER_ADMIN_API.md` مرجع اتصال صفحهٔ `/admin/{randomkey}` فرانت است.
+
         برای درخواست‌های غیر GET در `/api/auth`، مقدار `token` از `GET /api/auth/csrf` را در هدر `X-CSRF-TOKEN` بفرستید و کوکی همان درخواست را نگه دارید. پس از ورود، CSRF را با Bearer جدید دوباره بگیرید. برای تمدید نشست، Bearer را حذف کنید و با کوکی refresh، ابتدا CSRF و سپس `POST /api/auth/refresh` را بزنید.
 
         پس از ورود: موقعیت شغلی بسازید، سپس قالب مصاحبهٔ مربوط به آن را ثبت کنید.
@@ -15,6 +17,11 @@ internal static class OpenApiText
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("AdminAuth", "Entry") => "بررسی کلید خصوصی مسیر ورود سوپرادمین",
+        ("AdminAuth", "Captcha") => "دریافت کپچای تصویری یک‌بارمصرف سوپرادمین",
+        ("AdminAuth", "Login") => "ورود مستقل سوپرادمین با موبایل، رمز و کپچا",
+        ("AdminAuth", "Me") => "مشاهده حساب سوپرادمین جاری",
+        ("AdminAuth", "Logout") => "خروج و ابطال همه نشست‌های سوپرادمین حساب جاری",
         ("CandidateInterviews", "Event") => "ثبت رضایت یا رویداد دستگاه گزارش‌شده توسط داوطلب",
         ("CandidateInterviews", "Recording") => "آپلود خصوصی ویدیوی جلسه و زمان‌بندی پاسخ‌ها",
         ("Interviews", "RegenerateReport") => "بازتولید صریح گزارش با وزن موضوعات و آستانه بررسی انسانی",

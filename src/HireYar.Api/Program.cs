@@ -36,6 +36,7 @@ if (string.IsNullOrWhiteSpace(security.DataProtectionPath)) throw new InvalidOpe
 builder.Services.AddDataProtection().SetApplicationName("HireYar").PersistKeysToFileSystem(new DirectoryInfo(security.DataProtectionPath));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor(); builder.Services.AddScoped<ICurrentUser, CurrentUser>(); builder.Services.AddScoped<CurrentAccountValidation>();
+builder.Services.AddScoped<AdminAccountValidation>(); builder.Services.AddScoped<AdminEntryFilter>();
 builder.Services.AddScoped<ICurrentInterviewAccess, CurrentInterviewAccess>();
 builder.Services.AddScoped<PanelWizardService>();
 builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
@@ -73,15 +74,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
 });
 builder.Services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, InterviewAuthenticationHandler>(InterviewAuthenticationHandler.SchemeName, _ => { });
+builder.Services.AddAuthentication().AddJwtBearer(SuperAdminOptions.Scheme, o =>
+{
+    o.MapInboundClaims = false; o.EventsType = typeof(AdminAccountValidation);
+    o.TokenValidationParameters = new()
+    {
+        ValidateIssuer = true, ValidateAudience = true, ValidateIssuerSigningKey = true, ValidateLifetime = true,
+        RequireExpirationTime = true, RequireSignedTokens = true,
+        ValidIssuer = security.Issuer, ValidAudience = security.Audience + ":super-admin",
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(security.SigningKey)),
+        ValidAlgorithms = [SecurityAlgorithms.HmacSha256], ClockSkew = TimeSpan.FromSeconds(5), NameClaimType = "sub"
+    };
+});
 builder.Services.AddAuthorization(o => {
     o.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme).RequireAuthenticatedUser().Build();
-    o.AddPolicy("SystemAdmin", p => p.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme).RequireAuthenticatedUser().RequireClaim("system_admin", "true"));
+    o.AddPolicy("SystemAdmin", p => p.AddAuthenticationSchemes(SuperAdminOptions.Scheme).RequireAuthenticatedUser().RequireClaim("system_admin", "true"));
 });
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(security.AllowedOrigins).AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
 builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "hireyar.csrf"; o.Cookie.HttpOnly = true; o.Cookie.Path = "/api/auth"; o.Cookie.SameSite = SameSiteMode.Strict; o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; });
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
+    o.AddPolicy("admin-auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("SuperAdmin:AuthRequestsPerMinute") ?? 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("candidate", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("CandidateRateLimit:PermitLimit") ?? 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("AuthRateLimit:PermitLimit") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
@@ -90,6 +104,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
     doc.Info.Title = "HireYar API"; doc.Info.Version = "v1"; doc.Info.Description = OpenApiText.Introduction;
     doc.Components ??= new(); doc.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
     doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
+    doc.Components.SecuritySchemes["SuperAdmin"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT", Description = "Short-lived administrator session from password and CAPTCHA login; HR tokens cannot access admin endpoints." };
     doc.Components.SecuritySchemes["InterviewToken"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", Description = "Six ASCII digit access code scoped to the interview ID in the route. Legacy opaque invitation tokens remain supported. Cannot access HR endpoints." };
     return Task.CompletedTask;
 }).AddOperationTransformer(async (operation, context, ct) =>
@@ -144,7 +159,13 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                 } } }
         } };
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
-        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : "Bearer", context.Document)] = [] }];
+        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminPricing" ? "SuperAdmin" : "Bearer", context.Document)] = [] }];
+    if (controller == "AdminAuth")
+    {
+        operation.Parameters ??= [];
+        operation.Parameters.Add(new OpenApiParameter { Name = "X-Admin-Entry", In = ParameterLocation.Header, Required = true,
+            Description = "Configured private admin entry key from the frontend route; incorrect or missing values return 404.", Schema = new OpenApiSchema { Type = JsonSchemaType.String } });
+    }
     if (context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true && context.Description.HttpMethod != "GET")
     {
         operation.Parameters ??= [];
@@ -156,6 +177,25 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
         operation.Responses.TryAdd(status, new OpenApiResponse { Description = "ProblemDetails with code and traceId; validation errors include errors.", Content = new Dictionary<string, OpenApiMediaType> { ["application/problem+json"] = new() { Schema = schema } } });
 }));
 var app = builder.Build();
+if (args.Contains("--provision-super-admin", StringComparer.Ordinal))
+{
+    if (Console.IsInputRedirected) throw new InvalidOperationException("Administrator provisioning requires an interactive terminal.");
+    Console.Write("Existing verified Owner mobile: "); var mobile = Console.ReadLine() ?? "";
+    Console.Write("New administrator password (12–128 characters): ");
+    var password = new StringBuilder();
+    while (true)
+    {
+        var key = Console.ReadKey(intercept: true);
+        if (key.Key == ConsoleKey.Enter) break;
+        if (key.Key == ConsoleKey.Backspace) { if (password.Length > 0) password.Length--; }
+        else if (!char.IsControl(key.KeyChar) && password.Length < 129) password.Append(key.KeyChar);
+    }
+    Console.WriteLine();
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<AdminAccounts>().ProvisionAsync(mobile, password.ToString(), CancellationToken.None);
+    password.Clear(); Console.WriteLine("Administrator provisioned. No HTTP server was started.");
+    await app.DisposeAsync(); return;
+}
 if (!app.Environment.IsDevelopment())
     app.Use((context, next) =>
     {

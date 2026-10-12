@@ -37,7 +37,7 @@ public sealed class BillingTests(ApiFixture f)
     private async Task<Guid> Org(Account a) { Guid org = default; await f.Db(async db => org = await db.Users.Where(x => x.Id == a.Id).Select(x => x.OrganizationId).SingleAsync()); return org; }
     private async Task<Account> Admin()
     {
-        var a = await f.RegisterOwner(); await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == a.Id); u.IsSystemAdmin = true; await db.SaveChangesAsync(); }); return a;
+        return await f.RegisterAdmin();
     }
     private async Task<PackageDto> SeedPackage(string code) => (await (await f.Browser().Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!.Packages.Single(x => x.Code == code);
     private static PackageRequest Request(PackageDto p, decimal? rate = null, bool? active = null) => new(p.Code, p.Name, p.Description, active ?? p.IsActive, p.IsPublic, p.SortOrder, rate ?? p.AiPricePerMinuteUsd, p.RetentionDays);
@@ -94,10 +94,10 @@ public sealed class BillingTests(ApiFixture f)
     [PostgresFact]
     public async Task Normal_hr_cannot_administer_pricing_and_admin_revocation_is_immediate()
     {
-        var a = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.Forbidden, (await a.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        var a = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.Unauthorized, (await a.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
         var admin = await Admin(); Assert.Equal(HttpStatusCode.OK, (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
         await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == admin.Id); u.IsSystemAdmin = false; await db.SaveChangesAsync(); });
-        Assert.Equal(HttpStatusCode.Forbidden, (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
     }
     [PostgresFact]
     public async Task Duplicate_callbacks_and_concurrent_credit_verifications_fulfill_once()
