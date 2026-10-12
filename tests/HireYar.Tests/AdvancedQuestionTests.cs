@@ -182,10 +182,14 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
             f.InterviewAi.InteractionAction = "clarify"; await Submit();
             Assert.Equal(first, current.Question!.Id); Assert.Equal(0, current.Progress.AnsweredQuestions);
             f.InterviewAi.InteractionAction = null;
-            // The model proposes easy despite a passed medium; the server must force hard.
-            await f.Db(async db => { var s = await db.InterviewSessions.SingleAsync(s => s.Id == id);
-                f.InterviewAi.ProposedQuestionId = s.Questions.Where(q => q.Difficulty == 1 && q.QuestionId != first).OrderBy(q => q.Order).First().QuestionId; });
+            // An unknown model selection must not discard the passed medium's grade.
+            f.InterviewAi.ProposedQuestionId = Guid.NewGuid();
             await Submit(); Assert.Equal("سؤال 1 hard", current.Question!.Text);
+            await f.Db(async db => {
+                var assessed = await db.InterviewAnswers.SingleAsync(a => a.InterviewSessionId == id && a.QuestionId == first && !a.IsInteraction);
+                Assert.Equal(0.8m, assessed.Correctness); Assert.Equal(0.8m, assessed.AssessmentConfidence);
+                Assert.Equal("policy_reselection", assessed.FailureCode); Assert.Equal("Fallback", assessed.SelectionSource);
+            });
             Assert.True(f.InterviewAi.LastContext!.ProgressiveTopicQuestions);
             Assert.True(f.InterviewAi.LastContext.MediumFirstTopicQuestions);
             f.InterviewAi.ProposedQuestionId = null; f.InterviewAi.Correctness = 0.3m;
