@@ -29,3 +29,18 @@ public sealed class InterviewSessionRecordingConfiguration : IEntityTypeConfigur
         b.ToTable(t => t.HasCheckConstraint("CK_Recording_Values", "\"DurationSeconds\" BETWEEN 1 AND 14400 AND \"SizeBytes\" > 0 AND \"ContentType\" IN ('video/webm','video/mp4')"));
     }
 }
+
+public sealed class InterviewRecordingSegmentConfiguration : IEntityTypeConfiguration<InterviewRecordingSegment>
+{
+    public void Configure(EntityTypeBuilder<InterviewRecordingSegment> b)
+    {
+        b.HasKey(r => new { r.InterviewSessionId, r.SegmentNumber });
+        b.HasIndex(r => new { r.InterviewSessionId, r.UploadId }).IsUnique();
+        b.HasOne<InterviewSession>().WithMany().HasForeignKey(r => new { r.OrganizationId, r.InterviewSessionId })
+            .HasPrincipalKey(s => new { s.OrganizationId, s.Id });
+        b.Property(r => r.StorageKey).HasMaxLength(512); b.Property(r => r.ContentType).HasMaxLength(100);
+        b.Property(r => r.ContentHash).HasMaxLength(64); b.Property(r => r.TimelineJson).HasColumnType("jsonb");
+        b.ToTable(t => t.HasCheckConstraint("CK_RecordingSegment_Values",
+            "\"SegmentNumber\" BETWEEN 1 AND 1000 AND \"DurationSeconds\" BETWEEN 1 AND 14400 AND \"SizeBytes\" BETWEEN 1 AND 41943040 AND \"ContentType\" IN ('video/webm','video/mp4') AND length(\"ContentHash\") = 64"));
+    }
+}

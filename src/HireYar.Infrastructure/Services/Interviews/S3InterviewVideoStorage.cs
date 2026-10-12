@@ -136,8 +136,9 @@ public sealed partial class S3InterviewVideoStorage(IAmazonS3 client, LocalInter
 
 // ASP.NET FileStreamResult can seek for HTTP Range without loading the recording into memory/disk.
 internal sealed class S3VideoReadStream(IAmazonS3 client, string bucket, string key, long length, string etag,
-    CancellationToken requestToken) : Stream
+    CancellationToken requestToken) : Stream, IInterviewMediaMetadata
 {
+    public string EntityTag => etag;
     private long position, remaining;
     private GetObjectResponse? response;
     private bool disposed;

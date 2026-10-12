@@ -34,7 +34,8 @@ public sealed class InterviewAuthenticationHandler(IOptionsMonitor<Authenticatio
         // Final recording upload may follow automatic completion. This grace never permits new answers or starting again.
         closing |= s.Status == InterviewStatus.Completed && s.CompletedAtUtc > time.GetUtcNow().AddMinutes(-10) &&
             s.SupersededByInterviewId is null && s.AccessRevokedAtUtc is null && s.ExpiresAtUtc > time.GetUtcNow() &&
-            Request.Method == "POST" && (Request.Path.Value!.EndsWith("/recording", StringComparison.Ordinal) || Request.Path.Value.EndsWith("/events", StringComparison.Ordinal));
+            (Request.Method == "POST" && (Request.Path.Value!.EndsWith("/recording", StringComparison.Ordinal) || Request.Path.Value.EndsWith("/events", StringComparison.Ordinal)) ||
+             (Request.Method is "GET" or "POST") && Request.Path.Value!.EndsWith("/recording/segments", StringComparison.Ordinal));
         if (failure.Status != "available" && !closing) return AuthenticateResult.Fail("Interview access is no longer available.");
         failure = null;
         if (s.AccessLockedUntilUtc > time.GetUtcNow()) { failure = Locked(); return AuthenticateResult.Fail("Interview access is temporarily locked."); }

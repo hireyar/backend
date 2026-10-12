@@ -5,8 +5,9 @@ RUN dotnet restore HireYar.slnx && dotnet publish src/HireYar.Api -c Release --n
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.12 AS runtime
 WORKDIR /app
 COPY --from=build /out .
-RUN mkdir -p /keys /app/storage/interviews && chown $APP_UID:$APP_UID /keys /app/storage/interviews && chmod 700 /app/storage/interviews
+RUN mkdir -p /keys /app/storage/interviews /app/upload-temp && chown $APP_UID:$APP_UID /keys /app/storage/interviews /app/upload-temp && chmod 700 /app/storage/interviews /app/upload-temp
 USER $APP_UID
 ENV ASPNETCORE_HTTP_PORTS=8080
+ENV ASPNETCORE_TEMP=/app/upload-temp
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "HireYar.Api.dll"]

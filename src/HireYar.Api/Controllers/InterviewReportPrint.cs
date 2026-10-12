@@ -42,7 +42,8 @@ public static class InterviewReportPrint
         if (review is not null)
         {
             html.Append("<h2>رضایت و سابقه بررسی انسانی</h2><p>رضایت گزارش‌شده: ").Append(review.ConsentStatus switch { "accepted" => "تأیید شده", "revoked" => "پس گرفته شده", _ => "نامشخص" })
-                .Append(" · ضبط کامل: ").Append(review.Recording is null ? "نامشخص" : "فایل آپلود شده؛ کامل‌بودن تأیید نشده").Append("</p>");
+                .Append(" · ضبط کامل: ").Append(review.Recording is not null ? "فایل آپلود شده؛ کامل‌بودن تأیید نشده" :
+                    review.RecordingSegments is { Count: > 0 } ? $"{review.RecordingSegments.Count} بخش آپلود شده؛ کامل‌بودن تأیید نشده" : "نامشخص").Append("</p>");
             foreach (var entry in review.Entries.Where(e => e.ActorUserId is not null))
                 html.Append("<p>").Append(entry.Kind switch { "advance" => "مرحله بعد", "reject" => "رد", _ => "بررسی انسانی" }).Append(" · ")
                     .Append(E(entry.RecordedAtUtc.ToString("u"))).Append(" · ").Append(E(entry.Note)).Append("</p>");

@@ -57,10 +57,11 @@ public sealed class JobService(IApplicationDbContext db, ICurrentUser user, Time
     }, ct);
     private async Task CheckTitle(string title, Guid id, string currentTitle, CancellationToken ct)
     {
-        var normalized = title.Trim().ToLowerInvariant();
+        var normalized = TitleComparison.Normalize(title);
+        if (normalized.Length == 0) throw new AppException(400, "invalid_title", "عنوان باید دارای متن باشد.");
         // Keeping a historical title must remain possible after an internal invitation copy.
-        if (normalized == currentTitle.Trim().ToLowerInvariant()) return;
-        if (await Scoped.AnyAsync(x => x.Id != id && x.Title.Trim().ToLower() == normalized, ct))
+        if (normalized == TitleComparison.Normalize(currentTitle)) return;
+        if (await TitleComparison.ExistsAsync(Scoped.Where(x => x.Id != id).Select(x => x.Title), normalized, ct))
             throw new AppException(409, "job_title_duplicate", "عنوان موقعیت شغلی قبلاً ثبت شده است.");
     }
     private void Apply(JobPosition row, JobRequest request)

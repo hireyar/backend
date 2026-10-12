@@ -8,4 +8,9 @@ public sealed record InterviewRecordingOffset(Guid AnswerId, decimal StartSecond
 public sealed record InterviewRecordingDto(string VideoUrl, int DurationSeconds, IReadOnlyList<InterviewRecordingOffset> Timeline,
     string Source = "candidate_reported");
 public sealed record InterviewReviewDto(IReadOnlyList<InterviewReviewEntryDto> Entries,
-    string ConsentStatus, string RecordingStatus, InterviewRecordingDto? Recording);
+    string ConsentStatus, string RecordingStatus, InterviewRecordingDto? Recording,
+    IReadOnlyList<InterviewRecordingSegmentDto>? RecordingSegments = null);
+public sealed record InterviewRecordingSegmentDto(Guid UploadId, int SegmentNumber, string VideoUrl,
+    int DurationSeconds, long SizeBytes, IReadOnlyList<InterviewRecordingOffset> Timeline);
+public sealed record InterviewRecordingProgressDto(int NextSegmentNumber, long TotalSizeBytes, int TotalDurationSeconds,
+    IReadOnlyList<InterviewRecordingSegmentDto> Segments, bool LegacyRecordingUploaded);

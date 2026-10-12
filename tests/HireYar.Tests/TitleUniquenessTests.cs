@@ -30,6 +30,39 @@ public sealed class TitleUniquenessTests(ApiFixture f)
     }
 
     [PostgresFact]
+    public async Task Job_spacing_variants_conflict_on_create_and_update_but_self_edit_and_other_tenant_are_allowed()
+    {
+        var owner = await f.RegisterOwner();
+        var first = await Read<JobDto>(await owner.Client.Send(HttpMethod.Post, "/api/job-positions", Job("برنامه‌ نویس")), HttpStatusCode.Created);
+        foreach (var title in new[] { "برنامهنویس", "برنامه نویس", "برنامه‌نویس", " برنامه  نویس ", "برنامه\tنویس", "برنامه\u00A0نویس", "برنامه\u202Fنویس", "برنامه\u3000نویس" })
+            await Duplicate(await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest(title, "Synthetic")), "job_title_duplicate");
+        var same = await Read<JobDto>(await owner.Client.Send(HttpMethod.Put, $"/api/job-positions/{first.Id}", new UpdateJobRequest(Job("برنامهنویس"), first.RowVersion)), HttpStatusCode.OK);
+        var second = await Read<JobDto>(await owner.Client.Send(HttpMethod.Post, "/api/job-positions", Job("طراح")), HttpStatusCode.Created);
+        await Duplicate(await owner.Client.Send(HttpMethod.Put, $"/api/job-positions/{second.Id}", new UpdateJobRequest(Job("برنامه ‌ نویس"), second.RowVersion)), "job_title_duplicate");
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/job-positions", Job(" ‌ ‌ "))).StatusCode);
+        var other = await f.RegisterOwner();
+        await Read<JobDto>(await other.Client.Send(HttpMethod.Post, "/api/job-positions", Job("برنامه نویس")), HttpStatusCode.Created);
+        await f.Db(async db => { var row = await db.JobPositions.SingleAsync(x => x.Id == second.Id); Assert.Equal("طراح", row.Title); Assert.Equal(second.RowVersion, row.RowVersion); });
+        Assert.Equal("برنامهنویس", same.Title);
+    }
+
+    [PostgresFact]
+    public async Task Template_spacing_variants_conflict_across_positions_and_both_update_routes()
+    {
+        var owner = await f.RegisterOwner();
+        var job = await Read<JobDto>(await owner.Client.Send(HttpMethod.Post, "/api/job-positions", Job("Backend")), HttpStatusCode.Created);
+        var first = await Read<TemplateDto>(await owner.Client.Send(HttpMethod.Post, "/api/interview-templates", Template(job.Id, "مصاحبه‌ فنی")), HttpStatusCode.Created);
+        foreach (var title in new[] { "مصاحبهفنی", "مصاحبه فنی", "مصاحبه‌فنی", "مصاحبه  فنی", "مصاحبه\nفنی", "مصاحبه\u2009فنی" })
+            await Duplicate(await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", WizardTemplate(job.Id, title)), "template_title_duplicate");
+        var second = await Read<TemplateDto>(await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", WizardTemplate(job.Id, "دیگر")), HttpStatusCode.OK);
+        await Duplicate(await owner.Client.Send(HttpMethod.Put, $"/api/panel-wizard/templates/{second.Id}", new UpdateWizardTemplateRequest(WizardTemplate(job.Id, "مصاحبه ‌ فنی"), second.RowVersion)), "template_title_duplicate");
+        await Duplicate(await owner.Client.Send(HttpMethod.Put, $"/api/interview-templates/{second.Id}", new UpdateTemplateRequest(Template(job.Id, "مصاحبهفنی"), second.RowVersion)), "template_title_duplicate");
+        await Read<TemplateDto>(await owner.Client.Send(HttpMethod.Put, $"/api/interview-templates/{first.Id}", new UpdateTemplateRequest(Template(job.Id, "مصاحبهفنی"), first.RowVersion)), HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", WizardTemplate(job.Id, " ‌ ‌ "))).StatusCode);
+        await f.Db(async db => { var row = await db.InterviewTemplates.Include(x => x.Questions).SingleAsync(x => x.Id == second.Id); Assert.Equal("دیگر", row.Title); Assert.Equal(second.RowVersion, row.RowVersion); Assert.Equal(5, row.Questions.Count); });
+    }
+
+    [PostgresFact]
     public async Task Job_titles_are_shared_between_routes_scoped_to_tenant_and_released_only_on_delete()
     {
         var owner = await f.RegisterOwner();
@@ -103,13 +136,13 @@ public sealed class TitleUniquenessTests(ApiFixture f)
         var client = f.Browser();
         client.AccessToken = owner.Client.AccessToken;
         var jobs = await Task.WhenAll(
-            owner.Client.Send(HttpMethod.Post, "/api/job-positions", Job("Concurrent")),
-            client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest(" concurrent ", "Synthetic description")));
+            owner.Client.Send(HttpMethod.Post, "/api/job-positions", Job("Con current")),
+            client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest(" con‌current ", "Synthetic description")));
         var winner = Assert.Single(jobs, x => x.IsSuccessStatusCode);
         await Duplicate(Assert.Single(jobs, x => x.StatusCode == HttpStatusCode.Conflict), "job_title_duplicate");
         var job = (await winner.Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
         var templates = await Task.WhenAll(
-            owner.Client.Send(HttpMethod.Post, "/api/interview-templates", Template(job.Id, "Concurrent")),
+            owner.Client.Send(HttpMethod.Post, "/api/interview-templates", Template(job.Id, "Con current")),
             client.Send(HttpMethod.Post, "/api/panel-wizard/templates", WizardTemplate(job.Id, " concurrent ")));
         Assert.Single(templates, x => x.IsSuccessStatusCode);
         await Duplicate(Assert.Single(templates, x => x.StatusCode == HttpStatusCode.Conflict), "template_title_duplicate");
