@@ -32,6 +32,11 @@ public sealed class TestClock : TimeProvider
 }
 public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public const string AdminEntry = "synthetic-admin-entry-key-for-tests-only";
+    public const string AdminPassword = "Synthetic-Admin-Password-42!";
+    public bool AdminEnabled { get; init; } = true;
+    public int AdminRateLimit { get; init; } = 1000;
+    public TestAdminCaptcha AdminCaptcha { get; } = new();
     public bool Production { get; init; }
     public bool UseS3VideoStorage { get; init; }
     public FakeVideoS3 VideoS3 { get; } = new();
@@ -54,6 +59,9 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddConsole(); });
         b.UseEnvironment(Production ? "Production" : "Development");
         b.UseSetting("SkipLocalSettings", "true");
+        b.UseSetting("SuperAdmin:Enabled", AdminEnabled.ToString());
+        b.UseSetting("SuperAdmin:RandomKey", AdminEntry);
+        b.UseSetting("SuperAdmin:AuthRequestsPerMinute", AdminRateLimit.ToString());
         b.UseSetting("RegistrationTrial:DurationDays", TrialDurationDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
         b.UseSetting("RegistrationTrial:CreditAmountUsd", TrialCreditAmountUsd.ToString(System.Globalization.CultureInfo.InvariantCulture));
         b.UseSetting("InterviewDiagnostics:Enabled", DiagnosticsEnabled.ToString());
@@ -78,6 +86,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
+            s.RemoveAll<IAdminCaptcha>(); s.AddSingleton<IAdminCaptcha>(AdminCaptcha);
             if (UseS3VideoStorage) { s.RemoveAll<Amazon.S3.IAmazonS3>(); s.AddSingleton<Amazon.S3.IAmazonS3>(VideoS3); }
             if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }
             s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
@@ -134,6 +143,18 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         return new(browser, mobile, me.Id);
     }
     public async Task Db(Func<AppDbContext, Task> action) { await using var scope = Services.CreateAsyncScope(); await action(scope.ServiceProvider.GetRequiredService<AppDbContext>()); }
+    public async Task<Account> RegisterAdmin()
+    {
+        var a = await RegisterOwner();
+        await using (var scope = Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<HireYar.Infrastructure.Auth.AdminAccounts>().ProvisionAsync(a.Mobile, AdminPassword, default);
+        a.Client.AdminEntryKey = AdminEntry;
+        var challenge = (await (await a.Client.Send(HttpMethod.Get, "/api/admin/auth/captcha")).Content.ReadFromJsonAsync<AdminCaptchaDto>(BillingJson.Options))!;
+        var login = await a.Client.Send(HttpMethod.Post, "/api/admin/auth/login", new AdminLoginRequest(a.Mobile, AdminPassword, challenge.Id, "123456"));
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        a.Client.AccessToken = (await login.Content.ReadFromJsonAsync<AdminSessionDto>(BillingJson.Options))!.AccessToken;
+        return a;
+    }
     public async Task FundInterviewsAsync(Account account)
     {
         var pricing = await (await account.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options);
@@ -151,6 +172,7 @@ public sealed class Browser(HttpClient client)
 {
     private readonly Dictionary<string, string> cookies = new();
     public string? AccessToken { get; set; }
+    public string? AdminEntryKey { get; set; }
     public string RefreshToken => cookies.GetValueOrDefault("hireyar.refresh", "");
     public void SetRefresh(string value) => cookies["hireyar.refresh"] = value;
     private void Capture(HttpResponseMessage response)
@@ -158,6 +180,7 @@ public sealed class Browser(HttpClient client)
     private HttpRequestMessage Request(HttpMethod method, string url, object? body = null)
     {
         var request = new HttpRequestMessage(method, url); if (body is not null) request.Content = JsonContent.Create(body, options: BillingJson.Options);
+        if (AdminEntryKey is not null) request.Headers.Add("X-Admin-Entry", AdminEntryKey);
         if (AccessToken is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
         request.Headers.TryAddWithoutValidation("Cookie", string.Join("; ", cookies.Select(x => $"{x.Key}={x.Value}"))); return request;
     }

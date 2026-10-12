@@ -108,8 +108,7 @@ public sealed class BillingPanelTests(ApiFixture f)
     [PostgresFact]
     public async Task Credit_purchase_history_is_once_and_uses_paid_time_without_changing_subscription()
     {
-        var a = await f.RegisterOwner(); var admin = await f.RegisterOwner();
-        await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == admin.Id); u.IsSystemAdmin = true; await db.SaveChangesAsync(); });
+        var a = await f.RegisterOwner(); var admin = await f.RegisterAdmin();
         var product = (await (await admin.Client.Send(HttpMethod.Post, "/api/admin/pricing/ai-credit-packages", new CreditPackageRequest("Synthetic fifty dollars", 50m, 5000000m, "IRT", true, true, 0))).Content.ReadFromJsonAsync<CreditPackageDto>(BillingJson.Options))!;
         var credit = (await (await a.Client.Send(HttpMethod.Post, "/api/billing/ai-credit/purchases", new CreditPurchaseRequest(product.Id))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options))!;
         Assert.Empty((await History(a)).Transactions.Items); var since = DateTimeOffset.UtcNow.AddMinutes(30);

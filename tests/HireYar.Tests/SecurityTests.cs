@@ -106,6 +106,10 @@ public sealed class SecurityTests(ApiFixture f)
         var openApi = await openApiResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Contains("ورود با موبایل", openApi.GetProperty("info").GetProperty("description").GetString());
         Assert.Contains("ثبت‌نام", openApi.GetProperty("paths").GetProperty("/api/auth/otp/verify").GetProperty("post").GetProperty("summary").GetString());
+        var adminLogin = openApi.GetProperty("paths").GetProperty("/api/admin/auth/login").GetProperty("post");
+        Assert.Contains(adminLogin.GetProperty("parameters").EnumerateArray(), x => x.GetProperty("name").GetString() == "X-Admin-Entry" && x.GetProperty("required").GetBoolean());
+        var adminPricing = openApi.GetProperty("paths").GetProperty("/api/admin/pricing/packages").GetProperty("get");
+        Assert.True(adminPricing.GetProperty("security")[0].TryGetProperty("SuperAdmin", out _));
         var uploadContent = openApi.GetProperty("paths").GetProperty("/api/candidate/interviews/{interviewId}/answers").GetProperty("post").GetProperty("requestBody").GetProperty("content");
         Assert.False(uploadContent.TryGetProperty("application/x-www-form-urlencoded", out _));
         var uploadSchema = uploadContent.GetProperty("multipart/form-data").GetProperty("schema");

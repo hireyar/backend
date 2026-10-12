@@ -1,3 +1,11 @@
+## سوپرادمین محدود به ورود و مدیریت پکیج — 2026-10-12
+
+درخواست بک‌اند روی `codex/super-admin` از `dev`: Verified محلی؛ ورود password+PNG CAPTCHA، کلید appsettings و entry=404 نامعتبر، JWT مستقل و DB permission/stamp/lockout، CLI تعاملی provisioning، همان API پویا و RowVersion قیمت‌گذاری. [SUPER_ADMIN_API](SUPER_ADMIN_API.md) و ADR-039 مرجع‌اند. schema/Repository/عضویت چندسازمانی اضافه نشده؛ سوابق مالی snapshot محفوظ‌اند.
+
+باقی برای تحویل محصول: ساخت route guard و صفحه `/admin/{randomkey}`، تصویر کپچا/ورود، جدول پکیج/دوره/قیمت و مدیریت409 در ریپوی Angular؛ انتخاب و provision حساب واقعی، key خصوصی/Enabled مقصد و بررسی proxy/access-log مسیر خصوصی، آزمون UI واقعی. این اقدامات روی مقصد انجام نشده‌اند؛ سایر مدیریت‌های پلتفرم مجوز توسعه خودکار ندارند. فایل مشترک خاموش/کلید خالی، migration لازم نیست، commit/push/deploy نشده.
+
+Verification نهایی: restore/build صفر warning/error؛ ۳۲۵/۳۲۵ موفق، صفر Skip، PostgreSQL18 اختصاصی محلی و provider/CAPTCHA integration مصنوعی؛ `super-admin-final.trx`. تصویر PNG واقعی به‌صورت synthetic نمایش و بررسی شد؛ OCR/فرانت واقعی ادعا نمی‌شود.
+
 ## ویدیوی خصوصی آروان — 2026-10-12
 
 درخواست جاری: اتصال ویدیوهای تازه به S3 آروان، نگهداری credential در appsettings محلی ignored، multipart بک‌اند با حافظه محدود، پخش Owner scoped با Range و کنترل خصوصی‌بودن bucket اجرا شد؛ [INTERVIEW_VIDEO_STORAGE](INTERVIEW_VIDEO_STORAGE.md) مرجع است. migration/انتقال فایل قدیمی لازم نیست و volume صوت/رزومه/فایل تاریخی باید حفظ شود.

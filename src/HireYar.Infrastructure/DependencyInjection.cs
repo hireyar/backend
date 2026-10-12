@@ -27,6 +27,12 @@ public static class DependencyInjection
             o.SignIn.RequireConfirmedPhoneNumber = true;
         }).AddEntityFrameworkStores<AppDbContext>();
         services.Configure<SecurityOptions>(config.GetSection("Security"));
+        services.AddOptions<SuperAdminOptions>().Bind(config.GetSection("SuperAdmin"))
+            .Validate(x => x.IsValid(), "SuperAdmin requires a 32 to 128 character URL-safe RandomKey when enabled and AccessMinutes between 1 and 30.")
+            .ValidateOnStart();
+        services.AddSingleton<IAdminCaptcha, AdminCaptcha>();
+        services.AddScoped<AdminAccounts>();
+        services.AddScoped<IAdminAccounts>(s => s.GetRequiredService<AdminAccounts>());
         services.Configure<InvitationNotificationOptions>(config.GetSection("InterviewNotifications"));
         services.AddSingleton<HireYar.Application.Interviews.IInterviewInvitationNotifier>(s => new InterviewInvitationNotifier(
             new HttpClient { BaseAddress = new Uri("https://api.kavenegar.com/"), Timeout = TimeSpan.FromSeconds(10) },

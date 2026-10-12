@@ -1,3 +1,15 @@
+## تحویل بک‌اند سوپرادمین — 2026-10-12
+
+برنچ `codex/super-admin` از `dev` با Git پاک طبق درخواست ساخته شد؛ تغییرات working tree هستند و commit/push/deploy انجام نشده‌اند. ابتدا [SUPER_ADMIN_API](SUPER_ADMIN_API.md) و ADR-039 را بخوانید. ورود ادمین از `/api/admin/auth/{entry,captcha,login,me,logout}`، header X-Admin-Entry و JWT با audience مستقل انجام می‌شود. IsSystemAdmin مدل قبلی محفوظ است؛ OTP حساب privileged هم admin API را باز نمی‌کند. validation فعال/تأیید/مجوز/lockout/stamp/entry در هر درخواست؛ password failure و provisioning/logout زیر قفل کاربر. API admin pricing قبلی و snapshotهای خرید/اشتراک تغییر ساختاری ندارند.
+
+SuperAdmin مشترک خاموش/کلید خالی است. اپراتور key ۳۲..۱۲۸ URL-safe خصوصی و Enabled=true، سپس روی حساب Owner موجود/موبایل تأییدشده فرمان `dotnet run --project src/HireYar.Api --no-launch-profile -- --provision-super-admin` را تعاملی اجرا می‌کند؛ فرمان رمز را پنهان می‌گیرد و حساب DB تنظیم‌شده را تغییر می‌دهد. مقصد این نوبت اجرا نشد و migration لازم نیست. تنظیمات/credential محلی قبلی محفوظ‌اند.
+
+Angular در این ریپو نیست؛ route `/admin/{randomkey}` باید قبل نمایش فرم GET entry با header را تأیید کند و 404 صفحهٔ ورود را مخفی کند. PNG data URL، UUID کپچا و TTL دودقیقه؛ هر login challenge را مصرف می‌کند. token فقط حافظه/Authorization و بدون refresh؛ logout همه tokenهای ادمین حساب را باطل می‌کند. UI پکیج/دوره/قیمت و409 RowVersion مطابق قرارداد آمادهٔ اتصال است، هنوز ساخته/آزموده نشده. کپچای ساده تضمین مقاومت OCR نیست؛ حافظه یک process است.
+
+Verification نهایی واقعی: tool restore/restore موفق؛ build صفر warning/error؛ ۳۲۵/۳۲۵ موفق، صفر شکست/Skip روی PostgreSQL18 loopback:55487 اختصاصی و provider/CAPTCHA integration مصنوعی؛ `tests/HireYar.Tests/TestResults/super-admin-final.trx`. تست‌های موجود billing/snapshot/concurrency و سیزده case جدید auth/config/captcha/rate/lockout/revocation پاس شدند؛ preview تصویر PNG واقعی synthetic خوانا بود. اجرای میانی assertion صفحه فرانت و mapping summary غایب Swagger داشت که اصلاح شدند؛ بازاجرای کامل نهایی موفق است. مرزهای auth جدید در OpenAPI فارسی و SuperAdmin security scheme بررسی شدند. داده واقعی، ارسال خارجی، UI واقعی یا مقصد production آزموده/تغییر داده نشدند.
+
+پس از تست نهایی، صفر دیتابیس fixture باقی و cluster اختصاصی متوقف شد. همهٔ مقادیر appsettings قبل از این تغییر، با حذف بخش تازهٔ SuperAdmin از مقایسه، بدون نمایش مقدار برابر HEAD تأیید شدند؛ key/credential موجود بازنویسی نشده‌اند.
+
 ## تحویل ویدیوی خصوصی آروان — 2026-10-12
 
 روی dev با Git پاک شروع شد. [INTERVIEW_VIDEO_STORAGE](INTERVIEW_VIDEO_STORAGE.md) و ADR-038 را بخوانید: فقط videos تازه در S3، key با پیشوند s3/ و فایل تاریخی محلی، multipart محدود 8 MiB، پخش seekable با Range/ETag و Owner+سازمان+retention موجود. guard ACL/policy public و نامعلوم را رد می‌کند؛ ACL خصوصی فایل جای bucket policy نیست. اتصال واقعی نشان داد SDK v4 policy غایب را با response HTTP404/XML NoSuchBucketPolicy می‌دهد؛ handling امن مخصوص همان کد اضافه شد.

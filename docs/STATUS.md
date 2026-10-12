@@ -1,3 +1,13 @@
+## سوپرادمین، ورود و کلید مسیر — 2026-10-12
+
+روی `codex/super-admin` از `dev` پاک، بک‌اند ورود اختصاصی موبایل/رمز/CAPTCHA، header کلید entry و scheme/audience مستقل ادمین اضافه شد. IsSystemAdmin فعلی DB و API مدیریت پکیج‌ها/دوره‌ها/قیمت/اعتبار حفظ شدند؛ HR token حتی برای حساب ادمین دیگر به endpoint admin نمی‌رسد. key اشتباه/خاموش auth=404، check stamp/مجوز/active/lockout در هر درخواست و خروج ابطال همه نشست‌های ادمین؛ پنج شکست رمز قفل۱۵دقیقه. provisioning فرمان تعاملی محلی روی حساب موجود، hash استاندارد Identity و transaction دارد. ADR-039 و [SUPER_ADMIN_API](SUPER_ADMIN_API.md) قرارداد جاری‌اند.
+
+فایل مشترک SuperAdmin.Enabled=false و RandomKey خالی است؛ تنظیمات/credential محلی موجود دست‌نخورده‌اند. حساب واقعی/DB مقصد تجهیز نشده؛ اپراتور باید key خصوصی و رمز حساب انتخاب‌شده را فراهم کند. تصویر PNG دودقیقه/یک‌بارمصرف/bounded یک process است؛ نمایش واقعی PNG synthetic بررسی شد، مقاومت OCR تأیید نشده. صفحهٔ `/admin/{randomkey}` و جدول مدیریت در Angular جدا باقی‌اند؛ backend صفحه HTML آن را ایجاد نمی‌کند.
+
+اعتبارسنجی نهایی: tool restore/restore موفق، build صفر warning/error؛ **۳۲۵/۳۲۵ تست موفق، صفر Failed/Skipped** روی PostgreSQL18 اختصاصی loopback:55487 و providerهای مصنوعی. TRX: `tests/HireYar.Tests/TestResults/super-admin-final.trx`. سیزده case جدید تنظیمات/تصویر/TTL/capacity، header/disable، CAPTCHA single-use، حساب نامعتبر، جداسازی HR/admin، expiry/signature، logout/stamp/rotation/active، قفل concurrent و rate limiter Production دارند؛ تست‌های billing واقعی قیمت/snapshot/stale version هم پاس شدند. integration تصویر را فقط در fixture با challenge مصنوعی جایگزین می‌کند؛ unit سرویس واقعی و preview PNG نیز بررسی شدند. اجرای میانی یک assertion فرانت در ریپوی backend و یک summary غایب Swagger داشت؛ assertion اصلاح و mapping/schema تست تکمیل شد؛ نتیجه نهایی بازاجرای کامل ملاک است.
+
+تغییر schema/migration لازم نیست. صفر دیتابیس fixture باقی ماند و cluster اختصاصی متوقف شد؛ همهٔ مقادیر قبلی appsettings بدون چاپ مقدار با HEAD برابر تأیید شدند. commit/push/deploy/production و ارسال واقعی انجام نشده‌اند؛ working tree تغییرات حاضر را دارد.
+
 ## ذخیره خصوصی ویدیو در آروان — 2026-10-12
 
 روی dev با Git پاک آغاز شد. ویدیوهای تازه در ArvanS3، multipart با قطعات 8 MiB/ACL خصوصی و guard ACL+bucket policy؛ رسانه قبلی/صوت/رزومه محلی محفوظ. مدیر از API Owner سازمان خودش با retention و Range/no-store می‌خواند؛ URL مستقیم یا GET امضاشده عرضه نمی‌شود. تنظیمات عمومی بدون credential؛ کلیدهای ارسالی فقط در appsettings.Development.local.json ignored تنظیم شدند. migration/انتقال داده/Angular/push/deploy/production انجام نشده‌اند.
