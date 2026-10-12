@@ -1,3 +1,9 @@
+## ADR-039 — جداسازی انتخاب سؤال از ارزیابی معتبر در progressive (2026-10-12)
+
+طبق درخواست اصلاح، InterviewDecisionValidator پس از اعتبارسنجی کامل ساختار، action=advance، ارزیابی و شواهد، در جلسه ProgressiveTopicQuestions فقط پیشنهاد nextQuestionId نامعتبر را حذف می‌کند. نمره و شواهد معتبر حفظ می‌شوند؛ CandidateInterviewService پس از FinishAnswer با همان policy موجود، سطح و سؤال مجاز را دوباره انتخاب می‌کند. بنابراین شناسه ناشناخته/تکراری/خارج shortlist، نمره صحیح متوسط را به unknown و شاخه آسان تبدیل نمی‌کند. نمره یا شواهد نامعتبر و JSON نامعتبر همچنان fallback کامل با نمره null دارند؛ تعامل با سؤال پیشنهادی غیرnull همچنان رد می‌شود. جلسه غیرprogressive سیاست قبلی را حفظ می‌کند.
+
+قرارداد DTO/Domain/DB و آستانه‌ها تغییر نکردند؛ migration لازم نیست. diagnostics موجود policy_reselection و SelectionSource=Fallback انتخاب سرور را نشان می‌دهند، حتی وقتی نمره AI معتبر حفظ شده است. وضعیت نمره از Correctness/AssessmentConfidence مستقل خوانده می‌شود. کیفیت نمره مدل یا علت جلسه واقعی گزارش‌شده از این اصلاح نتیجه نمی‌شود. [ADVANCED_QUESTIONS_API](ADVANCED_QUESTIONS_API.md).
+
 ## ADR-038 — ویدیوی خصوصی در S3 آروان (2026-10-12)
 
 طبق درخواست کاربر، provider ویدیو ArvanS3 در Infrastructure و SDK رسمی AWSSDK.S3 اضافه شد؛ Domain/Application و قراردادهای فعلی IInterviewAudioStorage/DTO تغییر نکردند. فقط ویدیوهای تازهٔ پاسخ/معرفی/ضبط کامل به S3 با multipart قطعات 8 MiB و ACL=Private می‌روند؛ صوت/رزومه و keyهای تاریخی محلی محفوظ‌اند و migration/انتقال خودکار داده نداریم. کلید s3/... محل storage را مشخص می‌کند؛ provider ناموفق fallback محلی ندارد.
