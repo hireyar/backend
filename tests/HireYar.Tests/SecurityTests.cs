@@ -54,6 +54,7 @@ public sealed class SecurityTests(ApiFixture f)
         {
             builder.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddProvider(logs); });
             builder.UseEnvironment("Production");
+            builder.UseSetting("InterviewStorage:VideoProvider", "Local");
             builder.UseSetting("ConnectionStrings:Default", "Host=localhost;Database=hireyar_test;Username=test;Password=test");
             builder.UseSetting("Security:SigningKey", new string('x', 32));
             builder.UseSetting("Security:Issuer", "HireYar.Tests");
@@ -89,6 +90,7 @@ public sealed class SecurityTests(ApiFixture f)
         using var production = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
+            builder.UseSetting("InterviewStorage:VideoProvider", "Local");
             builder.UseSetting("ConnectionStrings:Default", "Host=localhost;Database=hireyar_test;Username=test;Password=test");
             builder.UseSetting("Security:SigningKey", new string('x', 32));
             builder.UseSetting("Security:Issuer", "HireYar.Tests");

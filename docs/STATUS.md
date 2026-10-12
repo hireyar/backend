@@ -1,3 +1,12 @@
+## ذخیره خصوصی ویدیو در آروان — 2026-10-12
+
+روی dev با Git پاک آغاز شد. ویدیوهای تازه در ArvanS3، multipart با قطعات 8 MiB/ACL خصوصی و guard ACL+bucket policy؛ رسانه قبلی/صوت/رزومه محلی محفوظ. مدیر از API Owner سازمان خودش با retention و Range/no-store می‌خواند؛ URL مستقیم یا GET امضاشده عرضه نمی‌شود. تنظیمات عمومی بدون credential؛ کلیدهای ارسالی فقط در appsettings.Development.local.json ignored تنظیم شدند. migration/انتقال داده/Angular/push/deploy/production انجام نشده‌اند.
+
+[INTERVIEW_VIDEO_STORAGE](INTERVIEW_VIDEO_STORAGE.md) قرارداد جاری است. آپلود مستقیم مرورگر به S3 برای حجم بسیار بالا پیشنهاد شده، هنوز API جدید/فرانت آن پیاده نشده؛ آپلود فعلی از IFormFile/بک‌اند با سقف ضبط 512 MiB می‌گذرد. حجم کل در RAM جمع نمی‌شود، اما buffering دیسک موقت ASP.NET و ترافیک بک‌اند همچنان وجود دارد.
+
+اعتبارسنجی نهایی: restore از NuGet عمومی و build موفق با صفر warning/error؛ suite کامل ۳۱۲/۳۱۲ موفق، صفر Failed/Skipped، PostgreSQL 18 اختصاصی loopback:55486 و S3/provider مصنوعی. TRX: tests/HireYar.Tests/TestResults/s3-video-final.trx. ۱۶ case واحد تازه و یک integration S3 شامل multipart محدود، Empty/oversize، private ACL/public policy/NotPrincipal، 404 XML امن/DTD ممنوع، abort لغو و پاسخ گم‌شده Complete، cleanup، فایل تاریخی/traversal، HTTP206/no-store و JWT/Owner/scope سازمان‌اند. اجرای اولیه suite دو شکست فقط در تنظیمات S3 fixtureهای مستقل Production داشت؛ override Local در آن‌ها اضافه و suite کامل موفق بازاجرا شد.
+
+Smoke واقعی آروان با داده مصنوعی 8 MiB+16 بایت، دو UploadPart/Complete، خواندن seek/Range احرازشده و GET بدون امضا موفق: anonymous=403؛ فایل مصنوعی حذف شد. GetBucketAcl=200 و نبود policy با HTTP404/XML NoSuchBucketPolicy تأیید شدند. لاگ ignored artifacts/s3-video-smoke.log فاقد credential/key فایل یا محتوای کاربر است. آزمون real codec/فرانت/فایل چندگیگابایتی/بار مقصد انجام نشده؛ محدودیت 512 MiB و IFormFile/ترافیک بک‌اند محفوظ‌اند. هیچ migration یا تغییر schema/data مقصد، bucket policy/ACL مقصد، push/deploy/production انجام نشده است.
 ## عنوان غیرتکراری موقعیت و قالب — 2026-10-12
 
 با حفظ تغییرات پاک‌سازی قبلی روی dev، ایجاد/ویرایش موقعیت و قالب در API قدیمی و panel-wizard، عنوان تکراری همان سازمان را با 409 و code اختصاصی رد می‌کنند. فاصله ابتدا/انتها و case انگلیسی نادیده گرفته می‌شوند؛ همان رکورد مستثنا، عنوان آرشیوشده همچنان رزرو و عنوان حذف‌شده قابل استفاده مجدد است. قالب در کل سازمان بررسی می‌شود. قفل سازمان موجود مانع رقابت ایجاد/ویرایش می‌شود؛ ADR-037 و PANEL_WIZARD_API قرارداد جاری‌اند.

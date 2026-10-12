@@ -19,5 +19,7 @@ public sealed class NetArzOptions : IOpenAiInterviewOptions
 }
 public sealed class InterviewStorageOptions
 {
+    public string VideoProvider { get; set; } = "Local";
+    public InterviewS3Options S3 { get; set; } = new();
     public string RootPath { get; set; } = "storage/interviews";
 }

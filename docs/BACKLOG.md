@@ -1,3 +1,12 @@
+## ویدیوی خصوصی آروان — 2026-10-12
+
+درخواست جاری: اتصال ویدیوهای تازه به S3 آروان، نگهداری credential در appsettings محلی ignored، multipart بک‌اند با حافظه محدود، پخش Owner scoped با Range و کنترل خصوصی‌بودن bucket اجرا شد؛ [INTERVIEW_VIDEO_STORAGE](INTERVIEW_VIDEO_STORAGE.md) مرجع است. migration/انتقال فایل قدیمی لازم نیست و volume صوت/رزومه/فایل تاریخی باید حفظ شود.
+
+باقیِ پیشنهاد حجم بالا: API جلسه آپلود مستقیم، امضای UploadPart/resume/finalize با quota و مالکیت سرور، CORS محدود، cleanup orphan و مصرف در Angular جدا. این پیشنهاد مجوز اجرای خودکار مرحله دیگر نیست. عملیاتی: credential مقصد، lifecycle فقط AbortIncompleteMultipartUpload، بررسی فضای temp/proxy/timeout، بار/codec/ضبط طولانی و player authenticated Range در فرانت؛ هیچ‌کدام روی production اعمال نشده‌اند.
+
+اعتبارسنجی نهایی: restore از NuGet عمومی و build موفق با صفر warning/error؛ suite کامل ۳۱۲/۳۱۲ موفق، صفر Failed/Skipped، PostgreSQL 18 اختصاصی loopback:55486 و S3/provider مصنوعی. TRX: tests/HireYar.Tests/TestResults/s3-video-final.trx. ۱۶ case واحد تازه و یک integration S3 شامل multipart محدود، Empty/oversize، private ACL/public policy/NotPrincipal، 404 XML امن/DTD ممنوع، abort لغو و پاسخ گم‌شده Complete، cleanup، فایل تاریخی/traversal، HTTP206/no-store و JWT/Owner/scope سازمان‌اند. اجرای اولیه suite دو شکست فقط در تنظیمات S3 fixtureهای مستقل Production داشت؛ override Local در آن‌ها اضافه و suite کامل موفق بازاجرا شد.
+
+Smoke واقعی آروان با داده مصنوعی 8 MiB+16 بایت، دو UploadPart/Complete، خواندن seek/Range احرازشده و GET بدون امضا موفق: anonymous=403؛ فایل مصنوعی حذف شد. GetBucketAcl=200 و نبود policy با HTTP404/XML NoSuchBucketPolicy تأیید شدند. لاگ ignored artifacts/s3-video-smoke.log فاقد credential/key فایل یا محتوای کاربر است. آزمون real codec/فرانت/فایل چندگیگابایتی/بار مقصد انجام نشده؛ محدودیت 512 MiB و IFormFile/ترافیک بک‌اند محفوظ‌اند. هیچ migration یا تغییر schema/data مقصد، bucket policy/ACL مقصد، push/deploy/production انجام نشده است.
 ## جلوگیری از عنوان تکراری — 2026-10-12
 
 درخواست حاضر در Create/Update موقعیت و Create/Update/SaveWizard قالب اجرا شد؛ scope سازمان، case/Trim، self-exclusion، آرشیو/حذف و رقابت با قفل موجود بررسی می‌شوند. فرانت جدا باید detail یا code پاسخ 409 (job_title_duplicate / template_title_duplicate) را کنار ورودی عنوان نمایش دهد؛ تغییر Angular اینجا انجام نشده است. migration لازم نیست، داده‌های قبلی و کپی داخلی قالب دعوت حذف/بازنویسی نشدند؛ ADR-037 مرجع حدود تضمین است.

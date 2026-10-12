@@ -1,3 +1,5 @@
+using Amazon.Runtime;
+using Amazon.S3;
 using HireYar.Application.Interviews;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,7 +55,30 @@ public static class InterviewDependencyInjection
         services.AddScoped<InterviewAccessStatusService>();
         services.AddSingleton<IResumeTextExtractor, ResumeTextExtractor>();
         services.AddHostedService<InterviewRecoveryWorker>();
-        services.AddSingleton<IInterviewAudioStorage, LocalInterviewAudioStorage>();
+        services.AddSingleton<LocalInterviewAudioStorage>();
+        services.AddOptions<InterviewStorageOptions>()
+            .Validate(o => o.VideoProvider is "Local" or "ArvanS3", "Invalid video storage provider.")
+            .Validate(o => o.VideoProvider == "Local" ||
+                (Uri.TryCreate(o.S3.Endpoint, UriKind.Absolute, out var u) && u.Scheme == "https" && u.AbsolutePath == "/" &&
+                string.IsNullOrEmpty(u.UserInfo) && string.IsNullOrEmpty(u.Query) && string.IsNullOrEmpty(u.Fragment) &&
+                !u.Host.StartsWith(o.S3.Bucket + ".", StringComparison.OrdinalIgnoreCase) &&
+                System.Text.RegularExpressions.Regex.IsMatch(o.S3.Bucket, "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$") &&
+                !string.IsNullOrWhiteSpace(o.S3.Region) && !string.IsNullOrWhiteSpace(o.S3.AccessKey) && !string.IsNullOrWhiteSpace(o.S3.SecretKey)),
+                "Private video storage requires an HTTPS service endpoint, bucket, region and credentials.").ValidateOnStart();
+        if (config["InterviewStorage:VideoProvider"] == "ArvanS3")
+        {
+            services.AddSingleton<IAmazonS3>(s => {
+                var o = s.GetRequiredService<IOptions<InterviewStorageOptions>>().Value.S3;
+                return new AmazonS3Client(new BasicAWSCredentials(o.AccessKey, o.SecretKey), new AmazonS3Config {
+                    ServiceURL = o.Endpoint, AuthenticationRegion = o.Region, ForcePathStyle = true,
+                    RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                    ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+                    MaxErrorRetry = 2, Timeout = TimeSpan.FromMinutes(2)
+                });
+            });
+            services.AddSingleton<IInterviewAudioStorage, S3InterviewVideoStorage>();
+        }
+        else services.AddSingleton<IInterviewAudioStorage>(s => s.GetRequiredService<LocalInterviewAudioStorage>());
         services.AddSingleton<InterviewPolicy>(); services.AddSingleton<InterviewDecisionValidator>();
         services.AddScoped<QuestionAudioService>(); services.AddScoped<CandidateInterviewService>(); services.AddScoped<InterviewManagementService>();
         return services;
