@@ -22,6 +22,7 @@ internal static class OpenApiText
         ("AdminAuth", "Login") => "ورود مستقل سوپرادمین با موبایل، رمز و کپچا",
         ("AdminAuth", "Me") => "مشاهده حساب سوپرادمین جاری",
         ("AdminAuth", "Logout") => "خروج و ابطال همه نشست‌های سوپرادمین حساب جاری",
+        ("AdminUsers", "Grant") => "اعطای دسترسی سوپرادمین به حساب موجود با شماره موبایل و صدور رمز",
         ("CandidateInterviews", "Event") => "ثبت رضایت یا رویداد دستگاه گزارش‌شده توسط داوطلب",
         ("CandidateInterviews", "Recording") => "آپلود خصوصی ویدیوی جلسه و زمان‌بندی پاسخ‌ها",
         ("Interviews", "RegenerateReport") => "بازتولید صریح گزارش با وزن موضوعات و آستانه بررسی انسانی",

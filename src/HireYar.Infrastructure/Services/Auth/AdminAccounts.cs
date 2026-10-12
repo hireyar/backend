@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using HireYar.Application.Auth;
 using HireYar.Application.Common;
@@ -60,18 +61,37 @@ public sealed class AdminAccounts(AppDbContext db, UserManager<ApplicationUser> 
         Check(await users.UpdateSecurityStampAsync(u));
         await tx.CommitAsync(ct);
     }
-    // Called only by the local interactive operator command, never by an HTTP endpoint.
+    public async Task<AdminGrantDto> GrantAsync(AdminGrantRequest r, CancellationToken ct)
+    {
+        if (!admin.Value.Enabled) throw AppException.NotFound();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var u = await db.Users.FromSqlInterpolated($"SELECT * FROM \"AspNetUsers\" WHERE \"PhoneNumber\" = {r.Mobile} FOR UPDATE").SingleOrDefaultAsync(ct)
+            ?? throw AppException.NotFound();
+        if (u is not { IsActive: true, PhoneNumberConfirmed: true, Role: OrganizationRole.Owner })
+            throw new AppException(400, "admin_account_ineligible", "حساب باید Owner فعال با موبایل تأییدشده باشد.");
+        if (u.IsSystemAdmin) throw new AppException(409, "already_super_admin", "این حساب از قبل سوپرادمین است.");
+        var password = "Hy!" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16)) + "a7";
+        await SetPasswordAndAdminAsync(u, password);
+        await tx.CommitAsync(ct);
+        return new(u.Id, u.FullName, r.Mobile, password);
+    }
+
+    // Bootstrap/reset command for the local operator; HTTP grants never reset existing admins.
     public async Task ProvisionAsync(string mobile, string password, CancellationToken ct)
     {
         if (password.Length is < 12 or > 128) throw new InvalidOperationException("Password must contain 12 to 128 characters.");
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var u = await db.Users.FromSqlInterpolated($"SELECT * FROM \"AspNetUsers\" WHERE \"PhoneNumber\" = {mobile} FOR UPDATE").SingleOrDefaultAsync(ct);
         if (u is not { IsActive: true, PhoneNumberConfirmed: true, Role: OrganizationRole.Owner }) throw new InvalidOperationException("An existing active, phone-confirmed Owner account is required.");
+        await SetPasswordAndAdminAsync(u, password);
+        await tx.CommitAsync(ct);
+    }
+    private async Task SetPasswordAndAdminAsync(ApplicationUser u, string password)
+    {
         if (await users.HasPasswordAsync(u)) Check(await users.RemovePasswordAsync(u));
         Check(await users.AddPasswordAsync(u, password));
         u.IsSystemAdmin = true; u.LockoutEnabled = true; u.LockoutEnd = null; u.AccessFailedCount = 0;
         Check(await users.UpdateAsync(u));
-        await tx.CommitAsync(ct);
     }
     private static void Check(IdentityResult result)
     {

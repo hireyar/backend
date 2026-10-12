@@ -45,6 +45,60 @@ public sealed class AdminCaptchaTests
 [Collection("Postgres")]
 public sealed class AdminAuthTests(ApiFixture f)
 {
+    private const string GrantRoute = "/api/admin/users/super-admins";
+    [PostgresFact]
+    public async Task Only_admin_can_grant_existing_owner_and_generated_password_allows_admin_login()
+    {
+        var admin = await f.RegisterAdmin(); var target = await f.RegisterOwner();
+        var request = new AdminGrantRequest(target.Mobile);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await f.Browser().Send(HttpMethod.Post, GrantRoute, request)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await target.Client.Send(HttpMethod.Post, GrantRoute, request)).StatusCode);
+        string? beforeStamp = null; Guid beforeOrganization = Guid.Empty;
+        await f.Db(async db => { var u = await db.Users.AsNoTracking().SingleAsync(x => x.Id == target.Id); beforeStamp = u.SecurityStamp; beforeOrganization = u.OrganizationId; });
+        var response = await admin.Client.Send(HttpMethod.Post, GrantRoute, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode); Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
+        var granted = (await response.Content.ReadFromJsonAsync<AdminGrantDto>(BillingJson.Options))!;
+        Assert.Equal(target.Id, granted.Id); Assert.Equal(target.Mobile, granted.Mobile);
+        Assert.InRange(granted.Password.Length, 12, 128);
+        await f.Db(async db => {
+            var after = await db.Users.AsNoTracking().SingleAsync(x => x.Id == target.Id);
+            Assert.True(after.IsSystemAdmin); Assert.NotEqual(granted.Password, after.PasswordHash);
+            Assert.NotEqual(beforeStamp, after.SecurityStamp); Assert.Equal(beforeOrganization, after.OrganizationId);
+        });
+        var browser = f.Browser(); browser.AdminEntryKey = ApiFixture.AdminEntry;
+        var login = await browser.Send(HttpMethod.Post, "/api/admin/auth/login", await Request(browser, target.Mobile, granted.Password));
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        browser.AccessToken = (await login.Content.ReadFromJsonAsync<AdminSessionDto>(BillingJson.Options))!.AccessToken;
+        Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.Client.Send(HttpMethod.Post, GrantRoute, request)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Get, "/api/admin/auth/me")).StatusCode);
+    }
+
+    [PostgresFact]
+    public async Task Grant_rejects_missing_inactive_unverified_and_invalid_mobile_accounts_without_mutation()
+    {
+        var admin = await f.RegisterAdmin();
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.Client.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest("09000000000"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.Client.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest("invalid"))).StatusCode);
+        foreach (var inactive in new[] { true, false }) {
+            var target = await f.RegisterOwner();
+            await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == target.Id); if (inactive) u.IsActive = false; else u.PhoneNumberConfirmed = false; await db.SaveChangesAsync(); });
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.Client.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest(target.Mobile))).StatusCode);
+            await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == target.Id); Assert.False(u.IsSystemAdmin); Assert.Null(u.PasswordHash); });
+        }
+    }
+
+    [PostgresFact]
+    public async Task Concurrent_grants_have_one_winner_and_do_not_reset_its_password()
+    {
+        var admin = await f.RegisterAdmin(); var target = await f.RegisterOwner();
+        var responses = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => admin.Client.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest(target.Mobile))));
+        var success = Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK);
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Conflict);
+        var granted = (await success.Content.ReadFromJsonAsync<AdminGrantDto>(BillingJson.Options))!;
+        var browser = f.Browser(); browser.AdminEntryKey = ApiFixture.AdminEntry;
+        Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/admin/auth/login", await Request(browser, target.Mobile, granted.Password))).StatusCode);
+    }
     private async Task<AdminLoginRequest> Request(Browser browser, string mobile, string? password = null)
     {
         var challenge = (await (await browser.Send(HttpMethod.Get, "/api/admin/auth/captcha")).Content.ReadFromJsonAsync<AdminCaptchaDto>(BillingJson.Options))!;
@@ -83,9 +137,11 @@ public sealed class AdminAuthTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Get, "/api/admin/auth/me")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/auth/me")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await b.Send(HttpMethod.Post, "/api/admin/auth/logout")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest(admin.Mobile))).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
         await f.SignInAsync(b, admin.Mobile);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest(admin.Mobile))).StatusCode);
     }
     [PostgresFact]
     public async Task Concurrent_bad_passwords_lock_the_account_and_recovery_requires_unlock()

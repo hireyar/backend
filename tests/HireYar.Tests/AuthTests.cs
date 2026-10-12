@@ -82,5 +82,7 @@ public sealed class AuthTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Get, "/swagger/swagger-ui.css")).StatusCode);
         var response = await c.Send(HttpMethod.Get, "/openapi/v1.json"); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var doc = await response.Content.ReadFromJsonAsync<JsonElement>(); Assert.True(doc.GetProperty("paths").TryGetProperty("/api/auth/refresh", out _));
+        var grant = doc.GetProperty("paths").GetProperty("/api/admin/users/super-admins").GetProperty("post");
+        Assert.True(grant.GetProperty("security")[0].TryGetProperty("SuperAdmin", out _));
     }
 }
