@@ -30,7 +30,6 @@ public sealed class InterviewDecisionValidator(InterviewPolicy policy)
         if (decision.SkillUpdates.Any(x => x is null || x.SkillId != question.SkillId || !Unit(x.Confidence) ||
                 x.Delta is < -1 or > 1 || string.IsNullOrWhiteSpace(x.Evidence) || x.Evidence.Length > 2000) ||
             decision.CoveredTopics.Any(x => x is null || x.Topic != question.Topic || !Unit(x.Coverage))) return fallback;
-        if (decision.NextQuestionId is { } next && allowed.All(x => x.QuestionId != next)) return fallback;
         if (decision.Action is not ("advance" or "clarify" or "followUp" or "redirect")) return fallback;
         if (decision.Action != "advance")
         {
@@ -45,9 +44,17 @@ public sealed class InterviewDecisionValidator(InterviewPolicy policy)
             assessment.Correctness is { } score && !Unit(score) || assessment.Confidence is { } confidence && !Unit(confidence) ||
             session.ProgressiveTopicQuestions && assessment.Correctness is null) return fallback;
         if (completion is null && decision.NextQuestionId is null && !session.ProgressiveTopicQuestions) return fallback;
+        // A progressive plan derives the next level from the validated grade after
+        // FinishAnswer. An invalid selection must not turn a valid grade into unknown.
+        var nextQuestionId = decision.NextQuestionId;
+        if (nextQuestionId is { } next && allowed.All(x => x.QuestionId != next))
+        {
+            if (!session.ProgressiveTopicQuestions) return fallback;
+            nextQuestionId = null;
+        }
         return new(decision.SkillUpdates.Select(x => new SkillAssessment(x.SkillId, x.Delta, x.Confidence, x.Evidence)).ToArray(),
             decision.CoveredTopics.Select(x => new TopicAssessment(question.SkillId, x.Topic, x.Coverage)).ToArray(),
-            completion is null ? decision.NextQuestionId : null, false, completion,
+            completion is null ? nextQuestionId : null, false, completion,
             Correctness: assessment.Correctness, AssessmentConfidence: assessment.Confidence);
     }
 

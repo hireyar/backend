@@ -45,6 +45,96 @@ public sealed class ProgressiveTopicRulesTests
         s.FinishAnswer(a.Id, [new(q.SkillId, 0.9m, 0.9m, "Synthetic evidence")],
             [new(q.SkillId, q.Topic, 1)], "Test", "Test", Now, score, confidence);
     }
+
+    [Theory]
+    [InlineData("sameTopicEasy", 0.9, 0.9, 5)]
+    [InlineData("otherTopic", 0.9, 0.9, 5)]
+    [InlineData("unknown", 0.7, 0.6, 5)]
+    [InlineData("current", 0.9, 0.9, 5)]
+    [InlineData("null", 0.9, 0.9, 5)]
+    [InlineData("unknown", 0.69, 1.0, 1)]
+    [InlineData("otherTopic", 1.0, 0.59, 1)]
+    public void Medium_first_preserves_valid_grade_when_next_selection_is_invalid(string selection, double score, double confidence, int expectedDifficulty)
+    {
+        var s = Plan(mediumFirst: true); var policy = new InterviewPolicy();
+        s.Start(policy.SelectFallback(s, Now)!.QuestionId, Now);
+        var answer = Pending(s);
+        var allowed = policy.GetAllowedQuestions(s, Now);
+        var current = s.Questions.Single(q => q.QuestionId == s.CurrentQuestionId);
+        Guid? proposed = selection switch {
+            "sameTopicEasy" => allowed.Single(q => q.Difficulty == 1).QuestionId,
+            "otherTopic" => s.Questions.First(q => q.Topic != current.Topic && q.Difficulty == 3).QuestionId,
+            "unknown" => Guid.NewGuid(),
+            "current" => current.QuestionId,
+            _ => null
+        };
+        var decision = new InterviewDecision {
+            AnswerAssessment = new() { Relevance = 1, Clarity = 1, EvidenceQuality = 1, Correctness = (decimal)score, Confidence = (decimal)confidence },
+            SkillUpdates = [new() { SkillId = current.SkillId, Delta = 0.1m, Confidence = 0.9m, Evidence = "Synthetic observation" }],
+            CoveredTopics = [new() { Topic = current.Topic, Coverage = 1 }], NextQuestionId = proposed,
+            ShouldComplete = false, Reason = "Synthetic passed answer"
+        };
+        var validated = new InterviewDecisionValidator(policy).ValidateOrFallback(
+            JsonSerializer.Serialize(decision, new JsonSerializerOptions(JsonSerializerDefaults.Web)), s,
+            allowed.Select(q => q.QuestionId).ToArray(), Now);
+        Assert.False(validated.UsedFallback);
+        Assert.Equal(selection == "sameTopicEasy" ? proposed : null, validated.NextQuestionId);
+        Assert.Equal((decimal)score, validated.Correctness);
+        Assert.Equal((decimal)confidence, validated.AssessmentConfidence);
+        Assert.Single(validated.SkillUpdates); Assert.Single(validated.CoveredTopics);
+        s.FinishAnswer(answer.Id, validated.SkillUpdates, validated.CoveredTopics, "Test", "Test", Now,
+            validated.Correctness, validated.AssessmentConfidence);
+        var next = Assert.Single(policy.GetAllowedQuestions(s, Now));
+        Assert.Equal(expectedDifficulty, next.Difficulty);
+        Assert.Equal(s.Questions.Single(q => q.QuestionId == s.CurrentQuestionId).Topic, next.Topic);
+        Assert.Single(s.Evidence);
+    }
+
+    [Theory]
+    [InlineData("hr_interview", 1)]
+    [InlineData("technical_interview", 4)]
+    public void Medium_first_topic_order_is_fixed_only_for_hr(string capability, int allowedTopicCount)
+    {
+        var s = Plan(mediumFirst: true); s.SetRequiredCapability(capability);
+        var policy = new InterviewPolicy();
+        var first = policy.SelectFallback(s, Now)!;
+        Assert.Equal("topic-1", first.Topic); Assert.Equal(3, first.Difficulty);
+        s.Start(first.QuestionId, Now); Grade(s, 1, 1);
+        s.AskNext(Assert.Single(policy.GetAllowedQuestions(s, Now)).QuestionId, Now); Grade(s, 1, 1);
+        var next = policy.GetAllowedQuestions(s, Now);
+        Assert.Equal(allowedTopicCount, next.Count);
+        Assert.Equal("topic-2", next[0].Topic);
+        Assert.All(next, q => Assert.Equal(3, q.Difficulty));
+    }
+
+    [Theory]
+    [InlineData("grade")]
+    [InlineData("missingGrade")]
+    [InlineData("unrelatedSkill")]
+    [InlineData("interaction")]
+    public void Invalid_assessment_or_interaction_is_not_salvaged_by_progressive_reselection(string invalid)
+    {
+        var s = Plan(mediumFirst: true); s.SetInteractionLimit(2);
+        var policy = new InterviewPolicy(); s.Start(policy.SelectFallback(s, Now)!.QuestionId, Now);
+        var answer = Pending(s);
+        var decision = new InterviewDecision {
+            AnswerAssessment = new() { Relevance = 1, Clarity = 1, EvidenceQuality = 1,
+                Correctness = invalid == "missingGrade" ? null : invalid == "grade" ? 1.1m : 0.9m,
+                Confidence = invalid == "missingGrade" ? null : 0.9m },
+            SkillUpdates = invalid == "unrelatedSkill"
+                ? [new() { SkillId = Guid.NewGuid(), Delta = 0.1m, Confidence = 1, Evidence = "Synthetic" }] : [],
+            CoveredTopics = [], NextQuestionId = Guid.NewGuid(), ShouldComplete = false, Reason = "Synthetic",
+            Action = invalid == "interaction" ? "clarify" : "advance",
+            CandidateMessage = invalid == "interaction" ? "Clarify the current question" : null
+        };
+        var result = new InterviewDecisionValidator(policy).ValidateOrFallback(
+            JsonSerializer.Serialize(decision, new JsonSerializerOptions(JsonSerializerDefaults.Web)), s,
+            policy.GetAllowedQuestions(s, Now).Select(q => q.QuestionId).ToArray(), Now);
+        Assert.True(result.UsedFallback); Assert.Null(result.Correctness); Assert.Empty(result.SkillUpdates);
+        s.FinishAnswer(answer.Id, result.SkillUpdates, result.CoveredTopics, "Test", "Test", Now,
+            result.Correctness, result.AssessmentConfidence);
+        Assert.Equal(1, Assert.Single(policy.GetAllowedQuestions(s, Now)).Difficulty);
+    }
     [Fact]
     public void Passed_topic_keeps_next_level_despite_coverage_and_sufficient_evidence()
     {
