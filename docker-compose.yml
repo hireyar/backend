@@ -28,15 +28,20 @@ services:
 #      Security__RefreshDays: "30"
       Security__DataProtectionPath: "/keys"
       InterviewStorage__RootPath: "/app/storage/interviews"
+      InterviewStorage__S3__AccessKey: "${HIREYAR_S3_ACCESS_KEY:?Set the private S3 access key outside Git}"
+      InterviewStorage__S3__SecretKey: "${HIREYAR_S3_SECRET_KEY:?Set the private S3 secret key outside Git}"
+      ASPNETCORE_TEMP: /app/upload-temp
 
 
     volumes:
       - protection-keys:/keys
       - interview-storage:/app/storage/interviews
+      - upload-temp:/app/upload-temp
 
     restart: unless-stopped
 
 volumes:
   protection-keys:
   interview-storage:
+  upload-temp:
 

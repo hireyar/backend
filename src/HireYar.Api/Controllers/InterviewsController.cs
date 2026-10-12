@@ -25,13 +25,21 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
     [HttpGet("api/interviews/{id:guid}/review")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<InterviewReviewDto> Review(Guid id, CancellationToken ct) => reviews.GetAsync(id, ct);
+    [HttpGet("api/interviews/{id:guid}/recording/segments")]
+    public Task<InterviewRecordingProgressDto> RecordingSegments(Guid id, CancellationToken ct) => reviews.RecordingProgressAsync(id, false, ct);
+    [HttpGet("api/interviews/{id:guid}/recording/segments/{number:int}/video")]
+    public async Task<IActionResult> RecordingSegment(Guid id, int number, CancellationToken ct, [FromQuery] bool download = false)
+    {
+        var media = await reviews.OpenSegmentAsync(id, number, ct);
+        return PrivateVideo(media.Content, media.ContentType, $"recording-{id:N}-{number}", download, media.ContentHash);
+    }
     [HttpPost("api/interviews/{id:guid}/decisions")]
     public Task<InterviewReviewEntryDto> Decide(Guid id, InterviewHumanDecisionRequest r, CancellationToken ct) => reviews.DecideAsync(id, r, ct);
     [HttpGet("api/interviews/{id:guid}/recording/video")]
-    public async Task<IActionResult> Recording(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Recording(Guid id, CancellationToken ct, [FromQuery] bool download = false)
     {
         var media = await reviews.OpenRecordingAsync(id, ct);
-        return File(media.Content, media.ContentType, enableRangeProcessing: true);
+        return PrivateVideo(media.Content, media.ContentType, $"recording-{id:N}", download);
     }
     [HttpGet("api/interviews")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
@@ -77,10 +85,10 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
         return File(media.Content, media.ContentType, enableRangeProcessing: true);
     }
     [HttpGet("api/interviews/{id:guid}/introduction/video")]
-    public async Task<IActionResult> IntroductionVideo(Guid id, CancellationToken ct)
+    public async Task<IActionResult> IntroductionVideo(Guid id, CancellationToken ct, [FromQuery] bool download = false)
     {
         var media = await service.OpenIntroductionMediaAsync(id, true, ct);
-        return File(media.Content, media.ContentType, enableRangeProcessing: true);
+        return PrivateVideo(media.Content, media.ContentType, $"introduction-{id:N}", download);
     }
     [HttpPost("api/interviews/{id:guid}/revoke")]
     public async Task<IActionResult> Revoke(Guid id, CancellationToken ct) { await service.RevokeAsync(id, ct); return NoContent(); }
@@ -98,11 +106,29 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
         return File(await storage.OpenReadAsync(cached.AudioStorageKey, ct), "audio/mpeg", enableRangeProcessing: true);
     }
     [HttpGet("api/interviews/{id:guid}/answers/{answerId:guid}/video")]
-    public async Task<IActionResult> AnswerVideo(Guid id, Guid answerId, CancellationToken ct)
+    public async Task<IActionResult> AnswerVideo(Guid id, Guid answerId, CancellationToken ct, [FromQuery] bool download = false)
     {
         var s = await service.MediaScopedAsync(id, ct);
         var answer = s.Answers.SingleOrDefault(x => x.Id == answerId) ?? throw AppException.NotFound();
         if (answer.VideoStorageKey is null) throw AppException.NotFound();
-        return File(await storage.OpenReadAsync(answer.VideoStorageKey, ct), answer.VideoContentType!, enableRangeProcessing: true);
+        return PrivateVideo(await storage.OpenReadAsync(answer.VideoStorageKey, ct), answer.VideoContentType!, $"answer-{answerId:N}", download);
+    }
+    private FileStreamResult PrivateVideo(Stream stream, string contentType, string name, bool download, string? contentHash = null)
+    {
+        var file = File(stream, contentType, enableRangeProcessing: true);
+        if (contentHash is not null) file.EntityTag = new Microsoft.Net.Http.Headers.EntityTagHeaderValue('"' + contentHash + '"');
+        else if (stream is IInterviewMediaMetadata metadata && Microsoft.Net.Http.Headers.EntityTagHeaderValue.TryParse(metadata.EntityTag, out var tag))
+            file.EntityTag = tag;
+        else
+        {
+            // Historical local files have immutable media identities. A weak tag does
+            // not claim a byte-level hash or authorize If-Range with a strong validator.
+            var identity = System.Text.Encoding.UTF8.GetBytes(name + ":" + stream.Length);
+            file.EntityTag = new Microsoft.Net.Http.Headers.EntityTagHeaderValue('"' + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(identity)) + '"', isWeak: true);
+        }
+        var filename = name + (contentType == "video/mp4" ? ".mp4" : ".webm");
+        if (download) file.FileDownloadName = filename;
+        else Response.Headers.ContentDisposition = $"inline; filename=\"{filename}\"";
+        return file;
     }
 }

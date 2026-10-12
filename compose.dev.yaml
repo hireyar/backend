@@ -33,6 +33,7 @@ services:
     volumes:
       - protection-keys:/keys
       - interview-storage:/app/storage/interviews
+      - upload-temp:/app/upload-temp
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,3 +41,4 @@ volumes:
   postgres-data:
   protection-keys:
   interview-storage:
+  upload-temp:

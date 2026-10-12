@@ -96,6 +96,7 @@ public sealed partial class InterviewFlowTests
         Assert.Equal(HttpStatusCode.OK, (await Upload(answerId, uploadId)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Upload(answerId, uploadId)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await Upload(answerId, Guid.NewGuid())).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await UploadSegment(c, invite.InterviewId, 1, Guid.NewGuid())).StatusCode);
         var review = (await (await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}/review")).Content.ReadFromJsonAsync<InterviewReviewDto>())!;
         Assert.Equal("uploaded_unverified", review.RecordingStatus); Assert.Equal(10m, review.Recording!.Timeline[0].StartSeconds);
         Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Get, review.Recording.VideoUrl)).StatusCode);
@@ -103,12 +104,37 @@ public sealed partial class InterviewFlowTests
         {
             request.Headers.Authorization = new("Bearer", hr.Client.AccessToken);
             request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(4, 9);
+            request.Headers.Add("Origin", "http://localhost:4200");
             using var rangeClient = f.CreateClient();
             var range = await rangeClient.SendAsync(request);
             Assert.Equal(HttpStatusCode.PartialContent, range.StatusCode);
             Assert.Equal(new byte[6], await range.Content.ReadAsByteArrayAsync());
             Assert.Equal("bytes 4-9/16", range.Content.Headers.ContentRange!.ToString());
             Assert.Equal("no-store", range.Headers.CacheControl!.ToString());
+            Assert.Contains("bytes", range.Headers.AcceptRanges); Assert.NotNull(range.Headers.ETag);
+            Assert.Equal("inline", range.Content.Headers.ContentDisposition!.DispositionType);
+            Assert.Equal("http://localhost:4200", Assert.Single(range.Headers.GetValues("Access-Control-Allow-Origin")));
+            var exposed = string.Join(",", range.Headers.GetValues("Access-Control-Expose-Headers")).Split(',').Select(h => h.Trim()).ToArray();
+            foreach (var header in new[] { "Content-Range", "Accept-Ranges", "ETag", "Content-Disposition" }) Assert.Contains(header, exposed, StringComparer.OrdinalIgnoreCase);
+            using var anonymousRequest = new HttpRequestMessage(HttpMethod.Get, review.Recording.VideoUrl);
+            anonymousRequest.Headers.Add("Origin", "http://localhost:4200");
+            var anonymous = await rangeClient.SendAsync(anonymousRequest);
+            Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode); Assert.True(anonymous.Headers.Contains("Access-Control-Expose-Headers"));
+            using var untrustedRequest = new HttpRequestMessage(HttpMethod.Get, review.Recording.VideoUrl);
+            untrustedRequest.Headers.Authorization = new("Bearer", hr.Client.AccessToken);
+            untrustedRequest.Headers.Add("Origin", "https://untrusted.example.test");
+            var untrusted = await rangeClient.SendAsync(untrustedRequest);
+            Assert.False(untrusted.Headers.Contains("Access-Control-Allow-Origin"));
+            using var downloadRequest = new HttpRequestMessage(HttpMethod.Get, review.Recording.VideoUrl + "?download=true");
+            downloadRequest.Headers.Authorization = new("Bearer", hr.Client.AccessToken);
+            var download = await rangeClient.SendAsync(downloadRequest);
+            Assert.Equal("attachment", download.Content.Headers.ContentDisposition!.DispositionType);
+            using var preflight = new HttpRequestMessage(HttpMethod.Options, review.Recording.VideoUrl);
+            preflight.Headers.Add("Origin", "http://localhost:4200"); preflight.Headers.Add("Access-Control-Request-Method", "GET");
+            preflight.Headers.Add("Access-Control-Request-Headers", "authorization,range,if-range");
+            var options = await rangeClient.SendAsync(preflight);
+            Assert.Equal(HttpStatusCode.NoContent, options.StatusCode);
+            Assert.Equal("http://localhost:4200", Assert.Single(options.Headers.GetValues("Access-Control-Allow-Origin")));
         }
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(review.Recording.VideoUrl)).StatusCode);
         var stranger = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, review.Recording.VideoUrl)).StatusCode);

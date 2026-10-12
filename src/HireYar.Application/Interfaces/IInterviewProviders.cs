@@ -40,6 +40,10 @@ public sealed class InterviewProviderException(string code) : Exception("Intervi
     public string Code { get; } = code;
 }
 public sealed record StoredAudio(string Key, long SizeBytes);
+public interface IInterviewMediaMetadata
+{
+    string EntityTag { get; }
+}
 public interface IInterviewAudioStorage
 {
     Task<StoredAudio> SaveAsync(Stream audio, string category, Guid ownerId, long maxBytes, CancellationToken ct);

@@ -35,6 +35,18 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
 {
     [HttpPost("events")]
     public Task<InterviewReviewEntryDto> Event(Guid interviewId, InterviewEventRequest r, CancellationToken ct) => reviews.RecordEventAsync(interviewId, r, ct);
+    [HttpGet("recording/segments")]
+    public Task<InterviewRecordingProgressDto> RecordingProgress(Guid interviewId, CancellationToken ct) => reviews.RecordingProgressAsync(interviewId, true, ct);
+    [HttpPost("recording/segments"), Consumes("multipart/form-data"), RequestSizeLimit(42L * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 42L * 1024 * 1024)]
+    public async Task<InterviewRecordingSegmentDto> RecordingSegment(Guid interviewId, [FromForm] SessionRecordingSegmentUpload upload, CancellationToken ct)
+    {
+        IReadOnlyList<InterviewRecordingOffset>? timeline;
+        try { timeline = System.Text.Json.JsonSerializer.Deserialize<InterviewRecordingOffset[]>(upload.Timeline, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)); }
+        catch (System.Text.Json.JsonException) { throw HireYar.Application.Common.AppException.Invalid("recording_timeline_invalid"); }
+        await using var stream = upload.Video.OpenReadStream();
+        return await reviews.UploadSegmentAsync(interviewId, upload.SegmentNumber, upload.UploadId, stream, upload.Video.FileName,
+            upload.Video.ContentType, upload.Video.Length, upload.DurationSeconds, timeline!, ct);
+    }
     [HttpPost("recording"), Consumes("multipart/form-data"), RequestSizeLimit(514L * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 514L * 1024 * 1024)]
     public async Task<InterviewRecordingDto> Recording(Guid interviewId, [FromForm] SessionRecordingUpload upload, CancellationToken ct)
     {
@@ -89,10 +101,14 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
     public async Task<IActionResult> Audio(Guid interviewId, Guid questionId, CancellationToken ct) => File(await service.OpenQuestionAudioAsync(interviewId, questionId, ct), "audio/mpeg", enableRangeProcessing: true);
 }
 
-public sealed class SessionRecordingUpload
+public class SessionRecordingUpload
 {
     [Required] public IFormFile Video { get; set; } = null!;
     public Guid UploadId { get; set; }
     [Range(1, 14400)] public int DurationSeconds { get; set; }
     [Required, StringLength(32000)] public string Timeline { get; set; } = "[]";
+}
+public sealed class SessionRecordingSegmentUpload : SessionRecordingUpload
+{
+    [Range(1, 1000)] public int SegmentNumber { get; set; }
 }

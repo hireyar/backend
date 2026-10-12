@@ -1508,6 +1508,61 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.ToTable("InterviewQuestionSnapshots", (string)null);
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewRecordingSegment", b =>
+                {
+                    b.Property<Guid>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SegmentNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("TimelineJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("UploadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UploadedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("InterviewSessionId", "SegmentNumber");
+
+                    b.HasIndex("InterviewSessionId", "UploadId")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId");
+
+                    b.ToTable("InterviewRecordingSegments", t =>
+                        {
+                            t.HasCheckConstraint("CK_RecordingSegment_Values", "\"SegmentNumber\" BETWEEN 1 AND 1000 AND \"DurationSeconds\" BETWEEN 1 AND 14400 AND \"SizeBytes\" BETWEEN 1 AND 41943040 AND \"ContentType\" IN ('video/webm','video/mp4') AND length(\"ContentHash\") = 64");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Domain.Interviews.InterviewReviewEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2778,6 +2833,16 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Interviews.InterviewSkill", null)
                         .WithMany()
                         .HasForeignKey("InterviewSessionId", "SkillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewRecordingSegment", b =>
+                {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

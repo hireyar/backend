@@ -1,6 +1,6 @@
 # ذخیره و پخش خصوصی ویدیوی مصاحبه
 
-به‌روزرسانی: 2026-10-12؛ بک‌اند روی dev. Angular در ریپوی جداست.
+به‌روزرسانی: 2026-10-12؛ بک‌اند روی dev. Angular در ریپوی جداست. API بخش‌بندی برای ادامه ضبط پس از رفرش اضافه شد؛ [RECORDING_SEGMENTS_API](RECORDING_SEGMENTS_API.md) قرارداد جدید است. انتشار مقصد همچنان در این درخواست انجام نشده است.
 
 ## تنظیمات
 
@@ -26,7 +26,16 @@ AccessKey و SecretKey در فایل مشترک خالی‌اند؛ مقادیر
 
 انتقال بک‌اند به S3 چندبخشی با قطعات 8 MiB، بافر محدود یک قطعه و ترتیب قطعی است؛ کل فایل در MemoryStream جمع نمی‌شود. سقف واقعی خوانده‌شده enforce می‌شود و stream خالی رد می‌شود. SDK برای خطاهای قابل تکرار retry محدود دارد. بعد از خطا/لغو، Abort و Delete برای همان key تصادفی با cancellation مستقل و مهلت ۱۰ ثانیه تلاش می‌شوند؛ پاسخ گم‌شدهٔ Complete نیز به پاک‌سازی key منجر می‌شود. قطع کامل فرایند/شبکه ممکن است upload ناقص یا فایل بی‌مرجع باقی بگذارد؛ پیشنهاد عملیاتی، Lifecycle فقط برای AbortIncompleteMultipartUpload پس از یک روز است. این policy در bucket اعمال نشده؛ lifecycle حذف کلی فایل‌ها پیشنهاد نمی‌شود چون retention سازمان‌ها متفاوت است.
 
-**محدودیت:** کلاینت هنوز کل فایل را به API می‌فرستد؛ IFormFile در ASP.NET ممکن است آن را روی دیسک موقت buffer کند. این نسخه browser-to-S3 نیست و از نو شروع کردن ارسال پس از قطع ارتباط کلاینت همچنان ممکن است لازم شود. سقف ضبط کامل همان 512 MiB و پاسخ/معرفی همان تنظیمات قبلی (پیش‌فرض 40 MiB ویدیو) است؛ محدودیت proxy، فضای temp و timeout مقصد باید متناسب باشند. افزایش بی‌قاعده سقف راه‌حل فایل چندگیگابایتی نیست.
+**محدودیت:** کلاینت هنوز فایل را به API می‌فرستد؛ IFormFile در ASP.NET ممکن است آن را روی دیسک موقت buffer کند. این نسخه browser-to-S3 نیست. مسیر تک‌فایلی قبلی resume بایت‌های فایل ندارد؛ مسیر جدید بخش‌بندی retry یک بخش مستقل را با hash و شناسه ثابت می‌پذیرد و manifest برای ادامه بعد از refresh دارد. سقف ضبط کامل/مجموع بخش‌ها 512 MiB، هر بخش جدید 40 MiB و پاسخ/معرفی همان تنظیمات قبلی‌اند. از concatenate خام فایل‌های WebM/MP4 مستقل یک فایل معتبر حاصل نمی‌شود؛ کاربر نمایش پشت‌سرهم بخش‌ها را انتخاب کرده است.
+
+## آماده‌سازی انتشار؛ اعمال مقصد انجام نشده
+
+- Production Compose اکنون `HIREYAR_S3_ACCESS_KEY` و `HIREYAR_S3_SECRET_KEY` را الزام می‌کند و به تنظیمات SDK می‌رساند؛ این متغیرها در محیط خصوصی میزبان قرار گیرند. کلیدها در image/Git یا خروجی config غیرquiet چاپ نشوند. روش استقرار دیگر باید InterviewStorage__S3__AccessKey/SecretKey را فراهم کند. endpoint/bucket/region مشترک و ACL=Private حفظ شده‌اند؛ grantهای عمومی یا policy نامعلوم در مسیر ذخیره/خواندن رد می‌شوند. bucket را هنگام انتشار با مجوزهای مستند بالا بررسی کنید؛ هیچ policy مقصد خودکار تغییر نکرده است.
+- Migration `20261012193519_AddInterviewRecordingSegments` پیش از API جدید لازم است. برای baseline دارای ConfigureRegistrationTrial، delta idempotent در artifacts/recording-segments-migrations.sql تولید می‌شود؛ baseline دیگری ابتدا migrationهای قبلی را نیاز دارد. اجرای migration مقصد در تسک انتشار جداست.
+- سقف بایت فایل ضبط یکپارچه در Application دقیقاً 536870912 است؛ بدنه multipart در API حداکثر 514 MiB برای overhead. در proxy سقف بدنه حداقل 514 MiB تنظیم شود تا فایل 512 MiB به‌دلیل envelope رد نشود؛ مسیر بخش‌ها بدنه 42 MiB/فایل 40 MiB دارد و مجموع 512 MiB زیر قفل enforce می‌شود. ظرفیت و سقف‌ها در تمام hopها (CDN/ingress/proxy/API) بررسی شوند.
+- Dockerfile دایرکتوری خصوصی و قابل نوشتن `/app/upload-temp` برای APP_UID و ASPNETCORE_TEMP می‌سازد؛ Compose volume اختصاصی upload-temp دارد. برای هر آپلود تک‌فایلی هم‌زمان دست‌کم 514 MiB فضای آزاد به‌اضافه حاشیه، سایر آپلودها و لاگ‌ها در نظر بگیرید؛ برای بخش‌ها نیز حجم هم‌زمان را حساب کنید. volume در مقصد از نظر quota/فضای آزاد/permission بررسی شود. به buffer پیش‌فرض روی root filesystem کوچک تکیه نکنید.
+- نمونه Nginx قابل تطبیق در [video-upload.nginx.conf](examples/video-upload.nginx.conf) سقف 514m، inactivity timeoutهای 600s و خاموش‌بودن buffering پراکسی را نشان می‌دهد؛ upstream و location باید با proxy واقعی تطبیق داده و قبل reload اعتبارسنجی شوند. این snippet نصب/reload نشده و timeout واقعی به شبکه/سرعت/پلتفرم وابسته است؛ تنظیم آن IFormFile buffering در API را حذف نمی‌کند.
+- آزمون انتشار با ویدیوی مصنوعی شامل POST، GET احرازشده Range=bytes=0-1023 →206، Origin مجاز و هدرهای expose، GET بدون JWT →401، سازمان دیگر →404، کنترل سقف/فضای temp و خصوصی‌بودن bucket انجام شود. تغییر CORS API به CORS عمومی bucket نیاز ندارد؛ مرورگر هنوز از API می‌خواند.
 
 ## مشاهدهٔ مدیر
 

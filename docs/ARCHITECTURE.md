@@ -1,3 +1,17 @@
+## ADR-042 — ضبط بخش‌بندی‌شده، CORS رسانه و انتشار (2026-10-12)
+
+طبق انتخاب صریح کاربر، ادامه بعد از refresh با فایل‌های مستقل و پخش پشت‌سرهم، بدون ادغام codec/file، اضافه شد. جدول InterviewRecordingSegments با PK جلسه/شماره، uploadId یکتا، FK مرکب سازمان/جلسه و SHA-256 محتوا دارد. Candidate POST/GET recording/segments دعوت همان جلسه، HR manifest/GET بخش فقط Owner همان سازمان و retention می‌خواهند. هر فایل مستقل حداکثر 40 MiB، مجموع 512 MiB/۱۴۴۰۰ ثانیه و ۱۰۰۰ بخش؛ شماره پیوسته و totals زیر قفل سازمان کنترل می‌شوند. network/hash بیرون transaction، recheck قبل commit و cleanup loser/failed برقرار است. Replay فقط با همان hash/metadata؛ مسیر تک‌فایلی قدیمی با حالت بخش‌بندی مخلوط نمی‌شود و رکورد تاریخی تبدیل ندارد. migration جدید additive و Down دارای داده رد می‌شود.
+
+گرِیس پایان قبلی ۱۰ دقیقه فقط برای GET/POST بخش‌ها هم گسترش یافت؛ پاسخ جدید/start/current بعد از completion باز نمی‌شوند. مدت/timeline اعلام کلاینت هستند؛ استقلال codec هر بخش، gaps و ذخیره Blob ارسال‌نشده مسئولیت فرانت است و فریم‌های ازدست‌رفته بازیابی نمی‌شوند. Review دارای manifest اختیاری و uploaded_segments_unverified، چاپ تعداد بخش‌ها را نشان می‌دهد؛ این نام کامل‌بودن رسانه را تأیید نمی‌کند. RECORDING_SEGMENTS_API قرارداد فرانت جداست.
+
+CORS برای originهای صریح چهار هدر Content-Range/Accept-Ranges/ETag/Content-Disposition را expose می‌کند؛ wildcard اضافه نشده. ویدیوها inline/download=true و ETag دارند؛ S3 از HEAD object، بخش جدید از SHA-256 واقعی و local تاریخی از tag ضعیف هویت immutable استفاده می‌کند. فایل خصوصی همچنان از API می‌گذرد و هیچ GET امضاشده/عمومی ایجاد نشده. Compose کلیدهای S3 خصوصی را لازم دارد، Docker/Compose temp اختصاصی دارند و نمونه proxy سقف 514 MiB بدنه با فایل 512 MiB/inactivity timeout را مستند می‌کند؛ deploy/proxy/bucket مقصد خودکار تغییر نکرده‌اند.
+
+## ADR-041 — یکتایی عنوان مستقل از فاصله و نیم‌فاصله (2026-10-12)
+
+طبق درخواست کاربر، مقایسه عنوان موقعیت و قالب در ADR-037 از Trim/case به حذف تمام whitespaceهای Unicode و U+200C در هر جای متن گسترش یافت. TitleComparison در Application.Common یک expression مشترک string.Replace برای ورودی و query EF می‌سازد؛ حذف کاراکترها در SQL ترجمه می‌شود و فقط EXISTS روی عنوان‌های scope سازمان/حذف‌نشده اجرا می‌شود، نه بارگذاری همه عنوان‌ها در حافظه. lower برای case انگلیسی سیاست قبلی را حفظ می‌کند؛ حرف‌های فارسی/عربی یا نشانه‌های دیگر تغییر داده نمی‌شوند.
+
+متن نمایشی عنوان و schema ثابت‌اند؛ migration/بازنویسی داده نداریم. عنوان با normalized خالی 400/invalid_title دارد. Create/Update موقعیت و Create/Update/SaveWizard قالب از قاعده واحد زیر قفل سازمان موجود استفاده می‌کنند؛ رقابت دو شکل فاصله‌دار/نیم‌فاصله‌دار فقط یک winner دارد. scope سازمان، self-edit عنوان معادل، حفظ عنوان تاریخی و کپی داخلی دعوت، رزرو عنوان آرشیو و آزادشدن پس از حذف ADR-037 محفوظ‌اند. عنوان تکراری 409 با codeهای قبلی است؛ PANEL_WIZARD_API قرارداد فرانت جاری است.
+
 ## ADR-040 — اعطای سوپرادمین به حساب موجود از پنل (2026-10-12)
 
 طبق درخواست صریح کاربر، POST /api/admin/users/super-admins با موبایل حساب موجود اضافه شد. فقط policy=SystemAdmin با audience مستقل و اعتبارسنجی زنده حساب درخواست‌دهنده مجاز است؛ مالک سازمان عادی/داوطلب مجوز ندارند. این عملیات مدیریت سراسری است و سازمان/عضویت مقصد تغییر نمی‌کند. Application DTO/interface، Controller در Api و Identity/SQL/تراکنش در AdminAccounts Infrastructure هستند؛ سرویس واسطه یا Repository تازه اضافه نشد.
