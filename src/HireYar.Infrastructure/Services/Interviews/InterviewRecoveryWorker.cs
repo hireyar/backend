@@ -29,17 +29,7 @@ public sealed class InterviewRecoveryWorker(IServiceScopeFactory scopes, Intervi
                     (s.ProcessingLeaseExpiresAtUtc == null || s.ProcessingLeaseExpiresAtUtc <= now))
                     .OrderBy(s => s.NextRecoveryAtUtc).ThenBy(s => s.Id).Select(s => new { s.OrganizationId, s.Id }).Take(20).ToListAsync(stoppingToken);
                 foreach (var item in pending)
-                {
-                    try
-                    {
-                        await using var work = scopes.CreateAsyncScope();
-                        using var trace = InterviewTrace.Begin(work.ServiceProvider.GetRequiredService<IInterviewDiagnostics>(), item.OrganizationId, item.Id, Guid.NewGuid().ToString("N"));
-                        InterviewTrace.Stage("BackgroundRecovery", "بازیابی پردازش پاسخ پذیرفته‌شده توسط worker");
-                        await work.ServiceProvider.GetRequiredService<CandidateInterviewService>().RecoverAsync(item.OrganizationId, item.Id, stoppingToken);
-                    }
-                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
-                    catch (Exception e) { logger.LogWarning("Interview recovery deferred interviewId={InterviewId} exceptionType={ExceptionType}", item.Id, e.GetType().Name); }
-                }
+                    await RecoverAsync(item.OrganizationId, item.Id, false, stoppingToken);
                 var introductions = await (from introduction in db.InterviewIntroductions.AsNoTracking()
                     join session in db.InterviewSessions.IgnoreAutoIncludes().AsNoTracking() on introduction.InterviewSessionId equals session.Id
                     where introduction.OrganizationId == session.OrganizationId && session.Stage == InterviewStage.CandidateIntroduction &&
@@ -50,20 +40,32 @@ public sealed class InterviewRecoveryWorker(IServiceScopeFactory scopes, Intervi
                     orderby introduction.NextRecoveryAtUtc, introduction.Id
                     select new { session.OrganizationId, session.Id }).Take(20).ToListAsync(stoppingToken);
                 foreach (var item in introductions)
-                {
-                    try
-                    {
-                        await using var work = scopes.CreateAsyncScope();
-                        using var trace = InterviewTrace.Begin(work.ServiceProvider.GetRequiredService<IInterviewDiagnostics>(), item.OrganizationId, item.Id, Guid.NewGuid().ToString("N"));
-                        InterviewTrace.Stage("BackgroundRecovery", "بازیابی معرفی صوتی پذیرفته‌شده توسط worker");
-                        await work.ServiceProvider.GetRequiredService<CandidateInterviewService>().RecoverIntroductionAsync(item.OrganizationId, item.Id, stoppingToken);
-                    }
-                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
-                    catch (Exception e) { logger.LogWarning("Introduction recovery deferred interviewId={InterviewId} exceptionType={ExceptionType}", item.Id, e.GetType().Name); }
-                }
+                    await RecoverAsync(item.OrganizationId, item.Id, true, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
             catch (Exception e) { logger.LogWarning("Interview recovery poll failed exceptionType={ExceptionType}", e.GetType().Name); }
+        }
+    }
+
+    private async Task RecoverAsync(Guid organizationId, Guid interviewId, bool introduction, CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            using var trace = InterviewTrace.Begin(scope.ServiceProvider.GetRequiredService<IInterviewDiagnostics>(),
+                organizationId, interviewId, Guid.NewGuid().ToString("N"));
+            InterviewTrace.Stage("BackgroundRecovery", introduction
+                ? "بازیابی معرفی صوتی پذیرفته‌شده توسط worker"
+                : "بازیابی پردازش پاسخ پذیرفته‌شده توسط worker");
+            var service = scope.ServiceProvider.GetRequiredService<CandidateInterviewService>();
+            if (introduction) await service.RecoverIntroductionAsync(organizationId, interviewId, ct);
+            else await service.RecoverAsync(organizationId, interviewId, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception e)
+        {
+            logger.LogWarning("{RecoveryKind} recovery deferred interviewId={InterviewId} exceptionType={ExceptionType}",
+                introduction ? "Introduction" : "Interview", interviewId, e.GetType().Name);
         }
     }
 }

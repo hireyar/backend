@@ -22,17 +22,18 @@ public sealed class InterviewPolicy
                     !session.Answers.Any(a => a.QuestionId == medium && a.Status == AnswerStatus.Processed && !a.IsInteraction);
                 return allowed.Take(session.RequiredCapabilityCode == "hr_interview" && !pendingMedium ? 1 : shortlistLimit).ToArray();
             }
+            var currentTopic = session.CurrentQuestionId is { } id
+                ? session.Questions.Single(q => q.QuestionId == id).Topic : null;
             var progressive = session.GetProgressiveQuestions().Where(q => !asked.Contains(q.QuestionId))
-                .OrderByDescending(q => session.CurrentQuestionId is { } id &&
-                    session.Questions.Single(x => x.QuestionId == id).Topic == q.Topic)
+                .OrderByDescending(q => currentTopic is not null && currentTopic == q.Topic)
                 .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).IsRequired)
                 .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).Priority)
-                .ThenBy(q => q.Order).ThenBy(q => q.QuestionId);
+                .ThenBy(q => q.Order).ThenBy(q => q.QuestionId).ToArray();
             // Keep both pass/fail branches during evaluation; HR topic order is fixed.
-            return (session.RequiredCapabilityCode == "hr_interview"
-                ? progressive.Where(q => q.Topic == progressive.FirstOrDefault()?.Topic || q.Difficulty == 1)
-                    .GroupBy(q => q.Difficulty == 1).Select(g => g.First())
-                : progressive).Take(shortlistLimit).ToArray();
+            if (session.RequiredCapabilityCode != "hr_interview") return progressive.Take(shortlistLimit).ToArray();
+            var firstTopic = progressive.FirstOrDefault()?.Topic;
+            return progressive.Where(q => q.Topic == firstTopic || q.Difficulty == 1)
+                .GroupBy(q => q.Difficulty == 1).Select(g => g.First()).Take(shortlistLimit).ToArray();
         }
         if (session.RequiredCapabilityCode == "hr_interview")
             return session.Questions.Where(q => q.IsActive && !asked.Contains(q.QuestionId) &&

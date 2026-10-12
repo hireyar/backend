@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using HireYar.Domain.Organizations;
 namespace HireYar.Application.Auth;
 
 public interface IAccounts

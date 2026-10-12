@@ -1,3 +1,17 @@
+## جلوگیری از عنوان تکراری — 2026-10-12
+
+درخواست حاضر در Create/Update موقعیت و Create/Update/SaveWizard قالب اجرا شد؛ scope سازمان، case/Trim، self-exclusion، آرشیو/حذف و رقابت با قفل موجود بررسی می‌شوند. فرانت جدا باید detail یا code پاسخ 409 (job_title_duplicate / template_title_duplicate) را کنار ورودی عنوان نمایش دهد؛ تغییر Angular اینجا انجام نشده است. migration لازم نیست، داده‌های قبلی و کپی داخلی قالب دعوت حذف/بازنویسی نشدند؛ ADR-037 مرجع حدود تضمین است.
+
+اعتبارسنجی نهایی: tool restore و restore موفق؛ build صفر warning/error؛ suite کامل ۲۹۵/۲۹۵ موفق، صفر شکست/Skip، روی PostgreSQL 18 اختصاصی loopback:55485 و provider مصنوعی. چهار تست جدید ایجاد/ویرایش، اشتراک قاعده بین مسیرهای قدیمی/ویزارد، scope سازمان، self-edit، آرشیو/حذف، عدم تغییر سؤال/RowVersion در شکست و رقابت create/update را بررسی کردند. TRX: tests/HireYar.Tests/TestResults/title-uniqueness-final.trx. تست‌های دعوت cross-position و snapshot قبلی هم موفق‌اند. داده مصنوعی قالب دوم trial و موقعیت/قالب‌های مستقل billing عنوان مستقل گرفتند؛ assertions مالی/قابلیت‌ها حذف نشدند. نتیجه اولیه suite موفق نبود؛ نتیجه نهایی پس از تطبیق داده تست و حفظ عنوان فعلی در ویرایش است.
+
+## پاک‌سازی کد — 2026-10-12
+
+پاک‌سازی درخواست حاضر: حذف واسطه حساب، wiring توکن ایمیلی بی‌مصرف، متد تمدید دعوت بدون caller، projection/property/usingهای بی‌اثر؛ یکسان‌سازی اجرای recovery و حذف مرتب‌سازی مکرر shortlist تاریخی. بهسازی بدون Repository/لایه عمومی جدید و بدون حذف قرارداد API یا migration انجام شد؛ ADR-036 و STATUS مرجع نتیجه‌اند.
+
+اعتبارسنجی واقعی: dotnet tool restore و restore موفق؛ build صفر warning/error؛ suite کامل ۲۹۱/۲۹۱ موفق، صفر شکست/Skip، روی PostgreSQL 18 اختصاصی loopback:55485 و providerهای مصنوعی. گزارش tests/HireYar.Tests/TestResults/cleanup-verified.trx و لاگ ignored artifacts/cleanup-tests.log. Git diff --check موفق است؛ کیفیت AI واقعی با این تست‌ها اثبات نمی‌شود.
+
+حذف جدول دعوت تیم یا شاخه‌های لازم برای جلسات/گزارش‌های تاریخی در این تغییر انجام نمی‌شود؛ این بخش‌ها با «کد بلااستفاده قابل حذف بدون تغییر داده» یکسان نیستند. کارهای قبلی backlog همچنان همان وضعیت قبلی دارند؛ قابلیت تازه‌ای از backlog اجرا نشد.
+
 ## تأیید دسترسی همه پکیج‌ها در دمو — 2026-10-11
 
 کاربر صریحاً انتخاب کرد همه امکانات باز باشند و مصرف از شارژ هدیه کم شود. بررسی کد نشان داد grant ثبت‌نام اجتماع features فعال پکیج‌های عمومی را ذخیره و RequireAsync/ویزارد/قالب موضوعی/start از همان snapshot استفاده می‌کنند؛ خرید پکیج لازم نیست و تغییر runtime لازم نشد. چهار integration مستقل برای عمومی/تخصصی با قالب عادی/موضوعی پیشرفته، حساب واقعی OTP trial با ۰٫۵ دلار و دو روز، پیشنهاد سؤال، دعوت، start/answer/complete، گزارش، کسر هزینه و رد جلسه شصت‌دقیقه‌ای با insufficient_ai_credit اضافه شدند. هیچ شارژ مصنوعی اضافی یا cash purchase در این سناریوها وجود ندارد.

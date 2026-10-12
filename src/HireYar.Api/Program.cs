@@ -4,7 +4,6 @@ using System.Threading.RateLimiting;
 using HireYar.Api.Errors;
 using HireYar.Api.OpenApi;
 using HireYar.Api.Security;
-using HireYar.Application.Auth;
 using HireYar.Application.Common;
 using HireYar.Application.Dashboard;
 using HireYar.Application.InterviewTemplates;
@@ -39,7 +38,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor(); builder.Services.AddScoped<ICurrentUser, CurrentUser>(); builder.Services.AddScoped<CurrentAccountValidation>();
 builder.Services.AddScoped<ICurrentInterviewAccess, CurrentInterviewAccess>();
 builder.Services.AddScoped<PanelWizardService>();
-builder.Services.AddScoped<AuthService>(); builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
+builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
 builder.Services.AddControllers().AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
 builder.Services.Configure<ApiBehaviorOptions>(o => o.InvalidModelStateResponseFactory = c =>
 {

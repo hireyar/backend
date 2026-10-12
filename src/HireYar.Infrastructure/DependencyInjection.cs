@@ -25,8 +25,7 @@ public static class DependencyInjection
             o.User.RequireUniqueEmail = false;
             o.Lockout.MaxFailedAccessAttempts = 5; o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             o.SignIn.RequireConfirmedPhoneNumber = true;
-        }).AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
-        services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(2));
+        }).AddEntityFrameworkStores<AppDbContext>();
         services.Configure<SecurityOptions>(config.GetSection("Security"));
         services.Configure<InvitationNotificationOptions>(config.GetSection("InterviewNotifications"));
         services.AddSingleton<HireYar.Application.Interviews.IInterviewInvitationNotifier>(s => new InterviewInvitationNotifier(

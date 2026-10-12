@@ -29,6 +29,7 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         await CheckJob(request.JobPositionId, ct);
         if (request.Questions.Any(x => x.Id.HasValue)) throw AppException.Invalid("unknown_question");
         var row = new InterviewTemplate { OrganizationId = user.OrganizationId, CreatedAtUtc = time.GetUtcNow() };
+        await CheckTitle(request.Title, row.Id, row.Title, ct);
         Apply(row, request); row.Questions = Questions(row.Id, request); db.InterviewTemplates.Add(row); await db.SaveChangesAsync(ct); return Map(row);
     }
     public Task<TemplateDto> SaveWizardAsync(Guid? id, WizardTemplateRequest r, byte[]? version, CancellationToken ct) => db.WithOrganizationBillingLockAsync(user.OrganizationId, () => SaveWizardAsyncLocked(id, r, version, ct), ct);
@@ -37,6 +38,7 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         await CheckJob(r.JobPositionId, ct);
         var row = id.HasValue ? await Scoped.Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw AppException.NotFound() : new InterviewTemplate { OrganizationId = user.OrganizationId, CreatedAtUtc = time.GetUtcNow() };
+        await CheckTitle(r.Title, row.Id, row.Title, ct);
         // Existing session FKs require templates to retain their position. Cross-position reuse is a copy at invitation.
         if (id.HasValue && row.JobPositionId != r.JobPositionId) throw AppException.Invalid("template_position_immutable");
         row.InterviewType = r.InterviewType; row.WelcomeMessage = r.WelcomeMessage.Trim(); row.GoodbyeMessage = r.GoodbyeMessage.Trim();
@@ -67,8 +69,17 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         if (row.UseTopicQuestions) throw AppException.Invalid("use_wizard_for_topic_template");
         await CheckJob(request.Template.JobPositionId, ct);
         if (request.Template.Questions.Any(x => x.Id.HasValue && row.Questions.All(q => q.Id != x.Id))) throw AppException.Invalid("unknown_question");
+        await CheckTitle(request.Template.Title, row.Id, row.Title, ct);
         db.SetOriginalVersion(row, request.RowVersion); Apply(row, request.Template);
         await db.ReplaceQuestionsAsync(row, Questions(row.Id, request.Template), ct); return Map(row);
+    }
+    private async Task CheckTitle(string title, Guid id, string currentTitle, CancellationToken ct)
+    {
+        var normalized = title.Trim().ToLowerInvariant();
+        // Keeping a historical title must remain possible after an internal invitation copy.
+        if (normalized == currentTitle.Trim().ToLowerInvariant()) return;
+        if (await Scoped.AnyAsync(x => x.Id != id && x.Title.Trim().ToLower() == normalized, ct))
+            throw new AppException(409, "template_title_duplicate", "عنوان قالب مصاحبه قبلاً ثبت شده است.");
     }
     private async Task CheckJob(Guid id, CancellationToken ct)
     { if (!await db.JobPositions.AnyAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null, ct)) throw AppException.NotFound(); }

@@ -52,9 +52,10 @@ public sealed class BillingTests(ApiFixture f)
     private async Task<WalletDto> Wallet(Account a) => (await (await a.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<WalletDto>(BillingJson.Options))!;
     private async Task<InterviewInvitation> Invite(Account a, string capability = "technical_interview")
     {
-        var job = await (await a.Client.Send(HttpMethod.Post, "/api/job-positions", new { title = "Synthetic role", description = "Synthetic job", seniority = "Senior", status = "Active" })).Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options);
+        var suffix = Guid.NewGuid().ToString("N");
+        var job = await (await a.Client.Send(HttpMethod.Post, "/api/job-positions", new { title = "Synthetic role " + suffix, description = "Synthetic job", seniority = "Senior", status = "Active" })).Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options);
         var jobId = job.GetProperty("id").GetGuid();
-        var template = await (await a.Client.Send(HttpMethod.Post, "/api/interview-templates", new { jobPositionId = jobId, title = "Synthetic interview", durationMinutes = 60, maxFollowUpQuestionsPerQuestion = 0, language = "fa-IR", isArchived = false,
+        var template = await (await a.Client.Send(HttpMethod.Post, "/api/interview-templates", new { jobPositionId = jobId, title = "Synthetic interview " + suffix, durationMinutes = 60, maxFollowUpQuestionsPerQuestion = 0, language = "fa-IR", isArchived = false,
             questions = new[] { new { text = "Synthetic", order = 1, competency = "HR", evaluationGuidance = "Observable evidence" } } })).Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options);
         var skill = await (await a.Client.Send(HttpMethod.Post, "/api/skills", new { name = "skill-" + Guid.NewGuid() })).Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options);
         var skillId = skill.GetProperty("id").GetGuid();
