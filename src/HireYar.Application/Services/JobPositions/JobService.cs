@@ -19,22 +19,28 @@ public sealed class JobService(IApplicationDbContext db, ICurrentUser user, Time
         return new(rows, total, page.Page, page.PageSize);
     }
     public async Task<JobDto> GetAsync(Guid id, CancellationToken ct) => Map(await Scoped.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound());
-    public async Task<JobDto> CreateAsync(JobRequest request, CancellationToken ct)
+    public Task<JobDto> CreateAsync(JobRequest request, CancellationToken ct) =>
+        db.WithOrganizationBillingLockAsync(user.OrganizationId, () => CreateLockedAsync(request, ct), ct);
+    private async Task<JobDto> CreateLockedAsync(JobRequest request, CancellationToken ct)
     {
         var row = new JobPosition
         {
             OrganizationId = user.OrganizationId,
             CreatedAtUtc = time.GetUtcNow()
         };
+        await CheckTitle(request.Title, row.Id, row.Title, ct);
         Apply(row, request);
         db.JobPositions.Add(row);
         await db.SaveChangesAsync(ct);
         return Map(row);
     }
-    public async Task<JobDto> UpdateAsync(Guid id, UpdateJobRequest request, CancellationToken ct)
+    public Task<JobDto> UpdateAsync(Guid id, UpdateJobRequest request, CancellationToken ct) =>
+        db.WithOrganizationBillingLockAsync(user.OrganizationId, () => UpdateLockedAsync(id, request, ct), ct);
+    private async Task<JobDto> UpdateLockedAsync(Guid id, UpdateJobRequest request, CancellationToken ct)
     {
         var row = await Scoped.SingleOrDefaultAsync(x => x.Id == id, ct) ??
             throw AppException.NotFound();
+        await CheckTitle(request.Job.Title, row.Id, row.Title, ct);
         db.SetOriginalVersion(row, request.RowVersion); Apply(row, request.Job);
         await db.SaveChangesAsync(ct);
         return Map(row);
@@ -49,6 +55,14 @@ public sealed class JobService(IApplicationDbContext db, ICurrentUser user, Time
         // Existing invitations keep their snapshots; no cascade destroys interview or financial history.
         return true;
     }, ct);
+    private async Task CheckTitle(string title, Guid id, string currentTitle, CancellationToken ct)
+    {
+        var normalized = title.Trim().ToLowerInvariant();
+        // Keeping a historical title must remain possible after an internal invitation copy.
+        if (normalized == currentTitle.Trim().ToLowerInvariant()) return;
+        if (await Scoped.AnyAsync(x => x.Id != id && x.Title.Trim().ToLower() == normalized, ct))
+            throw new AppException(409, "job_title_duplicate", "عنوان موقعیت شغلی قبلاً ثبت شده است.");
+    }
     private void Apply(JobPosition row, JobRequest request)
     {
         row.Title = request.Title.Trim();

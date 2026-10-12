@@ -85,7 +85,7 @@ public sealed class TrialPackageAccessTests
                 Assert.False(await db.SubscriptionPurchases.AnyAsync());
             });
             // A longer session still has its features; only the wallet prevents its start.
-            var tooLong = await Invite(await Save(request with { DurationMinutes = 60 }));
+            var tooLong = await Invite(await Save(request with { Title = "Synthetic trial long template", DurationMinutes = 60 }));
             using var otherCandidate = f.CreateClient(); otherCandidate.DefaultRequestHeaders.Authorization = new("Bearer", tooLong.Token);
             var rejected = await otherCandidate.PostAsync($"/api/candidate/interviews/{tooLong.InterviewId}/start", null);
             Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);

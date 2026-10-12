@@ -1,3 +1,21 @@
+## تحویل جلوگیری از عنوان تکراری — 2026-10-12
+
+JobService ایجاد/ویرایش را زیر قفل موجود سازمان انجام می‌دهد و TemplateService در هر سه مسیر ذخیره همان قاعده را بررسی می‌کند. تطبیق Trim و case-insensitive انگلیسی، فقط سازمان جاری و ردیف‌های حذف‌نشده است؛ رکورد جاری استثناست، آرشیو رزرو باقی می‌ماند و حذف عنوان را آزاد می‌کند. پاسخ 409 با job_title_duplicate / template_title_duplicate و detail فارسی؛ PANEL_WIZARD_API و ADR-037 به‌روزند.
+
+اعتبارسنجی نهایی: tool restore و restore موفق؛ build صفر warning/error؛ suite کامل ۲۹۵/۲۹۵ موفق، صفر شکست/Skip، روی PostgreSQL 18 اختصاصی loopback:55485 و provider مصنوعی. چهار تست جدید ایجاد/ویرایش، اشتراک قاعده بین مسیرهای قدیمی/ویزارد، scope سازمان، self-edit، آرشیو/حذف، عدم تغییر سؤال/RowVersion در شکست و رقابت create/update را بررسی کردند. TRX: tests/HireYar.Tests/TestResults/title-uniqueness-final.trx. تست‌های دعوت cross-position و snapshot قبلی هم موفق‌اند. داده مصنوعی قالب دوم trial و موقعیت/قالب‌های مستقل billing عنوان مستقل گرفتند؛ assertions مالی/قابلیت‌ها حذف نشدند. نتیجه اولیه suite موفق نبود؛ نتیجه نهایی پس از تطبیق داده تست و حفظ عنوان فعلی در ویرایش است. دیتابیس‌های fixture صفر باقی ماندند و cluster اختصاصی متوقف شد؛ git diff --check موفق است.
+
+تغییرات پاک‌سازی قبلی حفظ شدند و همه تغییرات هنوز commit/push/deploy نشده‌اند. schema/داده مقصد تغییر نکرده، migration ندارد. داده‌های تکراری قبلی خودکار پاک نمی‌شوند و حفظ عنوان فعلی هنگام ویرایش مجاز است؛ تغییر عنوان باید یکتا باشد؛ کپی داخلی دعوت cross-position با عنوان snapshot مبدأ محفوظ است. قراردادهای HTTP دیگر تغییر نکردند.
+
+## تحویل پاک‌سازی — 2026-10-12
+
+روی dev با شروع Git پاک، AuthService حذف شد؛ مصرف‌کننده حساب اکنون AuthController → IAccounts است و UserId فقط از ICurrentUser معتبر سرور می‌آید. Identity در Infrastructure باقی است. token providerهای ایمیلی و عمرشان مصرف فعال نداشتند و حذف شدند؛ Data Protection و OTP/refresh مستقل محفوظ‌اند.
+
+RenewInvitation قدیمی caller نداشت و حذف شد؛ resend موجود جلسه تازه می‌سازد. Provider در NetArzOptions بی‌اثر بود و حذف شد، ApiKey پیش‌فرض کلاس خالی است؛ appsettings/local config تغییر نکردند. recovery پاسخ/معرفی یک متد خصوصی مشترک با scope مستقل دارند و shortlist سیاست تاریخی یک‌بار مرتب می‌شود. schema/جدول تاریخی تیم/سیاست‌های snapshot حفظ شدند؛ migration لازم نیست. ADR-036 شرح دقیق تصمیم است.
+
+اعتبارسنجی واقعی: dotnet tool restore و restore موفق؛ build صفر warning/error؛ suite کامل ۲۹۱/۲۹۱ موفق، صفر شکست/Skip، روی PostgreSQL 18 اختصاصی loopback:55485 و providerهای مصنوعی. گزارش tests/HireYar.Tests/TestResults/cleanup-verified.trx و لاگ ignored artifacts/cleanup-tests.log. دیتابیس‌های fixture صفر باقی ماندند و cluster اختصاصی متوقف شد. Git diff --check موفق است؛ کیفیت AI واقعی با این تست‌ها اثبات نمی‌شود.
+
+تغییرات commit/push/deploy نشده‌اند؛ production و دیتابیس موجود کاربر تغییر نکردند. providerهای واقعی/Angular در این نوبت تست نمی‌شوند.
+
 ## تأیید دسترسی همه پکیج‌ها در دمو — 2026-10-11
 
 کاربر صریحاً انتخاب کرد همه امکانات باز باشند و مصرف از شارژ هدیه کم شود. بررسی کد نشان داد grant ثبت‌نام اجتماع features فعال پکیج‌های عمومی را ذخیره و RequireAsync/ویزارد/قالب موضوعی/start از همان snapshot استفاده می‌کنند؛ خرید پکیج لازم نیست و تغییر runtime لازم نشد. چهار integration مستقل برای عمومی/تخصصی با قالب عادی/موضوعی پیشرفته، حساب واقعی OTP trial با ۰٫۵ دلار و دو روز، پیشنهاد سؤال، دعوت، start/answer/complete، گزارش، کسر هزینه و رد جلسه شصت‌دقیقه‌ای با insufficient_ai_credit اضافه شدند. هیچ شارژ مصنوعی اضافی یا cash purchase در این سناریوها وجود ندارد.

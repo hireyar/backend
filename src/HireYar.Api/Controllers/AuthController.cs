@@ -1,5 +1,6 @@
 using HireYar.Api.Security;
 using HireYar.Application.Auth;
+using HireYar.Application.Common;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +8,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Route("api/auth"), EnableRateLimiting("auth"), ServiceFilter(typeof(CsrfFilter))]
-public sealed class AuthController(AuthService service, IWebHostEnvironment env) : ControllerBase
+public sealed class AuthController(IAccounts service, ICurrentUser user, IWebHostEnvironment env) : ControllerBase
 {
     private const string RefreshCookie = "hireyar.refresh";
     private CookieOptions Cookie(DateTimeOffset? expires = null) => new() { HttpOnly = true, Secure = !env.IsDevelopment(), SameSite = SameSiteMode.Strict, Path = "/api/auth", Expires = expires, IsEssential = true };
@@ -24,10 +25,10 @@ public sealed class AuthController(AuthService service, IWebHostEnvironment env)
     [AllowAnonymous, HttpPost("logout")]
     public async Task<IActionResult> Logout(CancellationToken ct) { await service.LogoutAsync(Request.Cookies[RefreshCookie] ?? "", ct); Response.Cookies.Delete(RefreshCookie, Cookie()); return NoContent(); }
     [HttpPost("logout-all")]
-    public async Task<IActionResult> LogoutAll(CancellationToken ct) { await service.LogoutAllAsync(ct); Response.Cookies.Delete(RefreshCookie, Cookie()); return NoContent(); }
+    public async Task<IActionResult> LogoutAll(CancellationToken ct) { await service.LogoutAllAsync(user.UserId, ct); Response.Cookies.Delete(RefreshCookie, Cookie()); return NoContent(); }
     [HttpGet("me")]
-    public Task<CurrentUserDto> Me(CancellationToken ct) => service.GetAsync(ct);
+    public Task<CurrentUserDto> Me(CancellationToken ct) => service.GetAsync(user.UserId, ct);
     [HttpPut("me")]
-    public Task<CurrentUserDto> Update(NameRequest r, CancellationToken ct) => service.UpdateAsync(r, ct);
+    public Task<CurrentUserDto> Update(NameRequest r, CancellationToken ct) => service.UpdateAsync(user.UserId, r, ct);
 
 }

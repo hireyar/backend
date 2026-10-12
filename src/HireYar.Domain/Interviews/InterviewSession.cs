@@ -163,12 +163,6 @@ public sealed class InterviewSession
         WelcomeMessage = InterviewRules.Text(welcome, 2000);
         GoodbyeMessage = InterviewRules.Text(goodbye, 2000);
     }
-    public void RenewInvitation(string hash, DateTimeOffset now, DateTimeOffset expires)
-    {
-        CheckTime(now); InterviewRules.Utc(expires);
-        InterviewRules.Require(Status == InterviewStatus.Created && AccessRevokedAtUtc is null && expires > now, "invitation_not_resendable");
-        SetAccessTokenHash(hash); CreatedAtUtc = now; ExpiresAtUtc = expires;
-    }
     public DateTimeOffset? QuestionReadyAtUtc { get; private set; }
     public void SetRequiredCapability(string code)
     {
