@@ -33,6 +33,8 @@ public sealed class TestClock : TimeProvider
 public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public bool Production { get; init; }
+    public bool UseS3VideoStorage { get; init; }
+    public FakeVideoS3 VideoS3 { get; } = new();
     public bool UseFixedOtp { get; init; }
     public bool DisabledPayments { get; init; }
     public bool DiagnosticsEnabled { get; init; }
@@ -68,9 +70,15 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("AI:Provider", "Disabled");
         b.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
         b.UseSetting("AI:NetArz:ApiKey", "");
+        b.UseSetting("InterviewStorage:VideoProvider", UseS3VideoStorage ? "ArvanS3" : "Local");
+        if (UseS3VideoStorage) {
+            b.UseSetting("InterviewStorage:S3:AccessKey", "synthetic-access");
+            b.UseSetting("InterviewStorage:S3:SecretKey", "synthetic-secret");
+        }
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
+            if (UseS3VideoStorage) { s.RemoveAll<Amazon.S3.IAmazonS3>(); s.AddSingleton<Amazon.S3.IAmazonS3>(VideoS3); }
             if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }
             s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
             s.RemoveAll<IPhoneOtpSender>(); s.AddSingleton<IPhoneOtpSender>(PhoneOtp);

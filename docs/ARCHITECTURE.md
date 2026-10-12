@@ -1,3 +1,11 @@
+## ADR-038 — ویدیوی خصوصی در S3 آروان (2026-10-12)
+
+طبق درخواست کاربر، provider ویدیو ArvanS3 در Infrastructure و SDK رسمی AWSSDK.S3 اضافه شد؛ Domain/Application و قراردادهای فعلی IInterviewAudioStorage/DTO تغییر نکردند. فقط ویدیوهای تازهٔ پاسخ/معرفی/ضبط کامل به S3 با multipart قطعات 8 MiB و ACL=Private می‌روند؛ صوت/رزومه و keyهای تاریخی محلی محفوظ‌اند و migration/انتقال خودکار داده نداریم. کلید s3/... محل storage را مشخص می‌کند؛ provider ناموفق fallback محلی ندارد.
+
+GET رسانه همچنان از Api با Owner معتبر، سازمان و retention و no-store می‌گذرد؛ URL عمومی/GET امضاشده صادر نمی‌شود، چون دارندهٔ لینک امضاشده تا انقضا مستقل از هویت می‌تواند آن را بخواند. stream seekable با HEAD/ETag و Range محدود، FileStreamResult 206 را بدون دانلود کامل فایل حفظ می‌کند. Bucket ACL و policy پیش از save/open بررسی و public/نامعلوم رد می‌شوند؛ کنترل خصوصی‌بودن فقط ACL فایل نیست. پاسخ واقعی NoSuchBucketPolicy در SDK v4 با XML امن/DTD ممنوع پذیرفته می‌شود.
+
+Endpoint سرویس از bucket جداست، HTTPS/ForcePathStyle/region صریح است؛ کلیدهای ارائه‌شده در appsettings.Development.local.json ignored تنظیم شدند، فایل مشترک credential خالی دارد و مقصد باید credential خودش را فراهم کند. lifecycle حذف multipart ناقص پیشنهاد شده ولی روی مقصد اعمال نشده است. Upload هنوز از HTTP multipart بک‌اند و IFormFile عبور می‌کند، سقف ضبط همان 512 MiB است؛ طرح browser-to-S3 multipart برای فایل‌های بزرگ فقط پیشنهاد مستند است. [INTERVIEW_VIDEO_STORAGE](INTERVIEW_VIDEO_STORAGE.md) قرارداد، محدودیت‌ها و اتصال فرانت جدا را توضیح می‌دهد.
+
 ## ADR-037 — جلوگیری از عنوان تکراری ورودی پنل (2026-10-12)
 
 عنوان موقعیت و قالب هنگام ایجاد/ویرایش در هر سازمان مستقل بررسی می‌شود؛ Trim و تطبیق case-insensitive انگلیسی با lower در query PostgreSQL، رکورد جاری مستثنا و DeletedAtUtc=null ملاک است. آرشیو عنوان را آزاد نمی‌کند؛ حذف منطقی می‌کند. قالب در کل سازمان یکتا بررسی می‌شود، نه فقط در یک موقعیت. ردیف‌های قبلی تغییر/حذف خودکار نمی‌شوند؛ حفظ عنوان فعلی، حتی در داده تکراری قدیمی یا کپی داخلی، مجاز است؛ تغییر عنوان باید غیرتکراری باشد.

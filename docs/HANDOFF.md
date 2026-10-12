@@ -1,3 +1,14 @@
+## تحویل ویدیوی خصوصی آروان — 2026-10-12
+
+روی dev با Git پاک شروع شد. [INTERVIEW_VIDEO_STORAGE](INTERVIEW_VIDEO_STORAGE.md) و ADR-038 را بخوانید: فقط videos تازه در S3، key با پیشوند s3/ و فایل تاریخی محلی، multipart محدود 8 MiB، پخش seekable با Range/ETag و Owner+سازمان+retention موجود. guard ACL/policy public و نامعلوم را رد می‌کند؛ ACL خصوصی فایل جای bucket policy نیست. اتصال واقعی نشان داد SDK v4 policy غایب را با response HTTP404/XML NoSuchBucketPolicy می‌دهد؛ handling امن مخصوص همان کد اضافه شد.
+
+کلیدهای درخواست فقط در appsettings.Development.local.json ignored هستند؛ در image نیستند. appsettings مشترک Endpoint/Region/Bucket/ArvanS3 و credential خالی دارد، شروع مقصد بدون credential رد می‌شود؛ operator باید تنظیمات Production را فراهم کند. کلید/URL امضاشده/داده واقعی در مستندات جدید یا لاگ تست ثبت نشدند. SDK از endpoint سرویس و ForcePathStyle استفاده می‌کند، نه آدرس bucket به عنوان ServiceURL. هیچ تغییر bucket policy/ACL مقصد اعمال نشد.
+
+آپلود HTTP فعلی و سقف 512 MiB حفظ شدند؛ browser-to-S3 multipart و player Angular فقط پیشنهاد/ادغام فرانت جدا هستند. lifecycle multipart ناقص پیشنهاد و هنوز اعمال نشده است؛ volume محلی قدیمی را حفظ کنید. provider را پس از ثبت S3 به Local تغییر ندهید مگر با انتقال صریح فایل‌ها. migration، push، deploy و تغییر production انجام نشده‌اند.
+
+اعتبارسنجی نهایی: restore از NuGet عمومی و build موفق با صفر warning/error؛ suite کامل ۳۱۲/۳۱۲ موفق، صفر Failed/Skipped، PostgreSQL 18 اختصاصی loopback:55486 و S3/provider مصنوعی. TRX: tests/HireYar.Tests/TestResults/s3-video-final.trx. ۱۶ case واحد تازه و یک integration S3 شامل multipart محدود، Empty/oversize، private ACL/public policy/NotPrincipal، 404 XML امن/DTD ممنوع، abort لغو و پاسخ گم‌شده Complete، cleanup، فایل تاریخی/traversal، HTTP206/no-store و JWT/Owner/scope سازمان‌اند. اجرای اولیه suite دو شکست فقط در تنظیمات S3 fixtureهای مستقل Production داشت؛ override Local در آن‌ها اضافه و suite کامل موفق بازاجرا شد.
+
+Smoke واقعی آروان با داده مصنوعی 8 MiB+16 بایت، دو UploadPart/Complete، خواندن seek/Range احرازشده و GET بدون امضا موفق: anonymous=403؛ فایل مصنوعی حذف شد. GetBucketAcl=200 و نبود policy با HTTP404/XML NoSuchBucketPolicy تأیید شدند. لاگ ignored artifacts/s3-video-smoke.log فاقد credential/key فایل یا محتوای کاربر است. آزمون real codec/فرانت/فایل چندگیگابایتی/بار مقصد انجام نشده؛ محدودیت 512 MiB و IFormFile/ترافیک بک‌اند محفوظ‌اند. هیچ migration یا تغییر schema/data مقصد، bucket policy/ACL مقصد، push/deploy/production انجام نشده است.
 ## تحویل جلوگیری از عنوان تکراری — 2026-10-12
 
 JobService ایجاد/ویرایش را زیر قفل موجود سازمان انجام می‌دهد و TemplateService در هر سه مسیر ذخیره همان قاعده را بررسی می‌کند. تطبیق Trim و case-insensitive انگلیسی، فقط سازمان جاری و ردیف‌های حذف‌نشده است؛ رکورد جاری استثناست، آرشیو رزرو باقی می‌ماند و حذف عنوان را آزاد می‌کند. پاسخ 409 با job_title_duplicate / template_title_duplicate و detail فارسی؛ PANEL_WIZARD_API و ADR-037 به‌روزند.
