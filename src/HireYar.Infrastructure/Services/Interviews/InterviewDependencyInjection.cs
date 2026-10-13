@@ -55,6 +55,7 @@ public static class InterviewDependencyInjection
         services.AddScoped<InterviewAccessStatusService>();
         services.AddSingleton<IResumeTextExtractor, ResumeTextExtractor>();
         services.AddHostedService<InterviewRecoveryWorker>();
+        services.AddHostedService<InterviewReportWorker>();
         services.AddSingleton<LocalInterviewAudioStorage>();
         services.AddOptions<InterviewStorageOptions>()
             .Validate(o => o.VideoProvider is "Local" or "ArvanS3", "Invalid video storage provider.")

@@ -64,3 +64,7 @@ public sealed record InterviewReportContext(string PositionTitle, string? Positi
 
 public sealed record GenerateInterviewReportRequest(IReadOnlyDictionary<string, decimal>? TopicWeights = null,
     decimal? ReviewThreshold = null);
+
+public sealed record InterviewReportGenerationDto(Guid InterviewId, string Status, string Stage, string Message,
+    bool CanRetry, int Attempts, DateTimeOffset? RequestedAtUtc, DateTimeOffset? StartedAtUtc,
+    DateTimeOffset? FinishedAtUtc, string? FailureCode, string? FailureStage, bool ReportAvailable);

@@ -216,7 +216,12 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
         Assert.Equal(0, f.ReportAi.Calls);
         Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
         var evidenceBefore = (await (await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).Content.ReadFromJsonAsync<HrInterviewDto>())!.Evidence;
-        var response = await hr.Client.Send(HttpMethod.Post, url); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var queued = await hr.Client.Send(HttpMethod.Get, url); Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+        var queuedStatus = (await queued.Content.ReadFromJsonAsync<InterviewReportGenerationDto>())!;
+        Assert.Equal("Queued", queuedStatus.Stage); Assert.False(queuedStatus.CanRetry); Assert.Equal(0, queuedStatus.Attempts);
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+        await f.ProcessReportAsync(invite.InterviewId);
+        var response = await hr.Client.Send(HttpMethod.Get, url); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var report = (await response.Content.ReadFromJsonAsync<InterviewReportDto>())!;
         Assert.Equal("openai/gpt-6-luna", report.Model); Assert.Single(report.Content.Findings); Assert.Single(f.ReportAi.LastContext!.Answers);
         Assert.Equal(2, f.ReportAi.LastContext.Questions.Count); // Answered question and next asked, unanswered question.
@@ -226,13 +231,19 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
         Assert.Equal(60m, details.OverallScore); Assert.True(details.RequiresHumanReview);
         Assert.Single(details.Questions, q => q.Score is null);
         Assert.Contains(details.Questions, q => q.AudioUrl == $"/api/interviews/{invite.InterviewId}/answers/{q.AnswerId}/audio");
-        var again = (await (await hr.Client.Send(HttpMethod.Post, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+        var again = (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
         var stored = (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
         Assert.Equal(report.CreatedAtUtc, again.CreatedAtUtc); Assert.Equal(report.CreatedAtUtc, stored.CreatedAtUtc); Assert.Equal(1, f.ReportAi.Calls);
         Assert.Equal(JsonSerializer.Serialize(report.Content), JsonSerializer.Serialize(stored.Content));
+        var succeeded = (await (await hr.Client.Send(HttpMethod.Get, url + "/status")).Content.ReadFromJsonAsync<InterviewReportGenerationDto>())!;
+        Assert.Equal("Succeeded", succeeded.Status); Assert.False(succeeded.CanRetry); Assert.True(succeeded.ReportAvailable);
+        Assert.Equal(1, succeeded.Attempts); Assert.NotNull(succeeded.StartedAtUtc); Assert.NotNull(succeeded.FinishedAtUtc);
         var stranger = await f.RegisterOwner(); Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, url)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, url + "/status")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Post, url)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(url + "/status")).StatusCode);
         await f.Db(async db => {
             var row = await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == invite.InterviewId);
             Assert.NotNull(row.ResultJson); Assert.Null(row.LeaseId); Assert.Equal(report.CreatedAtUtc, row.CreatedAtUtc);
@@ -251,16 +262,25 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
         foreach (var malformed in new[] { true, false })
         {
             f.ReportAi.Invalid = malformed; f.ReportAi.Fail = !malformed;
-            Assert.Equal(HttpStatusCode.ServiceUnavailable, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, (await hr.Client.Send(HttpMethod.Get, url)).StatusCode);
+            await f.ProcessReportAsync(invite.InterviewId);
+            var failedResponse = await hr.Client.Send(HttpMethod.Get, url);
+            Assert.Equal(HttpStatusCode.OK, failedResponse.StatusCode);
+            var failed = (await failedResponse.Content.ReadFromJsonAsync<InterviewReportGenerationDto>())!;
+            Assert.Equal("Failed", failed.Status); Assert.True(failed.CanRetry); Assert.NotNull(failed.FinishedAtUtc);
+            Assert.Equal(malformed ? "report_validation_failed" : "report_timeout", failed.FailureCode);
+            Assert.Equal(malformed ? "Validating" : "Generating", failed.FailureStage);
             await f.Db(async db => {
                 var row = await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == invite.InterviewId);
                 Assert.Null(row.ResultJson); Assert.Null(row.LeaseId);
+                Assert.Equal("Failed", row.GenerationStage);
                 Assert.Equal(InterviewStatus.Completed, (await db.InterviewSessions.SingleAsync(s => s.Id == invite.InterviewId)).Status);
             });
+            Assert.Equal(HttpStatusCode.Accepted, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
         }
         f.ReportAi.Invalid = f.ReportAi.Fail = false;
-        Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+        await f.ProcessReportAsync(invite.InterviewId);
+        Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Get, url)).StatusCode);
         Assert.Equal(3, f.ReportAi.Calls);
     }
 
@@ -271,16 +291,20 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
         await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null);
         var url = $"/api/interviews/{invite.InterviewId}/evaluation-report";
         f.ReportAi.Entered = new(TaskCreationOptions.RunContinuationsAsynchronously); f.ReportAi.Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        var pending = hr.Client.Send(HttpMethod.Post, url);
+        var pending = f.ProcessReportAsync(invite.InterviewId);
         await f.ReportAi.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         try
         {
             Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+            await f.ProcessReportAsync(invite.InterviewId); // Competing worker cannot claim.
+            var processing = await hr.Client.Send(HttpMethod.Get, url);
+            Assert.Equal(HttpStatusCode.Accepted, processing.StatusCode);
+            Assert.Equal("Generating", (await processing.Content.ReadFromJsonAsync<InterviewReportGenerationDto>())!.Stage);
             Assert.Equal(1, f.ReportAi.Calls);
             Assert.Equal(HttpStatusCode.NoContent, (await hr.Client.Send(HttpMethod.Delete, $"/api/interviews/{invite.InterviewId}")).StatusCode);
         }
         finally { f.ReportAi.Release.TrySetResult(); }
-        Assert.Equal(HttpStatusCode.NotFound, (await pending).StatusCode);
+        await pending;
         Assert.Equal(HttpStatusCode.NotFound, (await hr.Client.Send(HttpMethod.Get, url)).StatusCode);
         await f.Db(async db => Assert.Null((await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == invite.InterviewId)).ResultJson));
         f.ReportAi.Reset();
@@ -295,13 +319,19 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
         var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var firstRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         f.ReportAi.Entered = firstEntered; f.ReportAi.Release = firstRelease;
-        var old = hr.Client.Send(HttpMethod.Post, url); await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var old = f.ProcessReportAsync(invite.InterviewId); await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         try
         {
             f.Clock.Offset += TimeSpan.FromSeconds(160); f.ReportAi.Entered = f.ReportAi.Release = null;
-            var winner = await hr.Client.Send(HttpMethod.Post, url); Assert.Equal(HttpStatusCode.OK, winner.StatusCode);
+            await f.ProcessReportAsync(invite.InterviewId); // Expiry marks failure, without silently rerunning AI.
+            Assert.Equal(1, f.ReportAi.Calls);
+            var failed = (await (await hr.Client.Send(HttpMethod.Get, url + "/status")).Content.ReadFromJsonAsync<InterviewReportGenerationDto>())!;
+            Assert.Equal("Failed", failed.Status); Assert.Equal("report_interrupted", failed.FailureCode); Assert.True(failed.CanRetry);
+            Assert.Equal(HttpStatusCode.Accepted, (await hr.Client.Send(HttpMethod.Post, url)).StatusCode);
+            await f.ProcessReportAsync(invite.InterviewId);
+            var winner = await hr.Client.Send(HttpMethod.Get, url); Assert.Equal(HttpStatusCode.OK, winner.StatusCode);
             var report = (await winner.Content.ReadFromJsonAsync<InterviewReportDto>())!;
-            firstRelease.TrySetResult(); Assert.Equal(HttpStatusCode.Conflict, (await old).StatusCode);
+            firstRelease.TrySetResult(); await old;
             Assert.Equal(2, f.ReportAi.Calls);
             var stored = (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
             Assert.Equal(report.CreatedAtUtc, stored.CreatedAtUtc);
