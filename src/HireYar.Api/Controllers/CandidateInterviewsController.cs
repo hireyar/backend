@@ -64,6 +64,12 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<InterviewAccessStatus> AccessStatus(Guid interviewId, CancellationToken ct) => accessStatus.GetAsync(interviewId, ct);
     [HttpPost("start")] public Task<CandidateInterviewDto> Start(Guid interviewId, CancellationToken ct) => service.StartAsync(interviewId, ct);
+    [HttpGet("speaker-test/audio")]
+    [Produces("audio/mpeg")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> SpeakerTestAudio(Guid interviewId, CancellationToken ct) =>
+        File(await service.OpenSpeakerTestAudioAsync(interviewId, ct), "audio/mpeg", enableRangeProcessing: true);
     [HttpPost("audio-check"), Consumes("multipart/form-data"), RequestSizeLimit(3 * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 3 * 1024 * 1024)]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<InterviewAudioCheckDto> CheckAudio(Guid interviewId, [FromForm] AudioCheckUpload upload, CancellationToken ct)

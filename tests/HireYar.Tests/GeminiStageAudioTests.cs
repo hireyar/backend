@@ -28,6 +28,8 @@ public sealed partial class PanelWizardTests
     {
         public List<string> Inputs { get; } = [];
         public bool Fail { get; set; }
+        public TaskCompletionSource? Entered { get; set; }
+        public TaskCompletionSource? Release { get; set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Assert.Equal("https://liara.example.test/v1/audio/speech", request.RequestUri!.ToString());
@@ -37,6 +39,8 @@ public sealed partial class PanelWizardTests
             Assert.Equal("Aoede", root.GetProperty("voice").GetString());
             Assert.Equal("pcm", root.GetProperty("response_format").GetString());
             Inputs.Add(root.GetProperty("input").GetString()!);
+            Entered?.TrySetResult();
+            if (Release is { } waiting) await waiting.Task.WaitAsync(ct);
             return Fail ? new(HttpStatusCode.ServiceUnavailable) :
                 new(HttpStatusCode.OK) { Content = new ByteArrayContent(new byte[48000]) };
         }
