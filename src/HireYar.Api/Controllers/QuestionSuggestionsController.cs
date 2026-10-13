@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
-[ApiController, Authorize(Roles = "Owner"), Route("api/panel-wizard/question-suggestions")]
+[ApiController, Authorize(Roles = "Owner,Recruiter"), Route("api/panel-wizard/question-suggestions")]
 public sealed class QuestionSuggestionsController(QuestionSuggestionService service) : ControllerBase
 {
     [HttpPost]

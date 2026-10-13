@@ -2,7 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using HireYar.Domain.Organizations;
 namespace HireYar.Application.Auth;
 
-public sealed record NameRequest([Required, StringLength(200)] string FullName);
+public sealed record NameRequest([Required, StringLength(200)] string FullName,
+    [StringLength(200, MinimumLength = 1)] string? OrganizationName = null);
 public sealed record CurrentUserDto(Guid Id, string? Email, string? Mobile, string FullName, Guid OrganizationId, string OrganizationName, OrganizationRole Role);
 // Internal boundary result: controllers must return AccessResponse, never this refresh secret.
 public sealed record SessionResult(string AccessToken, DateTimeOffset AccessExpiresAtUtc, string RefreshToken, DateTimeOffset RefreshExpiresAtUtc);

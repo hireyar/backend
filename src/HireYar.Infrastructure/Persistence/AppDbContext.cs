@@ -20,6 +20,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<InterviewQuestion> InterviewQuestions => Set<InterviewQuestion>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<OtpChallenge> OtpChallenges => Set<OtpChallenge>();
+    public DbSet<MobileTeamInvitation> MobileTeamInvitations => Set<MobileTeamInvitation>();
     public DbSet<TeamInvitation> TeamInvitations => Set<TeamInvitation>();
     public DbSet<CandidateApplication> CandidateApplications => Set<CandidateApplication>();
     public DbSet<Skill> Skills => Set<Skill>();
