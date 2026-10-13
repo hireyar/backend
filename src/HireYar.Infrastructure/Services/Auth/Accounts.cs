@@ -51,9 +51,12 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
         }
         return new(challenge.ExpiresAtUtc);
     }
-    public async Task<SessionResult> VerifyOtpAsync(VerifyOtpRequest r, CancellationToken ct)
+    public Task<SessionResult> VerifyOtpAsync(VerifyOtpRequest r, CancellationToken ct) => VerifyAsync(r, null, ct);
+    public Task<SessionResult> AcceptTeamInvitationAsync(Guid id, VerifyOtpRequest r, CancellationToken ct) => VerifyAsync(r, id, ct);
+    private async Task<SessionResult> VerifyAsync(VerifyOtpRequest r, Guid? invitationId, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await TeamMembershipLocks.LockMobileAsync(db, r.Mobile, ct);
         var challenge = await db.OtpChallenges.FromSqlInterpolated($"SELECT * FROM \"OtpChallenges\" WHERE \"Mobile\" = {r.Mobile} FOR UPDATE").SingleOrDefaultAsync(ct);
         if (challenge is null || !challenge.Delivered || challenge.ConsumedAtUtc.HasValue || challenge.ExpiresAtUtc <= Now || challenge.FailedAttempts >= 5)
             throw AppException.Unauthorized();
@@ -66,8 +69,35 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
             throw AppException.Unauthorized();
         }
         var u = await db.Users.SingleOrDefaultAsync(x => x.PhoneNumber == r.Mobile, ct);
-        if (u is null)
+        if (invitationId is not null)
         {
+            var invitation = await db.MobileTeamInvitations.SingleOrDefaultAsync(x => x.Id == invitationId && x.Mobile == r.Mobile, ct)
+                ?? throw AppException.NotFound();
+            if (invitation.AcceptedAtUtc is not null || invitation.CancelledAtUtc is not null || invitation.ExpiresAtUtc <= Now)
+                throw new AppException(409, "invitation_unavailable", "Invitation is no longer available.");
+            var org = await db.Organizations.FromSqlInterpolated($"SELECT * FROM \"Organizations\" WHERE \"Id\" = {invitation.OrganizationId} FOR UPDATE").AsNoTracking().SingleOrDefaultAsync(ct)
+                ?? throw AppException.NotFound();
+            if (u is not null && (u.OrganizationId != org.Id || u.Role != OrganizationRole.Recruiter || u.IsActive))
+                throw new AppException(409, "mobile_unavailable", "This mobile cannot accept the invitation.");
+            if (u is null)
+            {
+                u = new ApplicationUser { Id = Guid.NewGuid(), UserName = r.Mobile, PhoneNumber = r.Mobile,
+                    PhoneNumberConfirmed = true, FullName = "کاربر", OrganizationId = org.Id, Role = OrganizationRole.Recruiter,
+                    CreatedAtUtc = Now, UpdatedAtUtc = Now };
+                Check(await users.CreateAsync(u));
+            }
+            else
+            {
+                if (await users.IsLockedOutAsync(u)) throw AppException.Unauthorized();
+                u.IsActive = true; u.PhoneNumberConfirmed = true; u.UpdatedAtUtc = Now;
+                Check(await users.UpdateSecurityStampAsync(u));
+            }
+            invitation.AcceptedAtUtc = Now;
+        }
+        else if (u is null)
+        {
+            if (await db.MobileTeamInvitations.AnyAsync(x => x.Mobile == r.Mobile && x.AcceptedAtUtc == null && x.CancelledAtUtc == null && x.ExpiresAtUtc > Now, ct))
+                throw new AppException(409, "team_invitation_pending", "Accept the team invitation before creating an organization.");
             var org = new Organization { Name = "سازمان من", CreatedAtUtc = Now, UpdatedAtUtc = Now };
             db.Organizations.Add(org); await db.SaveChangesAsync(ct);
             u = new ApplicationUser { Id = Guid.NewGuid(), UserName = r.Mobile, PhoneNumber = r.Mobile,
@@ -76,7 +106,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
             Check(await users.CreateAsync(u));
             await trials.CreateForNewOrganizationAsync(org.Id, org.CreatedAtUtc, ct);
         }
-        if (!u.IsActive || u.Role != OrganizationRole.Owner || await users.IsLockedOutAsync(u)) throw AppException.Unauthorized();
+        if (!u.IsActive || u.Role is not (OrganizationRole.Owner or OrganizationRole.Recruiter) || await users.IsLockedOutAsync(u)) throw AppException.Unauthorized();
         u.PhoneNumberConfirmed = true;
         challenge.ConsumedAtUtc = Now;
         var session = Issue(u, Guid.NewGuid());
@@ -97,7 +127,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
         {
             await Revoke(u.Id, old.FamilyId, ct); await tx.CommitAsync(ct); throw AppException.Unauthorized();
         }
-        if (old.ExpiresAtUtc <= Now || !u.IsActive || u.Role != OrganizationRole.Owner || !u.PhoneNumberConfirmed) throw AppException.Unauthorized();
+        if (old.ExpiresAtUtc <= Now || !u.IsActive || u.Role is not (OrganizationRole.Owner or OrganizationRole.Recruiter) || !u.PhoneNumberConfirmed) throw AppException.Unauthorized();
         var result = Issue(u, old.FamilyId);
         var next = db.ChangeTracker.Entries<RefreshToken>().Single(x => x.State == EntityState.Added).Entity;
         old.RevokedAtUtc = Now; old.ReplacedById = next.Id;
@@ -123,8 +153,22 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
          select new CurrentUserDto(u.Id, u.Email, u.PhoneNumber, u.FullName, u.OrganizationId, o.Name, u.Role)).SingleOrDefaultAsync(ct) ?? throw AppException.Unauthorized();
     public async Task<CurrentUserDto> UpdateAsync(Guid userId, NameRequest r, CancellationToken ct)
     {
-        var u = await users.FindByIdAsync(userId.ToString()) ?? throw AppException.Unauthorized();
-        u.FullName = r.FullName.Trim(); u.UpdatedAtUtc = Now; Check(await users.UpdateAsync(u)); return await GetAsync(userId, ct);
+        if (r.OrganizationName is not null && string.IsNullOrWhiteSpace(r.OrganizationName))
+            throw AppException.Invalid("invalid_organization_name");
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var u = await LockUser(userId, ct) ?? throw AppException.Unauthorized();
+        if (r.OrganizationName is not null)
+        {
+            if (u.Role != OrganizationRole.Owner) throw new AppException(403, "forbidden", "Owner access required.");
+            var org = await db.Organizations.SingleOrDefaultAsync(x => x.Id == u.OrganizationId, ct)
+                ?? throw new AppException(404, "not_found", "Organization not found.");
+            org.Name = r.OrganizationName.Trim();
+            org.UpdatedAtUtc = Now;
+        }
+        u.FullName = r.FullName.Trim(); u.UpdatedAtUtc = Now;
+        Check(await users.UpdateAsync(u));
+        await tx.CommitAsync(ct);
+        return await GetAsync(userId, ct);
     }
     private Task<ApplicationUser?> LockUser(Guid id, CancellationToken ct) => db.Users.FromSqlInterpolated($"SELECT * FROM \"AspNetUsers\" WHERE \"Id\" = {id} FOR UPDATE").SingleOrDefaultAsync(ct);
     private Task<int> Revoke(Guid userId, Guid? family, CancellationToken ct) => db.RefreshTokens.Where(x => x.UserId == userId && (!family.HasValue || x.FamilyId == family) && x.RevokedAtUtc == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAtUtc, Now), ct);
@@ -132,7 +176,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
     {
         var raw = TokenSecrets.Create(); var expires = Now.AddMinutes(Settings.AccessMinutes); var refreshExpires = Now.AddDays(Settings.RefreshDays);
         db.RefreshTokens.Add(new RefreshToken { UserId = u.Id, FamilyId = family, Hash = TokenSecrets.Hash(raw), CreatedAtUtc = Now, ExpiresAtUtc = refreshExpires });
-        var claims = new[] { new Claim("sub", u.Id.ToString()), new Claim("org", u.OrganizationId.ToString()), new Claim("role", u.Role.ToString()), new Claim("jti", Guid.NewGuid().ToString()) };
+        var claims = new[] { new Claim("sub", u.Id.ToString()), new Claim("org", u.OrganizationId.ToString()), new Claim("role", u.Role.ToString()), new Claim("jti", Guid.NewGuid().ToString()), new Claim("account_stamp", u.SecurityStamp ?? "") };
         var jwt = new JwtSecurityToken(Settings.Issuer, Settings.Audience, claims, Now.UtcDateTime, expires.UtcDateTime, new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Settings.SigningKey)), SecurityAlgorithms.HmacSha256));
         return new(new JwtSecurityTokenHandler().WriteToken(jwt), expires, raw, refreshExpires);
     }

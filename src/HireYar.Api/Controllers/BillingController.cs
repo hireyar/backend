@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
-[ApiController, Route("api/billing"), Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Owner,Recruiter")]
+[ApiController, Route("api/billing"), Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Owner")]
 public sealed class BillingController(ICurrentUser user, BillingQueryService query, WalletService wallet, PaymentService payments, BillingPanelService panel) : ControllerBase
 {
     [HttpGet("panel")] public Task<BillingPanelDto> Panel(CancellationToken ct) => panel.OverviewAsync(user.OrganizationId, User.IsInRole("Owner"), ct);

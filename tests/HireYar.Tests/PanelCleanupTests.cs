@@ -73,7 +73,7 @@ public sealed class PanelCleanupTests(ApiFixture f)
     {
         var owner = await f.RegisterOwner(); Guid org = default;
         await f.Db(async db => org = (await db.Users.FindAsync(owner.Id))!.OrganizationId);
-        foreach (var role in new[] { OrganizationRole.Owner, OrganizationRole.Recruiter })
+        foreach (var role in new[] { OrganizationRole.Owner })
         {
             await f.Db(async db =>
             {
@@ -89,7 +89,7 @@ public sealed class PanelCleanupTests(ApiFixture f)
         var browser = f.Browser(); await browser.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest("09999999999"));
         await f.Db(async db =>
         {
-            // A legacy recruiter is retained for history, but can never get an OTP session.
+            // Historical inactive recruiters remain blocked until explicit new invitation acceptance.
             db.Users.Add(new ApplicationUser { Id = Guid.NewGuid(), UserName = "09999999999", PhoneNumber = "09999999999", FullName = "Synthetic legacy",
                 OrganizationId = org, Role = OrganizationRole.Recruiter, IsActive = false, CreatedAtUtc = DateTimeOffset.UtcNow, UpdatedAtUtc = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();

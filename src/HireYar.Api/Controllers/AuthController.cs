@@ -20,6 +20,8 @@ public sealed class AuthController(IAccounts service, ICurrentUser user, IWebHos
     public Task<OtpRequestResult> RequestOtp(RequestOtpRequest r, CancellationToken ct) => service.RequestOtpAsync(r, ct);
     [AllowAnonymous, HttpPost("otp/verify")]
     public async Task<AccessResponse> VerifyOtp(VerifyOtpRequest r, CancellationToken ct) => Session(await service.VerifyOtpAsync(r, ct));
+    [AllowAnonymous, HttpPost("team-invitations/{id:guid}/accept")]
+    public async Task<AccessResponse> AcceptTeamInvitation(Guid id, VerifyOtpRequest r, CancellationToken ct) => Session(await service.AcceptTeamInvitationAsync(id, r, ct));
     [AllowAnonymous, HttpPost("refresh")]
     public async Task<AccessResponse> Refresh(CancellationToken ct) => Session(await service.RefreshAsync(Request.Cookies[RefreshCookie] ?? "", ct));
     [AllowAnonymous, HttpPost("logout")]

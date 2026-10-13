@@ -4,9 +4,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
-[ApiController, Authorize(Roles = "Owner")]
+[ApiController, Authorize(Roles = "Owner,Recruiter")]
 public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel, InterviewReportService reports, InterviewReviewService reviews) : ControllerBase
 {
+    [Authorize(Roles = "Owner")]
     [HttpPost("api/interviews/{id:guid}/evaluation-report")]
     public async Task<IActionResult> GenerateReport(Guid id, CancellationToken ct) => Accepted(
         $"/api/interviews/{id}/evaluation-report/status", await reports.RetryAsync(id, null, ct));
@@ -34,6 +35,7 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return Content(InterviewReportPrint.Render(report, await reviews.GetAsync(id, ct)), "text/html; charset=utf-8");
     }
+    [Authorize(Roles = "Owner")]
     [HttpPost("api/interviews/{id:guid}/evaluation-report/regenerate")]
     public async Task<IActionResult> RegenerateReport(Guid id, GenerateInterviewReportRequest r, CancellationToken ct) => Accepted(
         $"/api/interviews/{id}/evaluation-report/status", await reports.RetryAsync(id, r, ct));
@@ -48,6 +50,7 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
         var media = await reviews.OpenSegmentAsync(id, number, ct);
         return PrivateVideo(media.Content, media.ContentType, $"recording-{id:N}-{number}", download, media.ContentHash);
     }
+    [Authorize(Roles = "Owner")]
     [HttpPost("api/interviews/{id:guid}/decisions")]
     public Task<InterviewReviewEntryDto> Decide(Guid id, InterviewHumanDecisionRequest r, CancellationToken ct) => reviews.DecideAsync(id, r, ct);
     [HttpGet("api/interviews/{id:guid}/recording/video")]

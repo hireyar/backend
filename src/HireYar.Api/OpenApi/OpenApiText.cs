@@ -3,9 +3,9 @@ namespace HireYar.Api.OpenApi;
 internal static class OpenApiText
 {
     public const string Introduction = """
-        **ورود با موبایل:** `GET /api/auth/csrf` ← `POST /api/auth/otp/request` ← دریافت پیامک ← `POST /api/auth/otp/verify`. اگر موبایل حسابی نداشته باشد، حساب Owner و سازمان اولیه ساخته می‌شود؛ نام سازمان را با `PUT /api/organization` تکمیل کنید. API key و نام قالب VerifyLookup کاوه‌نگار باید در تنظیمات محرمانه محیط باشند.
+        **ورود با موبایل:** `GET /api/auth/csrf` ← `POST /api/auth/otp/request` ← دریافت پیامک ← `POST /api/auth/otp/verify`. اگر موبایل حسابی نداشته باشد و دعوت تیم باز نداشته باشد، حساب Owner و سازمان اولیه ساخته می‌شود؛ موبایل دعوت‌شده باید مسیر پذیرش صریح دعوت را طی کند؛ نام سازمان را با `PUT /api/organization` تکمیل کنید. API key و نام قالب VerifyLookup کاوه‌نگار باید در تنظیمات محرمانه محیط باشند.
 
-        **هر سازمان یک حساب مالک دارد؛ ورود فقط با موبایل و OTP است.**
+        **هر سازمان یک مالک دارد و می‌تواند زیرمجموعه Recruiter را با موبایل دعوت کند؛ ورود هر دو نقش با OTP است.** پذیرش دعوت با `POST /api/auth/team-invitations/{id}/accept` و OTP همان موبایل، بدون ساخت سازمان/هدیه جدید انجام می‌شود. مدیریت تیم، سازمان و امور مالی فقط مالک است؛ `docs/TEAM_MOBILE_API.md` قرارداد جاری دعوت است.
 
         **سوپرادمین:** ورود مستقل با موبایل/رمز و کپچا در `/api/admin/auth/login`؛ endpointهای auth هدر `X-Admin-Entry` می‌خواهند. توکن SuperAdmin کوتاه‌مدت و مستقل از توکن پنل سازمان است؛ قرارداد `docs/SUPER_ADMIN_API.md` مرجع اتصال صفحهٔ `/admin/{randomkey}` فرانت است.
 
@@ -17,6 +17,12 @@ internal static class OpenApiText
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("TeamMembers", "Members") => "فهرست اعضای سازمان جاری؛ فقط مالک",
+        ("TeamMembers", "Invitations") => "فهرست و وضعیت دعوت‌های موبایلی سازمان جاری",
+        ("TeamMembers", "Invite") => "ثبت دعوت سه‌روزه زیرمجموعه با شماره موبایل",
+        ("TeamMembers", "Cancel") => "لغو دعوت موبایلی سازمان جاری",
+        ("TeamMembers", "Deactivate") => "غیرفعال‌سازی زیرمجموعه و ابطال نشست‌ها",
+        ("Auth", "AcceptTeamInvitation") => "پذیرش صریح دعوت سازمان با OTP همان موبایل",
         ("AdminAuth", "Entry") => "بررسی کلید خصوصی مسیر ورود سوپرادمین",
         ("AdminAuth", "Captcha") => "دریافت کپچای تصویری یک‌بارمصرف سوپرادمین",
         ("AdminAuth", "Login") => "ورود مستقل سوپرادمین با موبایل، رمز و کپچا",

@@ -2254,7 +2254,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId")
                         .IsUnique()
-                        .HasFilter("\"IsActive\" = TRUE");
+                        .HasFilter("\"IsActive\" = TRUE AND \"Role\" = 'Owner'");
 
                     b.HasIndex("PhoneNumber")
                         .IsUnique()
@@ -2264,8 +2264,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("AspNetUsers", null, t =>
                         {
-                            t.HasCheckConstraint("CK_User_ActiveOwner", "NOT \"IsActive\" OR \"Role\" = 'Owner'");
-
                             t.HasCheckConstraint("CK_User_Role", "\"Role\" IN ('Owner','Recruiter')");
                         });
                 });
@@ -2349,6 +2347,50 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "FamilyId");
 
                     b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("HireYar.Infrastructure.Members.MobileTeamInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Mobile")
+                        .IsRequired()
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Mobile")
+                        .IsUnique()
+                        .HasFilter("\"AcceptedAtUtc\" IS NULL AND \"CancelledAtUtc\" IS NULL");
+
+                    b.HasIndex("OrganizationId", "CreatedAtUtc");
+
+                    b.ToTable("MobileTeamInvitations", t =>
+                        {
+                            t.HasCheckConstraint("CK_MobileTeamInvitation_Expiry", "\"ExpiresAtUtc\" > \"CreatedAtUtc\"");
+
+                            t.HasCheckConstraint("CK_MobileTeamInvitation_Mobile", "\"Mobile\" ~ '^09[0-9]{9}$'");
+
+                            t.HasCheckConstraint("CK_MobileTeamInvitation_State", "\"AcceptedAtUtc\" IS NULL OR \"CancelledAtUtc\" IS NULL");
+                        });
                 });
 
             modelBuilder.Entity("HireYar.Infrastructure.Members.TeamInvitation", b =>
@@ -3022,6 +3064,15 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Infrastructure.Auth.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Infrastructure.Members.MobileTeamInvitation", b =>
+                {
+                    b.HasOne("HireYar.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

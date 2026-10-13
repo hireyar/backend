@@ -21,9 +21,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<ApplicationUser
         b.HasIndex(x => x.PhoneNumber).IsUnique().HasFilter("\"PhoneNumber\" IS NOT NULL");
         b.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
         b.HasIndex(x => x.NormalizedEmail).IsUnique(); b.HasIndex(x => new { x.OrganizationId, x.IsActive });
-        b.HasIndex(x => x.OrganizationId).IsUnique().HasFilter("\"IsActive\" = TRUE");
+        b.HasIndex(x => x.OrganizationId).IsUnique().HasFilter("\"IsActive\" = TRUE AND \"Role\" = 'Owner'");
         b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
-        b.ToTable(t => { t.HasCheckConstraint("CK_User_Role", "\"Role\" IN ('Owner','Recruiter')"); t.HasCheckConstraint("CK_User_ActiveOwner", "NOT \"IsActive\" OR \"Role\" = 'Owner'"); });
+        b.ToTable(t => { t.HasCheckConstraint("CK_User_Role", "\"Role\" IN ('Owner','Recruiter')"); });
     }
 }
 public sealed class OtpChallengeConfiguration : IEntityTypeConfiguration<OtpChallenge>
@@ -105,5 +105,22 @@ public sealed class InvitationConfiguration : IEntityTypeConfiguration<TeamInvit
         b.Property(x => x.TokenHash).HasMaxLength(64).IsUnicode(false).IsRequired(); b.HasIndex(x => x.TokenHash).IsUnique();
         b.HasIndex(x => new { x.OrganizationId, x.NormalizedEmail }).IsUnique().HasFilter("\"AcceptedAtUtc\" IS NULL AND \"CancelledAtUtc\" IS NULL");
         b.HasIndex(x => new { x.OrganizationId, x.ExpiresAtUtc }); b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
+    }
+}
+
+public sealed class MobileTeamInvitationConfiguration : IEntityTypeConfiguration<MobileTeamInvitation>
+{
+    public void Configure(EntityTypeBuilder<MobileTeamInvitation> b)
+    {
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Mobile).HasMaxLength(11).IsRequired();
+        b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
+        b.HasIndex(x => new { x.OrganizationId, x.CreatedAtUtc });
+        b.HasIndex(x => x.Mobile).IsUnique().HasFilter("\"AcceptedAtUtc\" IS NULL AND \"CancelledAtUtc\" IS NULL");
+        b.ToTable(t => {
+            t.HasCheckConstraint("CK_MobileTeamInvitation_Mobile", "\"Mobile\" ~ '^09[0-9]{9}$'");
+            t.HasCheckConstraint("CK_MobileTeamInvitation_Expiry", "\"ExpiresAtUtc\" > \"CreatedAtUtc\"");
+            t.HasCheckConstraint("CK_MobileTeamInvitation_State", "\"AcceptedAtUtc\" IS NULL OR \"CancelledAtUtc\" IS NULL");
+        });
     }
 }
