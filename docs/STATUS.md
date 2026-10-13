@@ -1,3 +1,23 @@
+## پیاده‌سازی Gemini TTS با حفظ provider — 2026-10-13: Verified محلی و smoke واقعی
+
+طبق درخواست جدید، Liara/Gemini از audio/speech خروجی PCM می‌گیرد و Infrastructure آن را با FFmpeg به MP3 واقعی تبدیل می‌کند؛ انتخاب AI:Provider و MP3 قبلی NetArz/مدل‌های دیگر Liara محفوظ‌اند. فقط TtsModel/TtsVoice مشترک Liara به Gemini3.8/Aoede تغییر کردند؛ برابر بودن همه تنظیمات دیگر بدون چاپ مقدار بررسی شد. مسیر encoder محلی در تنظیمات ignored با حفظ تمام داده قبلی اضافه شد؛ Dockerfile ffmpeg نصب می‌کند. سرعت محلی، سقف۱۰MiB، دو ظرفیت، timeout/cancellation/kill، preflight codec قبل از تماس و startup منتخب، و خطاهای typed برقرارند. GEMINI_TTS و ADR-044 مرجع جاری و جایگزین «صرف امکان‌سنجی» پایین هستند.
+
+build نهایی صفر warning/error؛ ۱۹۵/۱۹۵ تست مرتبط موفق، صفر شکست/Skip با PostgreSQL18.6 اختصاصی loopback:55490 و provider مصنوعی، همراه encode/decode واقعی FFmpeg و محدودیت/سرعت/لغو؛ gemini-tts-final.trx. یک smoke واقعی با متن مصنوعی، بدون DB/API host، Liara/Aoede را حدود۴٫۸ثانیه به MP3 قابلdecode با۱۳۵۹۸۰بایت رساند؛ artifacts/gemini-tts-smoke.mp3. تست طول کوتاه، padding MP3 را لحاظ می‌کند؛ اجرای قبل از آماده‌شدن encoder Skip داشت و ملاک نتیجه نهایی بدونSkip است. کیفیت/تأخیر همه متن‌ها، image Docker واقعی و مقصد تأیید نشده‌اند؛ migration، push/deploy/production و داده واقعی تغییر نکردند. تغییرات بررسی سؤال محفوظ‌اند.
+
+## امکان‌سنجی Gemini TTS در لیارا — 2026-10-13
+
+درخواست صرفاً بررسی امکان و نیاز به تغییر بود. [مستندات رسمی لیارا](https://docs.liara.ir/ai/google-gemini/) مدل google/gemini-3.8-flash-tts و voice=Aoede را با audio/speech و خروجی PCM پشتیبانی می‌کند. adapter موجود همان مسیر را دارد، ولی MP3 می‌خواهد، امضای MP3 را بررسی و audio/mpeg تحویل می‌دهد؛ cache و endpointهای صوت هم MIME را MP3 فرض می‌کنند. تغییر مدل/صدا به‌تنهایی کافی نیست. برای حفظ قرارداد فعلی، تبدیل PCM به MP3 در Infrastructure و فراهم‌کردن encoder در runtime لازم است؛ گزینه WAV تغییر MIME و metadata می‌خواهد. بررسی کامل و محدودیت speed در HANDOFF ثبت شد.
+
+کد، تنظیمات، secret و داده مقصد تغییر نکردند؛ درخواست واقعی به Liara/تولید صوت/هزینه provider یا انتشار انجام نشد. build بدون warning/error و ۴۱/۴۱ InterviewProviderTests موفق، صفر شکست یا Skip؛ tests/HireYar.Tests/TestResults/gemini-tts-feasibility.trx. این تست‌ها رفتار فعلی و provider مصنوعی را بررسی می‌کنند و اثبات خروجی واقعی Gemini نیستند. تغییرات موجود بررسی سؤال حفظ شدند.
+
+## بررسی پیام ناقص‌بودن سؤال‌ها در فرانت — 2026-10-13
+
+روی dev پاک پس از commit قبلی reports، قرارداد و کد هر دو question-suggestions بررسی شد. level رشته کوچک easy/medium/hard؛ هر موضوع دقیقاً سه سطح یکتا با متن غیرخالی دارد و خروجی ناقص مدل با502 رد می‌شود. شمارنده‌های بانک T/3T/2T و endpoint تک‌موضوعی1/3/2 هستند؛ interviewQuestionCount سقف مصاحبه است و با شمار بانک برابر نیست. ترتیب سؤال‌ها تضمین نیست و mapper باید از level استفاده کند. نقص runtime در این فیلدها پیدا نشد؛ علت پیام فرانت بدون JSON مقصد و validator Angular قطعی نیست. درخواست JSON پالایش‌شده به کاربر داده شد؛ endpoint مقصد/داده واقعی/AI واقعی بررسی نشد.
+
+دو تست HTTP خام برای levels، شمارنده‌های۵/۷/۱۰/پیش‌فرض و تک‌موضوع، ترتیب معکوس و رد کمبود/تکرار/حروف بزرگ/عدد/null/متن خالی اضافه شد. تست قدیمی guard سیاست متوسط، به SQL واقعی Down همان migration محدود شد تا guard جدید گزارش مانع بررسی مستقل آن نشود؛ هیچ داده گزارش حذف و محافظی ضعیف نشد. runtime/schema/config تغییر نکردند؛ ADVANCED_QUESTIONS_API توضیح تفاوت شمارنده‌ها و اعتبارسنجی تک‌موضوع را دارد.
+
+اعتبارسنجی نهایی این بررسی: build بدون warning/error؛ ۵۵/۵۵ تست AdvancedQuestionTests، InterviewProviderTests و TrialPackageAccessTests موفق، صفر شکست یا Skip، با PostgreSQL18.6 اختصاصی loopback:55489 و provider مصنوعی. نتیجه: tests/HireYar.Tests/TestResults/question-suggestion-wire-final.trx. اجرای میانی فقط به انتظار قدیمی guard migration برخورد کرد؛ نتیجه نهایی پس از جداسازی محافظ‌ها ملاک است. suite کامل و مقصد واقعی بررسی نشدند.
+
 ## چرخه خودکار گزارش — 2026-10-13: Verified بک‌اند محلی
 
 روی dev با Git پاک، کد علت GET404 را تأیید کرد: completion گزارش را شروع نمی‌کرد؛ POST تولید را همزمان با HTTP انجام می‌داد، failure فقط lease را پاک و GET بدونResultJson404 می‌داد. report_processing فقط در POST و handler HTTP/body یکسان بود؛ mismatch404/409 مقصد بدون نسخه مستقر/لاگ پراکسی هنوز تأیید نشده است.

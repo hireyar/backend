@@ -6,7 +6,7 @@ using HireYar.Application.Interviews;
 using Microsoft.Extensions.Logging;
 namespace HireYar.Infrastructure.Interviews;
 
-public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiInterviewOptions config, ILogger logger, string providerName)
+public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiInterviewOptions config, ILogger logger, string providerName, IPcmSpeechEncoder? encoder = null)
     : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IInterviewReportProvider
 {
     public async Task<InterviewDecisionResult> GenerateReportAsync(InterviewReportContext context, CancellationToken ct)
@@ -26,6 +26,8 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
         { throw new InterviewProviderException("report_invalid_response"); }
     }
     public SpeechProfile Profile => new(config.TtsModel, config.TtsVoice, config.TtsSpeed);
+    internal static bool RequiresPcmEncoding(string provider, string model) => provider == "Liara" &&
+        model.StartsWith("google/gemini-", StringComparison.OrdinalIgnoreCase) && model.Contains("-tts", StringComparison.OrdinalIgnoreCase);
     public async Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct)
     {
         using var form = new MultipartFormDataContent();
@@ -98,13 +100,25 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
     }
     public async Task<TextToSpeechResult> GenerateAsync(string text, CancellationToken ct)
     {
-        using var body = JsonContent.Create(new { model = config.TtsModel, input = text, voice = config.TtsVoice, speed = config.TtsSpeed, response_format = "mp3" });
-        var bytes = await SendAsync("audio/speech", body, "tts", config.TtsModel, config.TtsTimeoutSeconds, 10 * 1024 * 1024, ct);
+        var gemini = RequiresPcmEncoding(providerName, config.TtsModel);
+        if (gemini) {
+            if (encoder is null) throw new InterviewProviderException("tts_encoder_unavailable");
+            await encoder.EnsureAvailableAsync(ct);
+        }
+        // Gemini documents PCM without speed. Apply the existing speed locally during encoding.
+        using var body = gemini
+            ? JsonContent.Create(new { model = config.TtsModel, input = text, voice = config.TtsVoice, response_format = "pcm" })
+            : JsonContent.Create(new { model = config.TtsModel, input = text, voice = config.TtsVoice, speed = config.TtsSpeed, response_format = "mp3" });
+        var bytes = await SendAsync("audio/speech", body, "tts", config.TtsModel, config.TtsTimeoutSeconds, 10 * 1024 * 1024, ct, gemini);
+        if (gemini) {
+            if (bytes.Length < 2 || bytes.Length % 2 != 0) throw new InterviewProviderException("tts_invalid_response");
+            bytes = await encoder!.EncodeAsync(bytes, config.TtsSpeed, ct);
+        }
         if (bytes.Length < 3 || !(bytes.AsSpan(0, 3).SequenceEqual("ID3"u8) || bytes[0] == 0xff && (bytes[1] & 0xe0) == 0xe0))
         { InterviewMetrics.TtsFailure.Add(1); throw new InterviewProviderException("tts_invalid_response"); }
         return new(bytes, "audio/mpeg");
     }
-    private async Task<byte[]> SendAsync(string path, HttpContent body, string operation, string model, int timeoutSeconds, int maxBytes, CancellationToken ct)
+    private async Task<byte[]> SendAsync(string path, HttpContent body, string operation, string model, int timeoutSeconds, int maxBytes, CancellationToken ct, bool pcm = false)
     {
         var watch = Stopwatch.StartNew(); int? status = null; string outcome = "success";
         var operationId = Guid.NewGuid().ToString("N");
@@ -127,6 +141,9 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             status = (int)response.StatusCode;
             if (!response.IsSuccessStatusCode) throw new InterviewProviderException($"{operation}_http_{status}");
+            if (pcm && response.Content.Headers.ContentType?.MediaType is { } mediaType &&
+                (mediaType.Contains("json", StringComparison.OrdinalIgnoreCase) || mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)))
+                throw new InterviewProviderException("tts_invalid_response");
             await using var source = await response.Content.ReadAsStreamAsync(timeout.Token);
             using var target = new MemoryStream(); var buffer = new byte[8192]; int read;
             while ((read = await source.ReadAsync(buffer, timeout.Token)) != 0)

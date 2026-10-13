@@ -1,3 +1,9 @@
+## ADR-044 — Gemini TTS با حفظ انتخاب provider و MP3 (2026-10-13)
+
+طبق درخواست پیاده‌سازی و تأکید بعدی کاربر، AI:Provider و adapterهای مستقل قبلی حفظ شدند. فقط Liara با مدل google/gemini-*-tts مسیر PCM دارد؛ NetArz و مدل‌های MP3 قبلی Liara ثابت‌اند. تنظیم مشترک Liara TtsModel و TtsVoice به Gemini3.8/Aoede تغییر کرد؛ مدل‌های STT/مصاحبه/گزارش، URL، credential و سایر مقادیر بدون تغییر تأیید شدند. PCM16LE/24kHz/mono در Infrastructure با FFmpeg به MP3 واقعی تبدیل می‌شود؛ speed قبلی با atempo محلی، نه پارامتر تأییدنشده upstream. Application/Domain/API و cache همچنان MP3 هستند؛ migration و تغییر Angular نداریم.
+
+encoder singleton با دو ظرفیت و process یک-thread، سقف۱۰MiB ورودی/خروجی، deadline شامل انتظار، pipes بدون shell/PCM temp، stderr بدون ذخیره/لاگ، cancellation و kill/cleanup محدود دارد. probe codec مصنوعی قبل از تماس هزینه‌دار و startup فقط برای Liara/Gemini؛ شکست typed و رفتار قبلی نبود صوت، بدون جابه‌جایی خودکار provider یا صدای ساختگی. cache identity مدل/صدا/سرعت قبلی نتیجه تازه می‌سازد و داده قدیمی محفوظ است. Docker runtime دارای ffmpeg و مسیر توسعه فقط در config ignored است؛ مستند GEMINI_TTS قرارداد اجرا و محدودیت اعتبارسنجی را ثبت می‌کند. انتشار انجام نشده است.
+
 ## ADR-043 — تولید خودکار گزارش و retry فقط پس از شکست (2026-10-13)
 
 طبق درخواست صریح کاربر، رفتار on-demand/synchronous در ADR-026 و بازتولید گزارش موفق در ADR-031 تغییر می‌کند: completion خودکار/دستی برای قرارداد snapshot دارای interview_report، رکورد Queued را در همان تراکنش تسویه/پایان ثبت می‌کند. یک worker ساده Infrastructure مستقل از recovery پاسخ، polling دوثانیه‌ای و concurrency حداکثر۴ دارد؛ صف همان جدول گزارش PostgreSQL است، بدون Repository/زیرساخت توزیع‌شده. تماس مدل همان یک تماس تمام تاریخچه و network خارج transaction؛ مدل/timeout/provider/محافظ شواهد و فرمول v3 محفوظ‌اند.

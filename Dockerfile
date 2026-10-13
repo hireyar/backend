@@ -3,6 +3,7 @@ WORKDIR /source
 COPY . .
 RUN dotnet restore HireYar.slnx && dotnet publish src/HireYar.Api -c Release --no-restore -o /out /p:UseAppHost=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.12 AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /out .
 RUN mkdir -p /keys /app/storage/interviews /app/upload-temp && chown $APP_UID:$APP_UID /keys /app/storage/interviews /app/upload-temp && chmod 700 /app/storage/interviews /app/upload-temp
