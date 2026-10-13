@@ -1,12 +1,14 @@
 # تکمیل بک‌اند گزارش مرجع HTML — 2026-10-10
 
+چرخه جاری 2026-10-13 در [INTERVIEW_REPORT_LIFECYCLE_API](INTERVIEW_REPORT_LIFECYCLE_API.md): completion صف خودکار، POST فقط retry پس از شکست با HTTP202، status مرحله/علت شکست/امکان retry؛ schema و فرمول report-v3 پایین محفوظ‌اند.
+
 تأیید محلی نهایی: build بدون warning/error و ۲۵۰/۲۵۰ تست suite کامل روی PostgreSQL 18 اختصاصی، صفر شکست/Skip؛ `tests/HireYar.Tests/TestResults/report-v3-verified.trx`. model drift=false، constraint سازمانی و محافظ downgrade واقعی آزموده شدند؛ SQL idempotent کامل دوبار روی scratch و یک migration history entry تأیید شد. provider و رسانه آزمون مصنوعی بودند؛ AI/ضبط واقعی و frontend مقصد تأیید نشده‌اند.
 
 این قرارداد افزوده report-v3 است؛ Angular در ریپوی جدا است. HTML ارائه‌شده مرجع محصول است، پرامپت و یادداشت‌های داخل آن دستور اجرایی مستقل نیستند. یک تماس مدل گزارش برای تمام ارزیابی‌ها حفظ شد؛ تماس به‌ازای هر سؤال و جدول موازی نمرات اضافه نشد. JSONB موجود خروجی کامل را ذخیره می‌کند. مدل‌ها، کلیدها، پرداخت و نمرات زنده تغییر نکردند.
 
 ## گزارش و محاسبه
 
-GET/POST `/api/interviews/{id}/evaluation-report` همان مسیر قبلی‌اند. POST موفق تکراری گزارش cached v1/v2/v3 را حفظ می‌کند. برای تولید نسخه جدید یا اعمال وزن‌ها، Owner صریحاً POST `/api/interviews/{id}/evaluation-report/regenerate` با بدنه زیر می‌فرستد:
+GET `/api/interviews/{id}/evaluation-report` گزارش cached v1/v2/v3 را حفظ می‌کند. POST فقط پس از شکست مجاز است. Owner هنگام retry می‌تواند POST `/api/interviews/{id}/evaluation-report/regenerate` با بدنه زیر بفرستد:
 
 ```json
 { "topicWeights": { "SQL": 2, "Linux": 1 }, "reviewThreshold": 70 }
@@ -16,7 +18,7 @@ GET/POST `/api/interviews/{id}/evaluation-report` همان مسیر قبلی‌�
 
 `details.overallScore = sum(answerScore*topicWeight)/sum(topicWeight)*20` با گردکردن دو رقم؛ فقط پاسخ‌های نهایی ارزیابی‌شده در مخرج‌اند. وزن هر پاسخ وزن موضوع آن است. topics همچنان میانگین نمره همان موضوع هستند؛ در مسیر موضوعی یک سؤال، همان نمره سؤال. `topicWeights`، `scoreFormula` و `reviewThreshold` در details موجودند. نمره زیر آستانه فقط requiresHumanReview را true می‌کند؛ به تصمیم عبور/رد خودکار منجر نمی‌شود. excellent/good/weak و aboveThresholdPercent همچنان آستانه سؤال ۳ از ۵ دارند و با آستانه کل گزارش متفاوت‌اند.
 
-بازتولید زیر lease موجود است؛ POST regenerate همزمان 409 می‌دهد. GET و POST cached حین بازتولید گزارش قبلی را می‌دهند؛ شکست، cancellation یا lease کهنه آن را حذف نمی‌کند. فقط نتیجه معتبر generator جاری جایگزین می‌شود؛ زمان/model/version جدید ثبت می‌شوند. report قبلی به‌صورت نسخه تاریخی جدا آرشیو نمی‌شود، اما سابقه تصمیم انسانی مستقل و محفوظ است.
+retry زیر lease موجود است؛ POST در صف/پردازش/موفقیت409 می‌دهد. GET cached هنگام بازیابی تلاش تاریخی ناموفق گزارش قبلی را می‌دهد؛ شکست، cancellation یا lease کهنه آن را حذف نمی‌کند. فقط نتیجه معتبر generator جاری جایگزین می‌شود؛ زمان/model/version جدید ثبت می‌شوند. گزارش قبلی جدا آرشیو نمی‌شود، سابقه تصمیم انسانی محفوظ است.
 
 `content.metrics` و `details.metrics` شامل code، score صحیح nullable ۰–۵، confidence nullable ۰–۱، explanation و evidence از `{answerId,quote}` هستند. برای نمودار، score را ×۲۰ کنید. تمام کدهای مربوط به نوع مصاحبه دقیقاً یک بار لازم‌اند. نمره غیر null به نقل‌قول دقیق پاسخ نهایی همان جلسه نیاز دارد؛ تعامل صرف، ID/quote ساختگی، کد اضافی/تکراری، confidence نامعتبر و نمره بدون شاهد رد می‌شوند. بدون شواهد score/confidence=null، evidence=[] و explanation درباره محدودیت است؛ صفر جایگزین نامشخص نیست.
 

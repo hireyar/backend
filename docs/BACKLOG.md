@@ -1,3 +1,9 @@
+## چرخه گزارش و شفافیت وضعیت — 2026-10-13
+
+بک‌اند روی dev محلی تأیید شد: شروع خودکار بعد از completion، صف و worker، مراحل ماندگار، علت و مرحله شکست، retry فقط در Failed، API وضعیت و رفع GET404 برای گزارش آماده‌نشده. ADR-043 و INTERVIEW_REPORT_LIFECYCLE_API مرجع جاری و جایگزین تولید همزمان و بازتولید گزارش موفق تاریخی هستند. build بدون warning/error و ۲۰۶ تست مرتبط PostgreSQL موفق، بدون شکست یا Skip؛ report-lifecycle-final.trx.
+
+باقی برای محصول: Angular جدا باید هر سه ثانیه status را تا موفقیت یا شکست بخواند، message و مرحله را نمایش دهد، دکمه را از canRetry کنترل و POST202 را به polling وصل کند. پس از refresh از status ادامه دهد و گزارش آماده را از GET بخواند. انتشار مستقل به migration20261013054737_AddReportGenerationLifecycle پیش از نسخه جدید، restart و بررسی نسخه و وضعیت HTTP در پراکسی مقصد نیاز دارد؛ آزمون واقعی تأخیر و کیفیت provider و ظرفیت صف باقی است. این موارد انجام نشده و backlog مجوز push/deploy نیست. تنظیمات و داده مقصد محفوظ‌اند؛ منشأ HTTP404 همراه body409 مقصد قطعی نیست.
+
 ## سوپرادمین محدود به ورود و مدیریت پکیج — 2026-10-12
 
 درخواست بک‌اند روی `codex/super-admin` از `dev`: Verified محلی؛ ورود password+PNG CAPTCHA، کلید appsettings و entry=404 نامعتبر، JWT مستقل و DB permission/stamp/lockout، CLI تعاملی provisioning، همان API پویا و RowVersion قیمت‌گذاری. [SUPER_ADMIN_API](SUPER_ADMIN_API.md) و ADR-039 مرجع‌اند. schema/Repository/عضویت چندسازمانی اضافه نشده؛ سوابق مالی snapshot محفوظ‌اند.

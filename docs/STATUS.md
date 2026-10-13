@@ -1,3 +1,11 @@
+## چرخه خودکار گزارش — 2026-10-13: Verified بک‌اند محلی
+
+روی dev با Git پاک، کد علت GET404 را تأیید کرد: completion گزارش را شروع نمی‌کرد؛ POST تولید را همزمان با HTTP انجام می‌داد، failure فقط lease را پاک و GET بدونResultJson404 می‌داد. report_processing فقط در POST و handler HTTP/body یکسان بود؛ mismatch404/409 مقصد بدون نسخه مستقر/لاگ پراکسی هنوز تأیید نشده است.
+
+طبق درخواست، completion خودکار/دستی صف durable را در تراکنش موجود ثبت می‌کند؛ worker مستقل با۴ظرفیت و polling۲ثانیه، مراحل/زمان‌ها/attempts/failureStage/code امن، status سبک/message فارسی/canRetry. GET pending202 و failure200 status، cached200 قبلی؛ POSTها فقط retryFailed با202 و صف/پردازش/موفقیت409. failure/expiry بدون retry خودکار، stale generator/deletion محفوظ؛ migration20261013054737_AddReportGenerationLifecycle لازم است. ADR-043 و INTERVIEW_REPORT_LIFECYCLE_API قرارداد جاری‌اند.
+
+tool restore/restore موفق؛ build نهایی صفرwarning/error؛ **۲۰۶/۲۰۶ تست مرتبط موفق، صفرFailed/Skipped** روی PostgreSQL18.6 اختصاصی loopback:55488، مدل/STT/TTS مصنوعی؛ tests/HireYar.Tests/TestResults/report-lifecycle-final.trx. worker واقعی بدونPOST، completion خودکار/دستی، شکستvalidator/timeout، cancellation/expiry، رقابتworker/retry، stale/deletion/scope، حفظcached/settings و migration backfill/idempotent دوبار/guardDown/modeldrift بررسی شدند. اجرای میانی یک انتظار نادرست200 به‌جای410 completionتکراری داشت و assertion analyzer اصلاح شد؛ نتیجه بازاجرای نهایی ملاک است. suite کامل تکرار نشد؛ AIواقعی/latency مقصد/Angular تأیید نشده‌اند. تنظیمات/secret، DB مقصد، commit/push/deploy/production تغییر نکردند.
+
 ## سوپرادمین، ورود و کلید مسیر — 2026-10-12
 
 روی `codex/super-admin` از `dev` پاک، بک‌اند ورود اختصاصی موبایل/رمز/CAPTCHA، header کلید entry و scheme/audience مستقل ادمین اضافه شد. IsSystemAdmin فعلی DB و API مدیریت پکیج‌ها/دوره‌ها/قیمت/اعتبار حفظ شدند؛ HR token حتی برای حساب ادمین دیگر به endpoint admin نمی‌رسد. key اشتباه/خاموش auth=404، check stamp/مجوز/active/lockout در هر درخواست و خروج ابطال همه نشست‌های ادمین؛ پنج شکست رمز قفل۱۵دقیقه. provisioning فرمان تعاملی محلی روی حساب موجود، hash استاندارد Identity و transaction دارد. ADR-039 و [SUPER_ADMIN_API](SUPER_ADMIN_API.md) قرارداد جاری‌اند.
