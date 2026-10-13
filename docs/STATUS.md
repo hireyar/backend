@@ -1,3 +1,9 @@
+## قالب فارسی ایمیل دعوت — 2026-10-13: Verified محلی
+
+ایمیل سادهٔ دعوت با HTML فارسی/RTL، Tahoma (متن14px/line-height28px؛ عنوان22px و موبایل20px)، کارت سفید، دکمهٔ سرمه‌ای، کد شش‌رقمی LTR با حفظ صفر آغازین و لینک جایگزین تکمیل شد. لوگوی موجود HireYar و رنگ‌های navy/teal/mint از بستهٔ محلی hireyar-angular-landing-complete.zip خوانده شدند؛ منبع، لندینگ و mockup داخل آن است، نه کد داشبورد Angular جاری که در این ریپو نیست. لوگو PNG embedded/CID و نسخهٔ متنی UTF-8 در multipart/alternative هستند؛ HTML/resource در Infrastructure بسته‌بندی می‌شود. مقادیر پویا HTML-encoded با جایگذاری یک‌باره، لینک فقط HTTP/HTTPS؛ نمایش انقضا شمسی/به وقت تهران و داده/API همچنان UTC هستند.
+
+tool restore/restore و build واقعی با صفر warning/error؛ InvitationNotificationTests: 14/14 موفق، صفر Failed/Skipped، شامل SMTP فقط loopback، MIME متنی/HTML/PNG واقعی، encoding نام/شغل/URL، حفظ کد و مرز روز تهران/استقلال فرهنگ سرور. TRX: tests/HireYar.Tests/TestResults/invitation-email-template.trx. پیش‌نمایش از renderer واقعی با داده مصنوعی در artifacts/invitation-email-preview؛ Chromium در760/390/320px، لوگو loaded و بدون overflow افقی، بازبینی تصویری دسکتاپ/موبایل. Gmail/Outlook واقعی و تطبیق با داشبورد جاری هنوز تأیید نشده‌اند؛ ارسال خارجی، DB/schema/config و push/deploy/production تغییر نکردند.
+
 ## پیاده‌سازی Gemini TTS با حفظ provider — 2026-10-13: Verified محلی و smoke واقعی
 
 طبق درخواست جدید، Liara/Gemini از audio/speech خروجی PCM می‌گیرد و Infrastructure آن را با FFmpeg به MP3 واقعی تبدیل می‌کند؛ انتخاب AI:Provider و MP3 قبلی NetArz/مدل‌های دیگر Liara محفوظ‌اند. فقط TtsModel/TtsVoice مشترک Liara به Gemini3.8/Aoede تغییر کردند؛ برابر بودن همه تنظیمات دیگر بدون چاپ مقدار بررسی شد. مسیر encoder محلی در تنظیمات ignored با حفظ تمام داده قبلی اضافه شد؛ Dockerfile ffmpeg نصب می‌کند. سرعت محلی، سقف۱۰MiB، دو ظرفیت، timeout/cancellation/kill، preflight codec قبل از تماس و startup منتخب، و خطاهای typed برقرارند. GEMINI_TTS و ADR-044 مرجع جاری و جایگزین «صرف امکان‌سنجی» پایین هستند.

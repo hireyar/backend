@@ -66,8 +66,8 @@ public sealed class InterviewInvitationNotifier(HttpClient http, IOptions<Invita
     private static async Task SendEmailAsync(InvitationNotification n, InvitationEmailOptions o, CancellationToken ct)
     {
         using var message = new MailMessage { From = new MailAddress(o.FromAddress, o.FromName),
-            Subject = "دعوت به مصاحبه — HireYar", SubjectEncoding = Encoding.UTF8, BodyEncoding = Encoding.UTF8,
-            Body = $"{n.CandidateName} عزیز،\nبرای مصاحبه موقعیت {n.PositionTitle} دعوت شده‌اید.\nلینک مصاحبه: {n.Invitation.InterviewUrl}\nکد ورود: {n.Invitation.AccessCode}\nمهلت ورود (UTC): {n.Invitation.ExpiresAtUtc:yyyy-MM-dd HH:mm}\n" };
+            Subject = "دعوت به مصاحبه | هایریار", SubjectEncoding = Encoding.UTF8, BodyEncoding = Encoding.UTF8 };
+        InterviewInvitationEmail.Populate(message, n);
         message.To.Add(new MailAddress(n.Email));
         using var smtp = new SmtpClient(o.Host, o.Port) { EnableSsl = o.EnableSsl, UseDefaultCredentials = false,
             Credentials = string.IsNullOrEmpty(o.Username) ? null : new NetworkCredential(o.Username, o.Password) };
