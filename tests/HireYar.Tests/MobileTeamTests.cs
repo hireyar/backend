@@ -204,6 +204,49 @@ public sealed class MobileTeamTests : IAsyncLifetime
         });
     }
     [PostgresFact]
+    public async Task Organization_features_share_current_paid_and_trial_entitlements_without_financial_data()
+    {
+        var owner = await f.RegisterOwner(); var member = await Accept(await Invite(owner, Mobile()));
+        var trialOwner = await f.RegisterOwner(signupTrial: true);
+        var trialMember = await Accept(await Invite(trialOwner, Mobile()));
+        var inactiveResponse = await member.Send(HttpMethod.Get, "/api/organization/features");
+        Assert.Equal(HttpStatusCode.OK, inactiveResponse.StatusCode);
+        var inactive = (await inactiveResponse.Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
+        Assert.False(inactive.HasActiveSubscription); Assert.Empty(inactive.Features); Assert.Null(inactive.ExpiresAtUtc);
+        await f.FundInterviewsAsync(owner);
+        foreach (var pair in new[] { (Owner: owner, Member: member), (Owner: trialOwner, Member: trialMember) })
+        {
+            var response = await pair.Member.Send(HttpMethod.Get, "/api/organization/features?organizationId=" + Guid.NewGuid());
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
+            var features = (await response.Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
+            var subscription = (await (await pair.Owner.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<HireYar.Application.Billing.SubscriptionOverviewDto>(BillingJson.Options))!.Current!;
+            Assert.True(features.HasActiveSubscription);
+            Assert.Equal(subscription.IsTrial, features.IsTrial); Assert.Equal(subscription.ExpiresAtUtc, features.ExpiresAtUtc);
+            Assert.Equal(subscription.Features.Select(x => (x.Code, x.Name, x.DataType, x.Value)), features.Features.Select(x => (x.Code, x.Name, x.DataType, x.Value)));
+            Assert.Contains(features.Features, x => x.Code == "technical_interview");
+            Assert.Contains(features.Features, x => x.Code == "advanced_ai_workflow");
+            var ownerFeatures = (await (await pair.Owner.Client.Send(HttpMethod.Get, "/api/organization/features")).Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
+            Assert.Equal(features.Features, ownerFeatures.Features);
+            var body = await (await pair.Member.Send(HttpMethod.Get, "/api/organization/features")).Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(new[] { "expiresAtUtc", "features", "hasActiveSubscription", "isTrial", "startedAtUtc" }, body.EnumerateObject().Select(x => x.Name).OrderBy(x => x).ToArray());
+            Assert.Equal(HttpStatusCode.Forbidden, (await pair.Member.Send(HttpMethod.Get, "/api/billing/subscription")).StatusCode);
+        }
+        Assert.False((await (await member.Send(HttpMethod.Get, "/api/organization/features")).Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!.IsTrial);
+        Assert.True((await (await trialMember.Send(HttpMethod.Get, "/api/organization/features")).Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!.IsTrial);
+        f.Clock.Offset = TimeSpan.FromDays(400);
+        try
+        {
+            var expiredResponse = await member.Send(HttpMethod.Get, "/api/organization/features");
+            Assert.Equal(HttpStatusCode.OK, expiredResponse.StatusCode);
+            var expired = (await expiredResponse.Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
+            Assert.False(expired.HasActiveSubscription); Assert.Empty(expired.Features); Assert.Null(expired.ExpiresAtUtc);
+        }
+        finally { f.Clock.Offset = TimeSpan.Zero; }
+        Assert.Equal(HttpStatusCode.Unauthorized, (await f.Browser().Send(HttpMethod.Get, "/api/organization/features")).StatusCode);
+
+    }
+    [PostgresFact]
     public async Task Migration_keeps_one_active_owner_and_refuses_downgrade_with_team_history()
     {
         var owner = await f.RegisterOwner(); await Invite(owner, Mobile());

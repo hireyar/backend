@@ -17,6 +17,7 @@ internal static class OpenApiText
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("Organization", "Features") => "قابلیت‌های فعال سازمان برای مالک و زیرمجموعه، بدون اطلاعات مالی",
         ("TeamMembers", "Members") => "فهرست اعضای سازمان جاری؛ فقط مالک",
         ("TeamMembers", "Invitations") => "فهرست و وضعیت دعوت‌های موبایلی سازمان جاری",
         ("TeamMembers", "Invite") => "ثبت دعوت سه‌روزه زیرمجموعه با شماره موبایل",

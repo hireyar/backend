@@ -60,3 +60,7 @@ JOIN "OrganizationSubscriptions" s
 Unique index یک trial در هر سازمان، FK مرکب منع رابطه بین سازمان‌ها، triggerهای immutable و constraint trigger تکمیل grant/ledger در commit اعمال می‌شوند. Down با تاریخچه trial صریحاً رد می‌شود. migration لازم پیش از کد: `20261010132215_AddRegistrationTrial`. اعمال migration مقصد و تغییر Angular این نوبت انجام نشده‌اند.
 
 تست‌های مالی قدیمی برای سناریوی حساب موجود از helper ساخت Owner مصنوعی بدون trial استفاده می‌کنند؛ تست‌های ثبت‌نام واقعی، جریان OTP را در دیتابیس اختصاصی طی می‌کنند. درگاه/AI تست جعلی‌اند؛ SQL واقعی PostgreSQL است.
+
+## خواندن غیرمالی قابلیت‌ها — 2026-10-13
+
+برای فرانت مشترک Owner/Recruiter از GET /api/organization/features استفاده شود؛ hasActiveSubscription/isTrial/startedAtUtc/expiresAtUtc/features در ریشه پاسخ هستند. همان CurrentAsync و snapshot trial/خرید را می‌خواند، بدون کیف‌پول/نرخ/پرداخت. تمام billing همچنان فقط Owner است؛ current.features در مسیرهای billing قبلی برای Owner محفوظ است. پس از انقضا، endpoint جدیدfeatures=[]/hasActiveSubscription=false می‌دهد. TEAM_MOBILE_API قرارداد دقیق و پرامپت اتصال است. این افزودن نیازی به migration یا تنظیمات تازه ندارد.
