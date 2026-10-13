@@ -12,6 +12,9 @@ public static class InterviewDependencyInjection
     {
         services.AddSingleton(config.GetSection("InterviewDiagnostics").Get<InterviewDiagnosticOptions>() ?? new());
         services.AddSingleton<IInterviewDiagnostics, InterviewDiagnostics>();
+        services.AddOptions<SpeechEncodingOptions>().Bind(config.GetSection("SpeechEncoding"))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.FfmpegPath) && o.TimeoutSeconds is >= 1 and <= 120, "Invalid speech encoder configuration.").ValidateOnStart();
+        services.AddSingleton<IPcmSpeechEncoder, FfmpegPcmSpeechEncoder>();
         var provider = config["AI:Provider"] ?? "Disabled";
         if (provider is not ("NetArz" or "Liara" or "Disabled"))
             throw new InvalidOperationException("AI:Provider must be NetArz, Liara or Disabled.");
@@ -24,6 +27,8 @@ public static class InterviewDependencyInjection
                 break;
             case "Liara":
                 ConfigureProvider<LiaraOptions>(services, config, provider);
+                if (OpenAiCompatibleInterviewClient.RequiresPcmEncoding(provider, config["AI:Liara:TtsModel"] ?? new LiaraOptions().TtsModel))
+                    services.AddHostedService<GeminiSpeechStartupCheck>();
                 services.AddHttpClient<LiaraClient>(h => h.Timeout = Timeout.InfiniteTimeSpan).RemoveAllLoggers();
                 RegisterProvider<LiaraClient>(services);
                 break;

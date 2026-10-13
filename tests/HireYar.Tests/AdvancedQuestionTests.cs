@@ -64,6 +64,83 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         return (await response.Content.ReadFromJsonAsync<PanelInvitationResult>())!;
     }
     [PostgresFact]
+    public async Task Suggestion_HTTP_JSON_has_lowercase_levels_complete_banks_and_endpoint_specific_counts()
+    {
+        var (owner, job) = await Setup();
+        foreach (var count in new[] { 5, 7, 10 })
+        {
+            // Deliberately vary model order: consumers must identify questions by level, not index.
+            var generated = FakeQuestionSuggestionProvider.Topics(count);
+            foreach (var topic in generated) topic.Questions.Reverse();
+            f.QuestionAi.Override = JsonSerializer.Serialize(new { topics = generated }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var response = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new QuestionSuggestionRequest(job.Id, count));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            AssertSuggestionWire(json, job.Id, count);
+            Assert.All(json.GetProperty("topics").EnumerateArray(), topic =>
+                Assert.Equal("hard", topic.GetProperty("questions")[0].GetProperty("level").GetString()));
+        }
+        f.QuestionAi.Override = null;
+        var defaultResponse = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new { jobPositionId = job.Id });
+        Assert.Equal(HttpStatusCode.OK, defaultResponse.StatusCode);
+        AssertSuggestionWire(await defaultResponse.Content.ReadFromJsonAsync<JsonElement>(), job.Id, 7);
+        var one = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions/topic", new TopicSuggestionRequest(job.Id, "SQL"));
+        Assert.Equal(HttpStatusCode.OK, one.StatusCode);
+        var single = await one.Content.ReadFromJsonAsync<JsonElement>();
+        AssertSuggestionWire(single, job.Id, 1);
+        Assert.Equal("SQL", single.GetProperty("topics")[0].GetProperty("name").GetString());
+    }
+
+    private static void AssertSuggestionWire(JsonElement json, Guid jobId, int count)
+    {
+        Assert.Equal(jobId, json.GetProperty("jobPositionId").GetGuid());
+        Assert.Equal(count, json.GetProperty("topicCount").GetInt32());
+        Assert.Equal(count * 3, json.GetProperty("bankQuestionCount").GetInt32());
+        Assert.Equal(count * 2, json.GetProperty("interviewQuestionCount").GetInt32());
+        var topics = json.GetProperty("topics"); Assert.Equal(count, topics.GetArrayLength());
+        foreach (var topic in topics.EnumerateArray())
+        {
+            Assert.False(string.IsNullOrWhiteSpace(topic.GetProperty("name").GetString()));
+            var questions = topic.GetProperty("questions"); Assert.Equal(3, questions.GetArrayLength());
+            var levels = questions.EnumerateArray().Select(q => q.GetProperty("level")).ToArray();
+            Assert.All(levels, level => Assert.Equal(JsonValueKind.String, level.ValueKind));
+            Assert.Equal(new[] { "easy", "hard", "medium" }, levels.Select(l => l.GetString()).OrderBy(l => l, StringComparer.Ordinal));
+            Assert.All(questions.EnumerateArray(), question => Assert.False(string.IsNullOrWhiteSpace(question.GetProperty("text").GetString())));
+        }
+    }
+
+    [PostgresFact]
+    public async Task Incomplete_missing_or_wrong_case_levels_never_return_success_on_either_suggestion_endpoint()
+    {
+        var (owner, job) = await Setup();
+        try {
+            foreach (var invalid in new[] { "missing", "duplicate", "uppercase", "numeric", "blank", "null" })
+            {
+                foreach (var single in new[] { false, true })
+                {
+                    var topics = FakeQuestionSuggestionProvider.Topics(single ? 1 : 7);
+                    if (single) topics[0] = topics[0] with { Name = "SQL" };
+                    if (invalid == "missing") topics[0].Questions.RemoveAt(2);
+                    if (invalid == "duplicate") topics[0].Questions[2] = topics[0].Questions[2] with { Level = "easy" };
+                    if (invalid == "uppercase") topics[0].Questions[0] = topics[0].Questions[0] with { Level = "Easy" };
+                    if (invalid == "blank") topics[0].Questions[0] = topics[0].Questions[0] with { Text = " " };
+                    f.QuestionAi.Override = JsonSerializer.Serialize(new { topics }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                    if (invalid == "numeric") f.QuestionAi.Override = f.QuestionAi.Override.Replace("\"level\":\"easy\"", "\"level\":1", StringComparison.Ordinal);
+                    if (invalid == "null") f.QuestionAi.Override = f.QuestionAi.Override.Replace("\"level\":\"easy\"", "\"level\":null", StringComparison.Ordinal);
+                    var response = single
+                        ? await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions/topic", new TopicSuggestionRequest(job.Id, "SQL"))
+                        : await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new QuestionSuggestionRequest(job.Id));
+                    Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+                    var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+                    Assert.Equal(502, problem.GetProperty("status").GetInt32());
+                    Assert.Equal("question_suggestions_invalid", problem.GetProperty("code").GetString());
+                }
+            }
+        }
+        finally { f.QuestionAi.Reset(); }
+    }
+
+    [PostgresFact]
     public async Task Suggestions_use_scoped_JD_support_auto_and_single_topic_and_do_not_save()
     {
         var (owner, job) = await Setup();
@@ -215,13 +292,14 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
                 var policyError = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
                     $"UPDATE \"InterviewSessions\" SET \"AskOneQuestionPerTopic\" = true WHERE \"Id\" = {id}"));
                 Assert.Equal("23514", policyError.SqlState);
-                var downgrade = await Assert.ThrowsAsync<Npgsql.PostgresException>(() =>
-                    db.GetService<IMigrator>().MigrateAsync("20261010054552_AddInterviewReportReview"));
+                // Exercise this migration's real Down SQL directly. Newer report history
+                // has its own guard and must not be removed to reach the older policy guard.
+                var downgradeScript = db.GetService<IMigrator>().GenerateScript(
+                    "20261010085424_AddMediumFirstTopicQuestions", "20261010075455_AddProgressiveTopicQuestions", MigrationsSqlGenerationOptions.NoTransactions);
+                var downgrade = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.Database.ExecuteSqlRawAsync(downgradeScript));
                 Assert.Equal("P0001", downgrade.SqlState); Assert.Contains("persisted answer assessments", downgrade.MessageText);
                 Assert.Contains("20261010085424_AddMediumFirstTopicQuestions", await db.Database.GetAppliedMigrationsAsync());
-                // Newer reversible migrations may already have been rolled back before
-                // this older guard rejects downgrade. Restore the shared fixture schema.
-                await db.Database.MigrateAsync();
+                // The guard raises before any schema or history change.
                 Assert.False(db.Database.HasPendingModelChanges()); });
             var replacement = await owner.Client.Send(HttpMethod.Post, $"/api/interviews/{id}/resend", new ResendInterviewRequest(3, false, false));
             Assert.Equal(HttpStatusCode.OK, replacement.StatusCode);

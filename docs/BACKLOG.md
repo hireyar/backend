@@ -1,3 +1,21 @@
+## Gemini TTS پیاده‌شده — 2026-10-13
+
+درخواست پیاده‌سازی انجام شد: انتخاب provider محفوظ، Liara/Gemini PCM→MP3، سرعت محلی، محافظ‌های حجم/ظرفیت/deadline/process، probe/startup و runtime Docker؛ GEMINI_TTS و ADR-044. build و ۱۹۵ تست مرتبط با PostgreSQL و encoder واقعی موفق، صفرSkip؛ smoke مصنوعی واقعی Liara حدود۴٫۸ثانیه و MP3 قابلdecode. امکان‌سنجی پایین تاریخی است و دیگر مانع مجوز پیاده‌سازی نیست.
+
+باقی برای انتشار مستقل: ساخت image دارای ffmpeg، حفظ/تأیید environment منتخب TtsModel/TtsVoice و نبود override قدیمی، startup/health و آزمون صوت مرورگر در مقصد؛ تست بار و تلفظ/تأخیر متن‌های طولانی. daemon Docker این نوبت در دسترس نبود؛ deploy یا restart مقصد مجاز تلقی/انجام نشد. migration/تغییر Angular لازم نیست. مسیر encoder توسعه ignored و binary داخل artifacts محفوظ بماند یا با نصب معمول جایگزین شود. مقادیر قبلی config و داده مقصد محفوظ‌اند.
+
+## امکان‌سنجی Gemini TTS لیارا — 2026-10-13
+
+امکان مستند است؛ راه‌اندازی با تغییر config تنها ممکن نیست، چون خروجی Gemini PCM و مسیر فعلی MP3 است. HANDOFF بررسی code/provider/cache/MIME را ثبت می‌کند. پیشنهاد برای حفظ API فعلی: تبدیل در Infrastructure با encoder runtime؛ گزینه WAV به قرارداد MIME و metadata نیاز دارد. اجرای این تغییر در درخواست بررسی مجاز تلقی نشد و هنوز انجام نشده است. ادامه در درخواست پیاده‌سازی: فرمت، تبدیل، payload بدون پارامتر تأییدنشده، محدودیت/cancellation، آزمون مصنوعی و smoke صوت با متن مصنوعی؛ کیفیت فارسی/سرعت/پشتیبانی speed و هزینه واقعی تأیید نشده‌اند. build و ۴۱ تست provider موفق؛ gemini-tts-feasibility.trx. مقصد/secret/انتشار تغییر نکردند.
+
+## بررسی اعتبارسنجی تولید سؤال در فرانت — 2026-10-13
+
+کد جاری پاسخ موفق را به موضوع‌های سه‌سطحی معتبر محدود می‌کند؛ level رشته کوچک و شمارنده‌های کل بانک T/3T/2T، تک‌موضوع1/3/2 هستند. تفاوت bankQuestionCount و interviewQuestionCount نقص بانک نیست و ترتیب سطح‌ها از مدل ثابت نیست. تست HTTP خام و توضیح اتصال در ADVANCED_QUESTIONS_API افزوده شد؛ تغییر runtime/schema/config لازم نشد.
+
+پیگیری باز: JSON همان پاسخ مشکل‌دار از مقصد، mapper/validator Angular برای حروف level و مقایسه شمارنده‌ها، جایگزینی فقط موضوع انتخاب‌شده و عدم اعمال حداقل۵موضوع روی پاسخ تک‌موضوعی. پاسخ مقصد و کد فرانت در دست نیستند؛ خطای گزارش‌شده قطعی رفع‌شده تلقی نمی‌شود. انتشار و تماس واقعی provider انجام نشده است.
+
+اعتبارسنجی: build بدون warning/error و ۵۵/۵۵ تست مرتبط روی PostgreSQL محلی موفق، صفر Skip؛ question-suggestion-wire-final.trx. صحت HTTP محلی تأیید شده، رفع پیام مقصد هنوز وابسته به شواهد فرانت است.
+
 ## چرخه گزارش و شفافیت وضعیت — 2026-10-13
 
 بک‌اند روی dev محلی تأیید شد: شروع خودکار بعد از completion، صف و worker، مراحل ماندگار، علت و مرحله شکست، retry فقط در Failed، API وضعیت و رفع GET404 برای گزارش آماده‌نشده. ADR-043 و INTERVIEW_REPORT_LIFECYCLE_API مرجع جاری و جایگزین تولید همزمان و بازتولید گزارش موفق تاریخی هستند. build بدون warning/error و ۲۰۶ تست مرتبط PostgreSQL موفق، بدون شکست یا Skip؛ report-lifecycle-final.trx.
