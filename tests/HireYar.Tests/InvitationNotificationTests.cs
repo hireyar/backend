@@ -68,7 +68,95 @@ public sealed class InvitationNotificationTests
     }
 
     [Fact]
-    public async Task Email_sends_utf8_invitation_to_local_smtp_only()
+    public async Task Email_sends_utf8_html_and_text_with_embedded_logo_to_local_smtp_only()
+    {
+        var wire = await CaptureEmail(Notice);
+        Assert.Contains("candidate@example.test", wire);
+        Assert.Contains("multipart/alternative", wire, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("multipart/related", wire, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Content-ID: <hireyar-logo>", wire, StringComparison.OrdinalIgnoreCase);
+        var text = DecodePart(wire, "text/plain");
+        var html = DecodePart(wire, "text/html");
+        foreach (var body in new[] { text, html })
+        {
+            Assert.Contains("123456", body);
+            Assert.Contains("https://example.test/interview/synthetic", body);
+            Assert.Contains("دعوت شده‌اید", body);
+            Assert.Contains("به وقت تهران", body);
+        }
+        Assert.Contains("lang=\"fa\" dir=\"rtl\"", html);
+        Assert.Contains("Tahoma,Arial,sans-serif", html);
+        Assert.Contains("cid:hireyar-logo", html);
+        Assert.Contains("ورود به مصاحبه", html);
+        Assert.DoesNotContain("<script", html);
+        var png = DecodeBytes(wire, "image/png");
+        Assert.True(png.AsSpan().StartsWith(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }));
+        using var resource = typeof(InterviewInvitationNotifier).Assembly.GetManifestResourceStream(
+            "HireYar.Infrastructure.Interviews.EmailTemplates.hireyar-logo.png");
+        Assert.NotNull(resource);
+        using var expected = new MemoryStream(); await resource.CopyToAsync(expected);
+        Assert.Equal(expected.ToArray(), png);
+    }
+
+    [Fact]
+    public async Task Email_encodes_untrusted_values_and_preserves_leading_zero_code()
+    {
+        var notice = Notice with
+        {
+            CandidateName = "<img src=x onerror=alert(1)> {{AccessCode}}",
+            PositionTitle = "طراح <script>alert(2)</script> & توسعه‌دهنده",
+            Invitation = Notice.Invitation with
+            {
+                AccessCode = "012345",
+                InterviewUrl = "https://example.test/interview/synthetic?a=1&label=\"test\"",
+                ExpiresAtUtc = new DateTimeOffset(2026, 10, 13, 21, 0, 0, TimeSpan.Zero)
+            }
+        };
+        var wire = await CaptureEmail(notice);
+        var html = DecodePart(wire, "text/html");
+        Assert.Contains("&lt;img src=x onerror=alert(1)&gt; {{AccessCode}}", html);
+        Assert.Contains("&lt;script&gt;alert(2)&lt;/script&gt; &amp;", html);
+        Assert.Contains("href=\"https://example.test/interview/synthetic?a=1&amp;label=&quot;test&quot;\"", html);
+        Assert.DoesNotContain("<script", html);
+        Assert.DoesNotContain("<img src=x", html);
+        Assert.Contains("012345</span>", html);
+        Assert.Contains("۱۴۰۵/۰۷/۲۲", html);
+        Assert.Contains("۰۰:۳۰", html);
+        Assert.Contains("012345", DecodePart(wire, "text/plain"));
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(html, "href=").Count);
+    }
+
+    [Fact]
+    public async Task Email_formats_expiry_independently_of_server_culture()
+    {
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new("ar-SA");
+            var notice = Notice with { Invitation = Notice.Invitation with
+                { ExpiresAtUtc = new DateTimeOffset(2026, 10, 13, 9, 0, 0, TimeSpan.Zero) } };
+            var html = DecodePart(await CaptureEmail(notice), "text/html");
+            Assert.Contains("۱۴۰۵/۰۷/۲۱", html);
+            Assert.Contains("۱۲:۳۰", html);
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
+    }
+
+    private static byte[] DecodeBytes(string wire, string mediaType)
+    {
+        var part = System.Text.RegularExpressions.Regex.Match(wire,
+            @"Content-Type:\s*" + System.Text.RegularExpressions.Regex.Escape(mediaType) +
+            @"\b[^\r\n]*(?:\r?\n(?!\r?\n)[^\r\n]*)*\r?\n\r?\n(?<payload>[A-Za-z0-9+/=\r\n]+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        Assert.True(part.Success, "Expected MIME part was not found.");
+        Assert.Contains("base64", part.Value, StringComparison.OrdinalIgnoreCase);
+        return Convert.FromBase64String(part.Groups["payload"].Value);
+    }
+
+    private static string DecodePart(string wire, string mediaType) =>
+        System.Text.Encoding.UTF8.GetString(DecodeBytes(wire, mediaType));
+
+    private static async Task<string> CaptureEmail(InvitationNotification notice)
     {
         var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0); listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -97,16 +185,11 @@ public sealed class InvitationNotificationTests
             var handler = new Handler();
             var options = new InvitationNotificationOptions { Email = new() { Enabled = true, Host = "127.0.0.1", Port = port,
                 EnableSsl = false, FromAddress = "sender@example.test" } };
-            Assert.Equal("NotRequested", (await Sender(handler, options).SendAsync(Notice, false, false, deadline.Token)).EmailDelivery);
-            var result = await Sender(handler, options).SendAsync(Notice, true, false, deadline.Token);
+            Assert.Equal("NotRequested", (await Sender(handler, options).SendAsync(notice, false, false, deadline.Token)).EmailDelivery);
+            var result = await Sender(handler, options).SendAsync(notice, true, false, deadline.Token);
             Assert.Equal("Sent", result.EmailDelivery); await server;
-            var wire = received.ToString(); Assert.Contains("candidate@example.test", wire);
-            Assert.Contains("charset=utf-8", wire, StringComparison.OrdinalIgnoreCase);
-            var payload = wire[(wire.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4)..];
-            var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
-            Assert.Contains("123456", decoded); Assert.Contains("https://example.test/interview/synthetic", decoded);
-            Assert.Contains("دعوت شده‌اید", decoded);
             Assert.Equal(0, handler.Calls);
+            return received.ToString();
         }
         finally { listener.Stop(); }
     }

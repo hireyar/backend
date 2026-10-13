@@ -19,7 +19,7 @@ UI بعد از Failed نباید ساخت دعوت را خودکار تکرار 
 
 ## appsettings
 
-`InterviewNotifications:Email` مستقل است: Enabled، Host، Port، EnableSsl (STARTTLS)، Username، Password، FromAddress، FromName و TimeoutSeconds. Host/FromAddress الزامی، Port بین 1 و 65535، timeout بین 1 و 60؛ Username/Password یا هر دو خالی برای SMTP بدون احراز هویت یا هر دو مقدار دارند. ایمیل متن UTF-8 با نام داوطلب، عنوان شغل، لینک، کد و انقضای UTC دارد. برای SMTP محلی می‌توان Port=1025 و EnableSsl=false گذاشت. تست‌ها فقط SMTP loopback مصرف می‌کنند.
+`InterviewNotifications:Email` مستقل است: Enabled، Host، Port، EnableSsl (STARTTLS)، Username، Password، FromAddress، FromName و TimeoutSeconds. Host/FromAddress الزامی، Port بین 1 و 65535، timeout بین 1 و 60؛ Username/Password یا هر دو خالی برای SMTP بدون احراز هویت یا هر دو مقدار دارند. ایمیل multipart/alternative با نسخهٔ متنی UTF-8 و HTML فارسی RTL دارد؛ Tahoma، لوگوی PNG همراه خود پیام (CID)، دکمهٔ ورود، کد شش‌رقمی LTR با حفظ صفر آغازین و لینک جایگزین. نام داوطلب/عنوان/URL در HTML encode می‌شوند؛ لینک فقط HTTP(S) است. انقضا در ایمیل شمسی و به وقت تهران نمایش داده می‌شود؛ زمان داده/API همچنان UTC است. قالب و تصویر به صورت EmbeddedResource در Infrastructure بسته‌بندی شده‌اند و تنظیمات برند/URL لوگوی تازه نیاز نیست. برای SMTP محلی می‌توان Port=1025 و EnableSsl=false گذاشت. تست‌ها فقط SMTP loopback مصرف می‌کنند.
 
 `InterviewNotifications:Sms` مستقل است: Enabled، ApiKey و Template. اگر ApiKey خالی باشد از `Kavenegar:ApiKey` موجود OTP استفاده می‌کند؛ Template دعوت همیشه مستقل و الزامی است. UseFixedOtp در کد دعوت اثری ندارد. هر دو Enabled پیش‌فرض false هستند.
 
