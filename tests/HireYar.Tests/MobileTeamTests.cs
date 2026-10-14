@@ -256,7 +256,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
             db.Users.Add(new HireYar.Infrastructure.Auth.ApplicationUser { Id = Guid.NewGuid(), UserName = Guid.NewGuid().ToString(), FullName = "Duplicate owner", OrganizationId = org, Role = OrganizationRole.Owner, IsActive = true });
             var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync()); Assert.Equal(PostgresErrorCodes.UniqueViolation, ((PostgresException)ex.InnerException!).SqlState);
             db.ChangeTracker.Clear();
-            var previous = (await db.Database.GetAppliedMigrationsAsync()).Reverse().Skip(1).First();
+            const string previous = "20261012193519_AddInterviewRecordingSegments";
             var blocked = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync(previous));
             Assert.Equal(PostgresErrorCodes.RaiseException, blocked.SqlState);
             Assert.Equal(1, await db.MobileTeamInvitations.CountAsync());

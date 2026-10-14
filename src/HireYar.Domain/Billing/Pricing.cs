@@ -11,6 +11,9 @@ public sealed class PricingPackage
     public int SortOrder { get; set; }
     public decimal AiPricePerMinuteUsd { get; set; }
     public int InterviewRetentionDays { get; set; }
+    public int IncludedTeamUsers { get; set; } = 3;
+    public int PaidTeamUserLimit { get; set; } = 30;
+    public decimal TeamUserMonthlyPriceIrt { get; set; } = 200_000m;
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
     public byte[] RowVersion { get; set; } = [];

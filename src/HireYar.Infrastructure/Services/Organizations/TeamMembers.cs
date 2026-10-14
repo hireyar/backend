@@ -1,4 +1,5 @@
 using HireYar.Application.Common;
+using HireYar.Application.Billing;
 using HireYar.Application.Organizations;
 using HireYar.Domain.Organizations;
 using HireYar.Infrastructure.Auth;
@@ -8,7 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Infrastructure.Organizations;
 
-public sealed class TeamMembers(AppDbContext db, ICurrentUser user, UserManager<ApplicationUser> users, TimeProvider time) : ITeamMembers
+public sealed class TeamMembers(AppDbContext db, ICurrentUser user, UserManager<ApplicationUser> users, TimeProvider time, TeamSeatService seats) : ITeamMembers
 {
     private DateTimeOffset Now => time.GetUtcNow();
     private void Owner()
@@ -52,6 +53,7 @@ public sealed class TeamMembers(AppDbContext db, ICurrentUser user, UserManager<
             pending.CancelledAtUtc = Now;
             await db.SaveChangesAsync(ct);
         }
+        await seats.RequireInvitationCapacityLockedAsync(user.OrganizationId, false, ct);
         var invitation = new MobileTeamInvitation { OrganizationId = user.OrganizationId, Mobile = request.Mobile, FirstName = request.FirstName.Trim(), LastName = request.LastName.Trim(), CreatedAtUtc = Now, ExpiresAtUtc = Now.AddDays(3) };
         db.MobileTeamInvitations.Add(invitation);
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);

@@ -40,7 +40,8 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
                 Assert.Equal(0.5m, entry.Amount); Assert.Equal(0m, entry.BalanceBefore); Assert.Equal(0.5m, entry.BalanceAfter);
                 var error = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261010132215_AddRegistrationTrial"));
                 Assert.Equal("23514", error.SqlState);
-                Assert.Contains("Cannot downgrade configured registration trial history", error.MessageText);
+                // The newer team snapshot guard now prevents reaching the older trial downgrade.
+                Assert.Contains("Cannot remove registration trial history", error.MessageText);
                 Assert.False(db.Database.HasPendingModelChanges());
             });
             var wallet = await (await owner.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<WalletDto>(BillingJson.Options);

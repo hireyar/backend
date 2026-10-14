@@ -16,6 +16,7 @@ internal static class BillingConfigurations
     }
     public static void Configure(ModelBuilder m)
     {
+        TeamSeatConfigurations.Configure(m);
         var p = m.Entity<PricingPackage>(); p.HasKey(x => x.Id); p.HasIndex(x => x.Code).IsUnique();
         p.Property(x => x.Code).HasMaxLength(64); p.Property(x => x.Name).HasMaxLength(200); p.Property(x => x.Description).HasMaxLength(4000);
         p.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever(); Money(p, nameof(PricingPackage.AiPricePerMinuteUsd));
@@ -46,7 +47,7 @@ internal static class BillingConfigurations
         pay.HasOne<AiCreditPackage>().WithMany().HasForeignKey(x => x.CreditPackageId);
         pay.HasIndex(x => new { x.Provider, x.ProviderTransactionId }).IsUnique().HasFilter("\"ProviderTransactionId\" IS NOT NULL");
         pay.HasIndex(x => new { x.Provider, x.ProviderAuthority }).IsUnique().HasFilter("\"ProviderAuthority\" IS NOT NULL");
-        pay.ToTable(t => t.HasCheckConstraint("CK_Payment_Values", "\"Amount\" > 0 AND \"Currency\" = 'IRT' AND \"Status\" IN ('Pending','Paid','Failed','Cancelled','Expired') AND \"Type\" IN ('Subscription','AiCredit') AND (\"Type\" <> 'AiCredit' OR (\"CreditPackageId\" IS NOT NULL AND \"CreditAmountUsdSnapshot\" > 0 AND \"EffectiveUsdToIrtSnapshot\" > 0)) AND (\"Status\" <> 'Paid' OR (\"PaidAtUtc\" IS NOT NULL AND \"ProviderTransactionId\" IS NOT NULL))"));
+        pay.ToTable(t => t.HasCheckConstraint("CK_Payment_Values", "\"Amount\" > 0 AND \"Currency\" = 'IRT' AND \"Status\" IN ('Pending','Paid','Failed','Cancelled','Expired') AND \"Type\" IN ('Subscription','AiCredit','TeamSeats') AND (\"Type\" <> 'AiCredit' OR (\"CreditPackageId\" IS NOT NULL AND \"CreditAmountUsdSnapshot\" > 0 AND \"EffectiveUsdToIrtSnapshot\" > 0)) AND (\"Status\" <> 'Paid' OR (\"PaidAtUtc\" IS NOT NULL AND \"ProviderTransactionId\" IS NOT NULL))"));
         pay.ToTable(t => t.HasCheckConstraint("CK_Payment_Tax", "(\"SubtotalAmountSnapshot\" IS NULL AND \"TaxAmountSnapshot\" IS NULL AND \"TaxPercentSnapshot\" IS NULL) OR (\"SubtotalAmountSnapshot\" IS NOT NULL AND \"TaxAmountSnapshot\" IS NOT NULL AND \"TaxPercentSnapshot\" IS NOT NULL AND \"SubtotalAmountSnapshot\" > 0 AND \"TaxAmountSnapshot\" >= 0 AND \"TaxPercentSnapshot\" BETWEEN 0 AND 100 AND \"Amount\" = \"SubtotalAmountSnapshot\" + \"TaxAmountSnapshot\")"));
         var purchase = m.Entity<SubscriptionPurchase>(); Tenant(purchase); purchase.HasIndex(x => x.PaymentId).IsUnique();
         purchase.HasOne<Payment>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.PaymentId }).HasPrincipalKey(x => new { x.OrganizationId, x.Id });
@@ -60,7 +61,7 @@ internal static class BillingConfigurations
         purchase.Property(x => x.ProratedCreditAmountSnapshot).HasPrecision(18, 0);
         purchase.HasOne<OrganizationSubscription>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ReplacesSubscriptionId }).HasPrincipalKey(x => new { x.OrganizationId, x.Id });
         purchase.ToTable(t => t.HasCheckConstraint("CK_Purchase_Values", "\"PeriodMonthsSnapshot\" BETWEEN 1 AND 120 AND \"PriceAmountSnapshot\" > 0 AND \"CurrencySnapshot\" = 'IRT' AND \"AiPricePerMinuteUsdSnapshot\" > 0 AND \"RetentionDaysSnapshot\" > 0"));
-        purchase.ToTable(t => t.HasCheckConstraint("CK_Purchase_Operation", "\"Operation\" IN ('purchase','renewal','upgrade') AND \"ProratedCreditAmountSnapshot\" BETWEEN 0 AND \"PriceAmountSnapshot\" AND ((\"Operation\" = 'upgrade' AND \"ReplacesSubscriptionId\" IS NOT NULL) OR (\"Operation\" <> 'upgrade' AND \"ReplacesSubscriptionId\" IS NULL AND \"ProratedCreditAmountSnapshot\" = 0))"));
+        purchase.ToTable(t => t.HasCheckConstraint("CK_Purchase_Operation", "\"Operation\" IN ('purchase','renewal','upgrade') AND \"ProratedCreditAmountSnapshot\" BETWEEN 0 AND (\"PriceAmountSnapshot\" + \"TeamSeatAmountIrtSnapshot\") AND ((\"Operation\" = 'upgrade' AND \"ReplacesSubscriptionId\" IS NOT NULL) OR (\"Operation\" <> 'upgrade' AND \"ReplacesSubscriptionId\" IS NULL AND \"ProratedCreditAmountSnapshot\" = 0))"));
         var e = m.Entity<SubscriptionEntitlement>(); e.HasKey(x => new { x.PurchaseId, x.Code }); e.Property(x => x.Code).HasMaxLength(64); e.Property(x => x.Name).HasMaxLength(200); e.Property(x => x.Value).HasMaxLength(1000); e.Property(x => x.DataType).HasConversion<string>().HasMaxLength(20);
         var sub = m.Entity<OrganizationSubscription>(); Tenant(sub); sub.HasIndex(x => x.PaymentId).IsUnique();
         sub.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);

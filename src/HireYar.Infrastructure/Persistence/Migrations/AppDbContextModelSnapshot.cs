@@ -551,7 +551,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_Payment_Tax", "(\"SubtotalAmountSnapshot\" IS NULL AND \"TaxAmountSnapshot\" IS NULL AND \"TaxPercentSnapshot\" IS NULL) OR (\"SubtotalAmountSnapshot\" IS NOT NULL AND \"TaxAmountSnapshot\" IS NOT NULL AND \"TaxPercentSnapshot\" IS NOT NULL AND \"SubtotalAmountSnapshot\" > 0 AND \"TaxAmountSnapshot\" >= 0 AND \"TaxPercentSnapshot\" BETWEEN 0 AND 100 AND \"Amount\" = \"SubtotalAmountSnapshot\" + \"TaxAmountSnapshot\")");
 
-                            t.HasCheckConstraint("CK_Payment_Values", "\"Amount\" > 0 AND \"Currency\" = 'IRT' AND \"Status\" IN ('Pending','Paid','Failed','Cancelled','Expired') AND \"Type\" IN ('Subscription','AiCredit') AND (\"Type\" <> 'AiCredit' OR (\"CreditPackageId\" IS NOT NULL AND \"CreditAmountUsdSnapshot\" > 0 AND \"EffectiveUsdToIrtSnapshot\" > 0)) AND (\"Status\" <> 'Paid' OR (\"PaidAtUtc\" IS NOT NULL AND \"ProviderTransactionId\" IS NOT NULL))");
+                            t.HasCheckConstraint("CK_Payment_Values", "\"Amount\" > 0 AND \"Currency\" = 'IRT' AND \"Status\" IN ('Pending','Paid','Failed','Cancelled','Expired') AND \"Type\" IN ('Subscription','AiCredit','TeamSeats') AND (\"Type\" <> 'AiCredit' OR (\"CreditPackageId\" IS NOT NULL AND \"CreditAmountUsdSnapshot\" > 0 AND \"EffectiveUsdToIrtSnapshot\" > 0)) AND (\"Status\" <> 'Paid' OR (\"PaidAtUtc\" IS NOT NULL AND \"ProviderTransactionId\" IS NOT NULL))");
                         });
                 });
 
@@ -578,6 +578,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<int>("IncludedTeamUsers")
+                        .HasColumnType("integer");
+
                     b.Property<int>("InterviewRetentionDays")
                         .HasColumnType("integer");
 
@@ -592,6 +595,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int>("PaidTeamUserLimit")
+                        .HasColumnType("integer");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -599,6 +605,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
+
+                    b.Property<decimal>("TeamUserMonthlyPriceIrt")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -610,6 +620,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("PricingPackages", t =>
                         {
+                            t.HasCheckConstraint("CK_Package_Team", "\"IncludedTeamUsers\" >= 1 AND \"PaidTeamUserLimit\" BETWEEN \"IncludedTeamUsers\" AND 10000 AND \"TeamUserMonthlyPriceIrt\" BETWEEN 0 AND 1000000000000");
+
                             t.HasCheckConstraint("CK_Package_Values", "\"AiPricePerMinuteUsd\" > 0 AND \"InterviewRetentionDays\" BETWEEN 1 AND 3650");
                         });
                 });
@@ -630,11 +642,21 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)");
 
+                    b.Property<int>("IncludedTeamUsers")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("PaidTeamUserLimit")
+                        .HasColumnType("integer");
+
                     b.Property<int>("RetentionDays")
                         .HasColumnType("integer");
+
+                    b.Property<decimal>("TeamUserMonthlyPriceIrt")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
 
                     b.HasKey("Id");
 
@@ -648,6 +670,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.ToTable("RegistrationTrials", t =>
                         {
                             t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountUsd\" > 0 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650");
+
+                            t.HasCheckConstraint("CK_Trial_Team", "\"IncludedTeamUsers\" >= 1 AND \"PaidTeamUserLimit\" BETWEEN \"IncludedTeamUsers\" AND 10000 AND \"TeamUserMonthlyPriceIrt\" BETWEEN 0 AND 1000000000000");
                         });
                 });
 
@@ -733,6 +757,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<int>("IncludedTeamUsersSnapshot")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Operation")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -761,6 +788,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PackagePeriodId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("PaidTeamUserLimitSnapshot")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("PaymentId")
                         .HasColumnType("uuid");
 
@@ -781,6 +811,17 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<int>("RetentionDaysSnapshot")
                         .HasColumnType("integer");
 
+                    b.Property<int>("TeamCapacitySnapshot")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TeamSeatAmountIrtSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<decimal>("TeamUserMonthlyPriceIrtSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
                     b.HasKey("Id");
 
                     b.HasAlternateKey("OrganizationId", "Id");
@@ -798,7 +839,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("SubscriptionPurchases", t =>
                         {
-                            t.HasCheckConstraint("CK_Purchase_Operation", "\"Operation\" IN ('purchase','renewal','upgrade') AND \"ProratedCreditAmountSnapshot\" BETWEEN 0 AND \"PriceAmountSnapshot\" AND ((\"Operation\" = 'upgrade' AND \"ReplacesSubscriptionId\" IS NOT NULL) OR (\"Operation\" <> 'upgrade' AND \"ReplacesSubscriptionId\" IS NULL AND \"ProratedCreditAmountSnapshot\" = 0))");
+                            t.HasCheckConstraint("CK_Purchase_Operation", "\"Operation\" IN ('purchase','renewal','upgrade') AND \"ProratedCreditAmountSnapshot\" BETWEEN 0 AND (\"PriceAmountSnapshot\" + \"TeamSeatAmountIrtSnapshot\") AND ((\"Operation\" = 'upgrade' AND \"ReplacesSubscriptionId\" IS NOT NULL) OR (\"Operation\" <> 'upgrade' AND \"ReplacesSubscriptionId\" IS NULL AND \"ProratedCreditAmountSnapshot\" = 0))");
+
+                            t.HasCheckConstraint("CK_Purchase_Team", "\"IncludedTeamUsersSnapshot\" >= 1 AND \"PaidTeamUserLimitSnapshot\" BETWEEN \"IncludedTeamUsersSnapshot\" AND 10000 AND \"TeamUserMonthlyPriceIrtSnapshot\" BETWEEN 0 AND 1000000000000 AND \"TeamCapacitySnapshot\" BETWEEN \"IncludedTeamUsersSnapshot\" AND \"PaidTeamUserLimitSnapshot\" AND \"TeamSeatAmountIrtSnapshot\" >= 0");
 
                             t.HasCheckConstraint("CK_Purchase_Values", "\"PeriodMonthsSnapshot\" BETWEEN 1 AND 120 AND \"PriceAmountSnapshot\" > 0 AND \"CurrencySnapshot\" = 'IRT' AND \"AiPricePerMinuteUsdSnapshot\" > 0 AND \"RetentionDaysSnapshot\" > 0");
                         });
@@ -842,6 +885,61 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "CreatedAtUtc", "Id");
 
                     b.ToTable("SubscriptionReplacements");
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.TeamSeatPurchase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AmountIrt")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("MonthlyPriceIrt")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PreviousCapacity")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("QuotedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TargetCapacity")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "PaymentId");
+
+                    b.HasIndex("OrganizationId", "SubscriptionId");
+
+                    b.ToTable("TeamSeatPurchases", t =>
+                        {
+                            t.HasCheckConstraint("CK_TeamSeat_Values", "\"PreviousCapacity\" >= 1 AND \"TargetCapacity\" BETWEEN \"PreviousCapacity\" + 1 AND 10000 AND \"MonthlyPriceIrt\" > 0 AND \"AmountIrt\" > 0 AND \"ExpiresAtUtc\" > \"QuotedAtUtc\" AND \"CreatedAtUtc\" >= \"QuotedAtUtc\"");
+                        });
                 });
 
             modelBuilder.Entity("HireYar.Domain.InterviewTemplates.InterviewQuestion", b =>
@@ -2781,6 +2879,29 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("HireYar.Domain.Billing.SubscriptionReplacement", b =>
+                {
+                    b.HasOne("HireYar.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Billing.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "PaymentId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Billing.OrganizationSubscription", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "SubscriptionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.TeamSeatPurchase", b =>
                 {
                     b.HasOne("HireYar.Domain.Organizations.Organization", null)
                         .WithMany()

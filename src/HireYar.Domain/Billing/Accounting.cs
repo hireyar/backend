@@ -1,6 +1,6 @@
 namespace HireYar.Domain.Billing;
 
-public enum PaymentType { Subscription, AiCredit }
+public enum PaymentType { Subscription, AiCredit, TeamSeats }
 public enum PaymentStatus { Pending, Paid, Failed, Cancelled, Expired }
 public sealed class Payment
 {
@@ -66,6 +66,11 @@ public sealed class SubscriptionPurchase
     public decimal DiscountPercentSnapshot { get; set; }
     public decimal AiPricePerMinuteUsdSnapshot { get; set; }
     public int RetentionDaysSnapshot { get; set; }
+    public int IncludedTeamUsersSnapshot { get; set; } = 3;
+    public int PaidTeamUserLimitSnapshot { get; set; } = 30;
+    public decimal TeamUserMonthlyPriceIrtSnapshot { get; set; } = 200_000m;
+    public int TeamCapacitySnapshot { get; set; } = 3;
+    public decimal TeamSeatAmountIrtSnapshot { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public List<SubscriptionEntitlement> Entitlements { get; set; } = [];
     public string Operation { get; set; } = "purchase";

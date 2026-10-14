@@ -22,6 +22,7 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
         if (id is null) db.PricingPackages.Add(p); else db.SetOriginalVersion(p, version!);
         p.Code = r.Code; p.Name = r.Name.Trim(); p.Description = r.Description.Trim(); p.IsActive = r.IsActive; p.IsPublic = r.IsPublic;
         p.SortOrder = r.SortOrder; p.AiPricePerMinuteUsd = r.AiPricePerMinuteUsd; p.InterviewRetentionDays = r.InterviewRetentionDays; p.UpdatedAtUtc = time.GetUtcNow();
+        p.IncludedTeamUsers = r.IncludedTeamUsers; p.PaidTeamUserLimit = r.PaidTeamUserLimit; p.TeamUserMonthlyPriceIrt = r.TeamUserMonthlyPriceIrt;
         await db.SaveChangesAsync(ct); return Map(p, false);
     }
     public async Task<PackageDto> SavePeriodAsync(Guid packageId, Guid? id, PeriodWriteRequest r, CancellationToken ct)
@@ -77,12 +78,15 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
     }
     private static void ValidatePackage(PackageRequest r)
     {
+        if (r.IncludedTeamUsers < 1 || r.PaidTeamUserLimit < r.IncludedTeamUsers || r.PaidTeamUserLimit > 10000 ||
+            r.TeamUserMonthlyPriceIrt is < 0 or > 1000000000000m || !BillingMath.HasPrecision(r.TeamUserMonthlyPriceIrt, 0)) throw AppException.Invalid("invalid_team_pricing");
         if (string.IsNullOrWhiteSpace(r.Name) || !System.Text.RegularExpressions.Regex.IsMatch(r.Code, "^[a-z][a-z0-9_]{1,63}$") ||
             r.AiPricePerMinuteUsd is <= 0 or > 1000 || !BillingMath.HasPrecision(r.AiPricePerMinuteUsd, 6) || r.InterviewRetentionDays is < 1 or > 3650) throw AppException.Invalid();
     }
     public static PackageDto Map(PricingPackage p, bool publicOnly) => new(p.Id, p.Code, p.Name, p.Description, p.IsActive, p.IsPublic, p.SortOrder,
         p.AiPricePerMinuteUsd, p.InterviewRetentionDays, p.RowVersion,
         p.Features.Where(x => !publicOnly || x.IsEnabled).OrderBy(x => x.Feature.Code).Select(x => new FeatureDto(x.FeatureId, x.Feature.Code, x.Feature.Name, x.Feature.Description, x.Feature.DataType, x.IsEnabled, x.Value)).ToArray(),
-        p.Periods.Where(x => !publicOnly || x.IsActive).OrderBy(x => x.SortOrder).ThenBy(x => x.Months).Select(x => new PeriodDto(x.Id, x.Months, x.PriceAmount, x.Currency, x.DiscountPercent, x.IsActive, x.SortOrder)).ToArray());
+        p.Periods.Where(x => !publicOnly || x.IsActive).OrderBy(x => x.SortOrder).ThenBy(x => x.Months).Select(x => new PeriodDto(x.Id, x.Months, x.PriceAmount, x.Currency, x.DiscountPercent, x.IsActive, x.SortOrder)).ToArray(),
+        p.IncludedTeamUsers, p.PaidTeamUserLimit, p.TeamUserMonthlyPriceIrt);
     private static CreditPackageDto MapCredit(AiCreditPackage p) => new(p.Id, p.Name, p.CreditAmountUsd, p.SellPriceAmount, p.SellPriceCurrency, p.IsActive, p.IsPublic, p.SortOrder, p.RowVersion);
 }

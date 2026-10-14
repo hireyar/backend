@@ -9,7 +9,7 @@ using System.Text.Json;
 namespace HireYar.Application.Billing;
 
 public sealed class BillingPanelService(IApplicationDbContext db, WalletService wallet, BillingQueryService query,
-    ISubscriptionEntitlementService entitlements, IPaymentGateway gateway, TimeProvider time, IOptions<BillingPanelOptions> options)
+    ISubscriptionEntitlementService entitlements, IPaymentGateway gateway, TimeProvider time, IOptions<BillingPanelOptions> options, TeamSeatService seats)
 {
     public Task<BillingPanelDto> OverviewAsync(Guid org, bool owner, CancellationToken ct) => db.WithOrganizationBillingLockAsync(org, async () =>
     {
@@ -39,6 +39,9 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
         var package = await db.PricingCatalog.AsNoTracking().Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature)
             .SingleOrDefaultAsync(x => x.IsActive && x.IsPublic && x.Periods.Any(p => p.Id == r.PackagePeriodId && p.IsActive), ct) ?? throw AppException.NotFound();
         var period = package.Periods.Single(x => x.Id == r.PackagePeriodId); var now = time.GetUtcNow();
+        var teamCapacity = await seats.PurchaseCapacityLockedAsync(org, package, r.TeamCapacity, ct);
+        var seatAmount = TeamSeatMath.BillableUsers(teamCapacity, package.IncludedTeamUsers, package.PaidTeamUserLimit) * package.TeamUserMonthlyPriceIrt * period.Months;
+        var contractAmount = period.PriceAmount + seatAmount;
         var current = await entitlements.CurrentAsync(org, ct); Guid? replaces = null; decimal credit = 0;
         var source = current is null ? null : await db.OrganizationSubscriptions.AsNoTracking().SingleAsync(x => x.OrganizationId == org && x.Id == current.Id, ct);
         if (r.Operation == "renewal" && source is not null && source.PackageId != package.Id) throw AppException.Invalid("renewal_requires_same_package");
@@ -64,24 +67,29 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
             // Non-cash grants have no paid value to credit. Round whole remaining UTC days down, never over-credit a partial day.
             var totalDays = (decimal)Math.Ceiling((source.ExpiresAtUtc - source.StartedAtUtc).TotalDays);
             var remainingDays = (decimal)Math.Floor((source.ExpiresAtUtc - now).TotalDays);
-            var sourceNet = purchase.PriceAmountSnapshot;
+            var sourceNet = purchase.PriceAmountSnapshot + purchase.TeamSeatAmountIrtSnapshot;
             credit = payment.Provider == "InternalTestGrant" ? 0 : decimal.Floor(sourceNet * Math.Max(0, remainingDays) / totalDays);
-            credit = Math.Min(credit, period.PriceAmount); replaces = source.Id;
+            var additions = await (from seat in db.TeamSeatPurchases.AsNoTracking() join pay in db.Payments on seat.PaymentId equals pay.Id
+                                   where seat.OrganizationId == org && pay.OrganizationId == org && seat.SubscriptionId == source.Id && pay.Status == PaymentStatus.Paid
+                                   select seat).ToListAsync(ct);
+            credit += additions.Sum(x => decimal.Floor(x.AmountIrt * Math.Max(0, remainingDays) /
+                Math.Max(1m, (decimal)Math.Ceiling((x.ExpiresAtUtc - x.QuotedAtUtc).TotalDays))));
+            credit = Math.Min(credit, contractAmount); replaces = source.Id;
         }
         var tail = await db.OrganizationSubscriptions.Where(x => x.OrganizationId == org && x.ExpiresAtUtc > now &&
             (x.Status == SubscriptionStatus.Active || x.Status == SubscriptionStatus.Scheduled) &&
             !db.SubscriptionReplacements.Any(rp => rp.OrganizationId == org && rp.SubscriptionId == x.Id)).MaxAsync(x => (DateTimeOffset?)x.ExpiresAtUtc, ct);
         var start = replaces.HasValue ? now : tail ?? now;
-        var subtotal = period.PriceAmount - credit; if (subtotal <= 0) throw AppException.Invalid("upgrade_has_no_payable_amount");
+        var subtotal = contractAmount - credit; if (subtotal <= 0) throw AppException.Invalid("upgrade_has_no_payable_amount");
         var taxPercent = options.Value.SubscriptionTaxPercent; var tax = decimal.Round(subtotal * taxPercent / 100m, 0, MidpointRounding.AwayFromZero);
-        decimal? original = period.DiscountPercent < 100 ? decimal.Round(period.PriceAmount / (1 - period.DiscountPercent / 100m), 0, MidpointRounding.AwayFromZero) : null;
+        decimal? original = period.DiscountPercent < 100 ? decimal.Round(period.PriceAmount / (1 - period.DiscountPercent / 100m), 0, MidpointRounding.AwayFromZero) + seatAmount : null;
         var features = package.Features.Where(x => x.IsEnabled).Select(x => new EntitlementDto(x.Feature.Code, x.Feature.Name, x.Feature.DataType, x.Value)).ToArray();
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new {
-            org, period.Id, package.RowVersion, r.Operation, credit, taxPercent, period.PriceAmount, replaces, QueueEnd = replaces.HasValue ? null : tail
+            org, period.Id, package.RowVersion, r.Operation, credit, taxPercent, period.PriceAmount, replaces, teamCapacity, seatAmount, QueueEnd = replaces.HasValue ? null : tail
         }))));
         return (package, period, new(period.Id, package.Name, period.Months, r.Operation, period.Currency, original,
-            original - period.PriceAmount, period.DiscountPercent, period.PriceAmount, credit, taxPercent, tax, subtotal + tax,
-            start, start.AddMonths(period.Months), replaces, package.AiPricePerMinuteUsd, package.InterviewRetentionDays, features, fingerprint));
+            original - contractAmount, period.DiscountPercent, contractAmount, credit, taxPercent, tax, subtotal + tax,
+            start, start.AddMonths(period.Months), replaces, package.AiPricePerMinuteUsd, package.InterviewRetentionDays, features, fingerprint, teamCapacity, seatAmount));
     }
 
     public async Task<InvoiceDto> InvoiceAsync(Guid org, Guid id, CancellationToken ct)
@@ -93,13 +101,21 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
             var p = await db.SubscriptionPurchases.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == org && x.PaymentId == id, ct);
             var s = await db.OrganizationSubscriptions.AsNoTracking().SingleAsync(x => x.OrganizationId == org && x.PaymentId == id, ct);
             subscription = new(p.PackagePeriodId, p.PackageNameSnapshot, p.PeriodMonthsSnapshot, p.Operation, p.CurrencySnapshot,
-                p.OriginalAmountSnapshot, p.DiscountAmountSnapshot, p.DiscountPercentSnapshot, p.PriceAmountSnapshot, p.ProratedCreditAmountSnapshot,
+                p.OriginalAmountSnapshot, p.DiscountAmountSnapshot, p.DiscountPercentSnapshot, p.PriceAmountSnapshot + p.TeamSeatAmountIrtSnapshot, p.ProratedCreditAmountSnapshot,
                 pay.TaxPercentSnapshot ?? 0, pay.TaxAmountSnapshot ?? 0, pay.Amount, s.StartedAtUtc, s.ExpiresAtUtc, p.ReplacesSubscriptionId,
-                p.AiPricePerMinuteUsdSnapshot, p.RetentionDaysSnapshot, p.Entitlements.Select(x => new EntitlementDto(x.Code, x.Name, x.DataType, x.Value)).ToArray());
+                p.AiPricePerMinuteUsdSnapshot, p.RetentionDaysSnapshot, p.Entitlements.Select(x => new EntitlementDto(x.Code, x.Name, x.DataType, x.Value)).ToArray(), null, p.TeamCapacitySnapshot, p.TeamSeatAmountIrtSnapshot);
         }
-        return new(id, $"HY-{id:N}", pay.ProviderTransactionId!, pay.PaidAtUtc!.Value, pay.Type.ToString(), subscription?.PackageName ?? pay.CreditPackageNameSnapshot!,
+        TeamSeatQuoteDto? team = null;
+        if (pay.Type == PaymentType.TeamSeats)
+        {
+            var seat = await db.TeamSeatPurchases.AsNoTracking().SingleAsync(x => x.OrganizationId == org && x.PaymentId == id, ct);
+            team = new(seat.SubscriptionId, seat.PreviousCapacity, seat.TargetCapacity, seat.TargetCapacity - seat.PreviousCapacity,
+                seat.MonthlyPriceIrt, (seat.ExpiresAtUtc - seat.QuotedAtUtc).Ticks / (30m * TimeSpan.TicksPerDay), seat.AmountIrt,
+                "IRT", seat.QuotedAtUtc, seat.ExpiresAtUtc, "");
+        }
+        return new(id, $"HY-{id:N}", pay.ProviderTransactionId!, pay.PaidAtUtc!.Value, pay.Type.ToString(), subscription?.PackageName ?? (team is not null ? "ظرفیت کاربران تیم" : pay.CreditPackageNameSnapshot!),
             pay.Currency, subscription?.SubtotalAmount ?? pay.SubtotalAmountSnapshot ?? pay.Amount, subscription?.ProratedCreditAmount ?? 0,
-            pay.TaxPercentSnapshot ?? 0, pay.TaxAmountSnapshot ?? 0, pay.Amount, pay.CreditAmountUsdSnapshot, subscription);
+            pay.TaxPercentSnapshot ?? 0, pay.TaxAmountSnapshot ?? 0, pay.Amount, pay.CreditAmountUsdSnapshot, subscription, team);
     }
 
     public Task<FinancialHistoryDto> HistoryAsync(Guid org, FinancialHistoryQuery r, CancellationToken ct) => db.WithOrganizationBillingLockAsync(org, async () =>
@@ -109,10 +125,10 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
                           where p.OrganizationId == org && p.Status == PaymentStatus.Paid && p.Provider != "InternalTestGrant"
                           join purchase in db.SubscriptionPurchases on p.Id equals purchase.PaymentId into purchases
                           from purchase in purchases.DefaultIfEmpty()
-                          select new FinancialRow { Id = p.Id, Date = p.PaidAtUtc!.Value, Category = p.Type == PaymentType.Subscription ? "subscription" : "aiCredit", Kind = "payment",
-                              Name = p.Type == PaymentType.Subscription ? purchase.PackageNameSnapshot : p.CreditPackageNameSnapshot!,
-                              Amount = p.Type == PaymentType.Subscription ? -p.Amount : p.CreditAmountUsdSnapshot!.Value,
-                              Currency = p.Type == PaymentType.Subscription ? "IRT" : "USD", Cash = p.Amount,
+                          select new FinancialRow { Id = p.Id, Date = p.PaidAtUtc!.Value, Category = p.Type == PaymentType.Subscription ? "subscription" : p.Type == PaymentType.TeamSeats ? "teamSeats" : "aiCredit", Kind = "payment",
+                              Name = p.Type == PaymentType.Subscription ? purchase.PackageNameSnapshot : p.Type == PaymentType.TeamSeats ? "ظرفیت کاربران تیم" : p.CreditPackageNameSnapshot!,
+                              Amount = p.Type != PaymentType.AiCredit ? -p.Amount : p.CreditAmountUsdSnapshot!.Value,
+                              Currency = p.Type != PaymentType.AiCredit ? "IRT" : "USD", Cash = p.Amount,
                               Seconds = null, InterviewId = null, Candidate = null, Tracking = p.ProviderTransactionId!, PaymentId = p.Id };
         var ledgerRows = from t in db.AiCreditTransactions.AsNoTracking()
                          where t.OrganizationId == org && t.Type != CreditTransactionType.CreditPurchase
@@ -137,7 +153,8 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
             g.Sum(x => x.Category == "subscription" && x.Kind == "payment" ? x.Cash ?? 0 : 0),
             g.Sum(x => x.Category == "aiCredit" && x.Kind == "payment" ? x.Amount : 0),
             g.Sum(x => x.Kind == "usage" ? -x.Amount : 0), g.Sum(x => x.Kind == "usage" ? (long)(x.Seconds ?? 0) : 0),
-            g.Sum(x => x.Category == "aiCredit" && x.Kind == "payment" ? x.Cash ?? 0 : 0))).SingleOrDefaultAsync(ct) ?? new(0, 0, 0, 0, 0);
+            g.Sum(x => x.Category == "aiCredit" && x.Kind == "payment" ? x.Cash ?? 0 : 0),
+            g.Sum(x => x.Category == "teamSeats" && x.Kind == "payment" ? x.Cash ?? 0 : 0))).SingleOrDefaultAsync(ct) ?? new(0, 0, 0, 0, 0);
         var page = await rows.OrderByDescending(x => x.Date).ThenBy(x => x.Id).Skip(r.Skip).Take(r.PageSize).ToListAsync(ct);
         return new FinancialHistoryDto(time.GetUtcNow(), new(page.Select(x => new FinancialHistoryItemDto(x.Id, x.Date,
             x.Kind == "usage" ? "مصرف اعتبار مصاحبه" : x.Kind == "payment" ? "خرید " + x.Name : "تغییر اعتبار: " + x.Name,
