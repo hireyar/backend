@@ -21,7 +21,7 @@ public sealed class TeamMembers(AppDbContext db, ICurrentUser user, UserManager<
         if (org is null) throw AppException.NotFound();
     }
     private TeamInvitationDto Map(MobileTeamInvitation i) => new(i.Id, i.Mobile, i.CreatedAtUtc, i.ExpiresAtUtc,
-        i.AcceptedAtUtc is not null ? "Accepted" : i.CancelledAtUtc is not null ? "Cancelled" : i.ExpiresAtUtc <= Now ? "Expired" : "Pending");
+        i.AcceptedAtUtc is not null ? "Accepted" : i.CancelledAtUtc is not null ? "Cancelled" : i.ExpiresAtUtc <= Now ? "Expired" : "Pending", i.FirstName, i.LastName);
     public async Task<Page<TeamMemberDto>> ListAsync(PageQuery page, CancellationToken ct)
     {
         Owner();
@@ -52,7 +52,7 @@ public sealed class TeamMembers(AppDbContext db, ICurrentUser user, UserManager<
             pending.CancelledAtUtc = Now;
             await db.SaveChangesAsync(ct);
         }
-        var invitation = new MobileTeamInvitation { OrganizationId = user.OrganizationId, Mobile = request.Mobile, CreatedAtUtc = Now, ExpiresAtUtc = Now.AddDays(3) };
+        var invitation = new MobileTeamInvitation { OrganizationId = user.OrganizationId, Mobile = request.Mobile, FirstName = request.FirstName.Trim(), LastName = request.LastName.Trim(), CreatedAtUtc = Now, ExpiresAtUtc = Now.AddDays(3) };
         db.MobileTeamInvitations.Add(invitation);
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         return Map(invitation);

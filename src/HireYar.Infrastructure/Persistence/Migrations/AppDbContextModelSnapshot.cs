@@ -2367,6 +2367,14 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Mobile")
                         .IsRequired()
                         .HasMaxLength(11)
@@ -2388,6 +2396,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_MobileTeamInvitation_Expiry", "\"ExpiresAtUtc\" > \"CreatedAtUtc\"");
 
                             t.HasCheckConstraint("CK_MobileTeamInvitation_Mobile", "\"Mobile\" ~ '^09[0-9]{9}$'");
+
+                            t.HasCheckConstraint("CK_MobileTeamInvitation_Name", "(\"FirstName\" IS NULL AND \"LastName\" IS NULL) OR (\"FirstName\" IS NOT NULL AND \"LastName\" IS NOT NULL AND length(\"FirstName\") > 0 AND length(\"LastName\") > 0 AND length(\"FirstName\") + 1 + length(\"LastName\") <= 200)");
 
                             t.HasCheckConstraint("CK_MobileTeamInvitation_State", "\"AcceptedAtUtc\" IS NULL OR \"CancelledAtUtc\" IS NULL");
                         });

@@ -1,6 +1,6 @@
 # دعوت موبایلی زیرمجموعه سازمان
 
-قرارداد جاری 2026-10-13؛ API فقط، Angular در ریپوی جدا. درخواست صریح کاربر برای زیرمجموعه جایگزین محدودیت پیشین «فقط Owner فعال» شد. یک Owner فعال، چند Recruiter و فقط یک سازمان برای هر حساب حفظ می‌شود؛ هیچ حساب تاریخی خودکار فعال/منتقل نمی‌شود.
+قرارداد جاری 2026-10-14؛ API فقط، Angular در ریپوی جدا. درخواست صریح کاربر برای زیرمجموعه جایگزین محدودیت پیشین «فقط Owner فعال» شد. یک Owner فعال، چند Recruiter و فقط یک سازمان برای هر حساب حفظ می‌شود؛ هیچ حساب تاریخی خودکار فعال/منتقل نمی‌شود.
 
 ## API مالک
 
@@ -9,8 +9,8 @@
 | مسیر | ورودی / نتیجه |
 | --- | --- |
 | GET /api/team/members | Page/PageSize؛ Page<TeamMemberDto> شامل id/fullName/mobile/role/isActive، فقط سازمان جاری |
-| GET /api/team/invitations | Page/PageSize؛ Page<TeamInvitationDto> شامل id/mobile/createdAtUtc/expiresAtUtc/status |
-| POST /api/team/invitations | `{ "mobile": "09xxxxxxxxx" }`؛201 و TeamInvitationDto با شناسه دعوت |
+| GET /api/team/invitations | Page/PageSize؛ Page<TeamInvitationDto> شامل id/mobile/firstName/lastName/createdAtUtc/expiresAtUtc/status |
+| POST /api/team/invitations | `{ "mobile": "09xxxxxxxxx", "firstName": "سارا", "lastName": "آزمایشی" }`؛201 و TeamInvitationDto با شناسه دعوت |
 | DELETE /api/team/invitations/{id} | لغو دعوت،204؛ تکرار لغو بی‌اثر، دعوت پذیرفته‌شده409 |
 | POST /api/team/members/{id}/deactivate | غیرفعال‌سازی Recruiter،204؛ مالک قابل غیرفعال‌سازی نیست |
 
@@ -53,7 +53,7 @@ Migration `20261013092724_AddMobileTeamInvitations`: جدول جدید مستق�
 
 ## پرامپت اتصال فرانت
 
-در تنظیمات حساب، بخش «اعضای سازمان» را فقط برای role=Owner بساز. فهرست اعضا و دعوت‌ها را با GET /api/team/members و GET /api/team/invitations و صفحه‌بندی بخوان. فرم شماره موبایل دقیقاً۱۱رقم ASCII با09 داشته باشد و POST /api/team/invitations بزند.201 یعنی «دعوت ثبت شد»، نه «پیامک ارسال شد». با id برگشتی، لینک صفحه پذیرش در دامنه همین فرانت بساز و امکان کپی بده؛ API مسیر فرانت را تعیین نمی‌کند. لغو دعوت با DELETE invitations/{id}، غیرفعال‌سازی زیرمجموعه با POST members/{id}/deactivate و سپس refresh فهرست‌ها باشد؛ مالک دکمه غیرفعال‌سازی ندارد. حالت انتظار و خطاهای400/401/403/404/409 را نمایش بده.
+در تنظیمات حساب، بخش «اعضای سازمان» را فقط برای role=Owner بساز. فهرست اعضا و دعوت‌ها را با GET /api/team/members و GET /api/team/invitations و صفحه‌بندی بخوان. فرم شماره موبایل دقیقاً۱۱رقم ASCII با09 و دو ورودی اجباری نام و نام خانوادگی داشته باشد؛ mobile/firstName/lastName را به POST /api/team/invitations بفرستد. هر نام حداکثر۱۰۰کاراکتر و نام کامل پس از Trim و اتصال با یک فاصله حداکثر۲۰۰کاراکتر است.201 یعنی «دعوت ثبت شد»، نه «پیامک ارسال شد». با id برگشتی، لینک صفحه پذیرش در دامنه همین فرانت بساز و امکان کپی بده؛ API مسیر فرانت را تعیین نمی‌کند. لغو دعوت با DELETE invitations/{id}، غیرفعال‌سازی زیرمجموعه با POST members/{id}/deactivate و سپس refresh فهرست‌ها باشد؛ مالک دکمه غیرفعال‌سازی ندارد. حالت انتظار و خطاهای400/401/403/404/409 را نمایش بده.
 
 صفحه پذیرش id را از URL بگیرد، موبایل و OTP و تأیید صریح پذیرش را بگیرد و طبق جریان CSRF بالا به POST /api/auth/team-invitations/{id}/accept وصل شود؛ در این صفحه از otp/verify معمولی استفاده نکن. token/cookie/code را در URL، لاگ یا ذخیره دائمی نگذار؛ روش مدیریت access و refresh پروژه را حفظ کن. بعد از ورود، me را بخوان و نام سازمان/role را در state مشترک به‌روز کن. برای Recruiter منوهای تیم/تنظیمات سازمان/مالی/diagnostics و retry گزارش/تصمیم انسانی را مخفی کن، خواندن گزارش و مسیرهای کاری را باز نگه دار. در تنظیمات حساب Recruiter فقط fullName را PUT کن، organizationName را ارسال نکن. کنترل UI جای مجوز API را نمی‌گیرد.409/team_invitation_pending در ورود معمولی به‌معنی نیاز به لینک پذیرش از مالک است؛ سازمان دیگری نساز.
 
@@ -76,3 +76,27 @@ Migration `20261013092724_AddMobileTeamInvitations`: جدول جدید مستق�
 پرامپت تکمیلی فرانت: دریافت قابلیت‌ها برای هر دو نقش را به GET /api/organization/features تغییر بده؛ features از ریشه پاسخ خوانده شود، نه current.features. hasActiveSubscription و expiresAtUtc مبنای دسترسی جدید و features.code مبنای روشن‌کردن قابلیت‌ها هستند. مصاحبه عمومی hr_interview+ai_interview، تخصصی technical_interview+ai_interview؛ پیشنهاد سؤال AI و قالب موضوعی پیشرفته advanced_ai_workflow+adaptive_questions+adaptive_difficulty می‌خواهند. وابستگی به packageCode یا شرط role=Owner برای قابلیت مصاحبه/سؤالAI نگذار؛ نقش فقط مدیریت اعضا/تنظیمات/مالی و سایر موارد ماتریس بالا را محدود می‌کند. پس از تغییر اشتراک و هنگام ورود/بارگذاری پنل وضعیت را دوباره بخوان؛ خطای درخواست را حالت قابلیت‌نامعلوم با امکان retry نشان بده، نه بی‌اشتراکی قطعی. در نبود subscription یا feature مربوط، UI را محدود کن؛ بررسی نهایی API همیشه authoritative است. APIهای مالی مالک را برای بخش مالی خودش حفظ کن و برای Recruiter آن‌ها را فراخوانی نکن.
 
 اعتبارسنجی تکمیل features: build صفر warning/error و42/42 تست مرتبط، صفر شکست/Skip روی PostgreSQL18 اختصاصی loopback55494؛ organization-features-verified.trx. DTO fields دقیقاً پنج فیلد غیرمالی، برابری قابلیت‌های خرید/trial با source فعلی، بی‌اشتراکی/انقضا، scope و no-store/401/403 مالی بررسی شدند. migration تازه لازم نیست؛ انتشار مقصد/تغییر فرانت انجام نشده است.
+
+## نام و نام خانوادگی در دعوت — 2026-10-14
+
+دعوت جدید اکنون هر سه فیلد را اجباری می‌گیرد:
+
+```json
+{
+  "mobile": "09xxxxxxxxx",
+  "firstName": "سارا",
+  "lastName": "آزمایشی"
+}
+```
+
+هر نام Required، غیرخالی/غیرصرفاً whitespace و حداکثر۱۰۰کاراکتر ورودی است؛ جمع طول دو مقدار Trim‌شده به‌علاوه یک فاصله باید حداکثر۲۰۰باشد. مثال100+100 با400 رد و100+99 پذیرفته می‌شود. فاصله اول/آخر در ذخیره حذف، فاصله داخلی/نیم‌فاصله حفظ می‌شود. درخواست قدیمی فقطmobile یا نام ناقص/بیش‌ازحد400 ValidationProblemDetails می‌گیرد و دعوت/حساب ساخته نمی‌شود.
+
+POST201 و GET فهرست دعوت‌ها firstName/lastName را برمی‌گردانند. داده به MobileTeamInvitations افزوده و در دعوت pending نگهداری می‌شود؛ هنگام ایجاد دعوت حساب/نام پروفایل موجود تغییر نمی‌کند. پس از پذیرش صریح با همان OTP قبلی، FullName حساب جدید یا Recruiter غیرفعال همان سازمان از `firstName.Trim() + " " + lastName.Trim()` تنظیم می‌شود. سپس me و members همان FullName را دارند و شخص مثل قبل می‌تواند نام خودش را ویرایش کند. reinvite دارای نام تازه فقط هنگام پذیرش آن را روی FullName قبلی اعمال می‌کند؛ تا پذیرش نام قبلی محفوظ است. هیچ تغییر نقش/سازمان/نشست یا انتقال حساب اضافه نشده است.
+
+برای دعوت‌های تاریخی، ستون‌های تازه null/null می‌مانند و داده حدسی backfill نمی‌شود. این دعوت‌ها با flow OTP قبلی قابل‌پذیرش‌اند؛ حساب موجود نام قبلی‌اش را نگه می‌دارد و حساب جدید legacy همان پیش‌فرض «کاربر» را می‌گیرد. فرانت در فهرست دعوت قدیمی برای نامnull از موبایل/عنوان جایگزین استفاده کند و آن را خطا نداند. پذیرش دعوت همچنان فقط mobile/code می‌خواهد؛ firstName/lastName در فرم پذیرش الزامی جدید نیستند.
+
+Migration `20261014052638_AddMobileTeamInvitationNames` باید قبل از نسخه جدید API در مقصد اعمال شود. دو ستون nullableباmaxlength100 و check نامِ جفت/طول مجموع به جدول موجود اضافه می‌کند؛ داده‌های قدیمی محفوظ‌اند. Down در حضور هر نام ذخیره‌شده با خطا متوقف می‌شود تا نام‌ها حذف نشوند. schema حساب/FullName قبلی تغییر نکرده است. انتشار، تغییر دیتابیس مقصد و فرانت در این تسک انجام نشده‌اند.
+
+پرامپت تکمیلی فرانت: فرم «دعوت عضو» فقط برای Owner، سه ورودی mobile، firstName با عنوان «نام» و lastName با عنوان «نام خانوادگی» داشته باشد؛ هر سه required و نام‌هاmax100 و combinedTrimLength+space<=200. همان POST /api/team/invitations را با هر سه فیلد بزن. خطاهای validation400 را کنار ورودی مربوط نمایش بده. نام/نام خانوادگی پاسخ را در فهرست دعوت‌ها نشان بده و null/null دعوت قدیمی را پشتیبانی کن؛ فهرست اعضا و حساب جاری همچنان fullName دارند. جریان لینک دعوت، OTP، پذیرش، role و organizationId را تغییر نده و نام‌ها را به درخواست accept اضافه نکن. هماهنگی انتشار فرانت با migration/API جدید لازم است؛ فرانت نام را به‌عنوان نمایش داده استفاده کند و در HTML escape کند.
+
+اعتبارسنجی نام دعوت: build صفرwarning/error و42/42 تست مرتبط بدون شکست/Skip روی PostgreSQL18 اختصاصی محلی، سه regression تازه نام/Trim/200حد/validation/Swagger/reinvite/legacyUp/guardDown؛ team-invitation-names-verified.trx. مدل و snapshot بدون اختلاف؛ SQL delta idempotent در artifacts/team-invitation-names-migrations.sql تولید، جداگانه اجرا نشده است. مقصد/فرانت/انتشار تغییر نکردند.

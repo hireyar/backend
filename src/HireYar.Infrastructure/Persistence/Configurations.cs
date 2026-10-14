@@ -113,11 +113,14 @@ public sealed class MobileTeamInvitationConfiguration : IEntityTypeConfiguration
     public void Configure(EntityTypeBuilder<MobileTeamInvitation> b)
     {
         b.HasKey(x => x.Id);
+        b.Property(x => x.FirstName).HasMaxLength(100);
+        b.Property(x => x.LastName).HasMaxLength(100);
         b.Property(x => x.Mobile).HasMaxLength(11).IsRequired();
         b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
         b.HasIndex(x => new { x.OrganizationId, x.CreatedAtUtc });
         b.HasIndex(x => x.Mobile).IsUnique().HasFilter("\"AcceptedAtUtc\" IS NULL AND \"CancelledAtUtc\" IS NULL");
         b.ToTable(t => {
+            t.HasCheckConstraint("CK_MobileTeamInvitation_Name", "(\"FirstName\" IS NULL AND \"LastName\" IS NULL) OR (\"FirstName\" IS NOT NULL AND \"LastName\" IS NOT NULL AND length(\"FirstName\") > 0 AND length(\"LastName\") > 0 AND length(\"FirstName\") + 1 + length(\"LastName\") <= 200)");
             t.HasCheckConstraint("CK_MobileTeamInvitation_Mobile", "\"Mobile\" ~ '^09[0-9]{9}$'");
             t.HasCheckConstraint("CK_MobileTeamInvitation_Expiry", "\"ExpiresAtUtc\" > \"CreatedAtUtc\"");
             t.HasCheckConstraint("CK_MobileTeamInvitation_State", "\"AcceptedAtUtc\" IS NULL OR \"CancelledAtUtc\" IS NULL");
