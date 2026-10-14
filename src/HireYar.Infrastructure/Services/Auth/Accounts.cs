@@ -79,16 +79,19 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 ?? throw AppException.NotFound();
             if (u is not null && (u.OrganizationId != org.Id || u.Role != OrganizationRole.Recruiter || u.IsActive))
                 throw new AppException(409, "mobile_unavailable", "This mobile cannot accept the invitation.");
+            var invitedName = !string.IsNullOrWhiteSpace(invitation.FirstName) && !string.IsNullOrWhiteSpace(invitation.LastName)
+                ? $"{invitation.FirstName.Trim()} {invitation.LastName.Trim()}" : null;
             if (u is null)
             {
                 u = new ApplicationUser { Id = Guid.NewGuid(), UserName = r.Mobile, PhoneNumber = r.Mobile,
-                    PhoneNumberConfirmed = true, FullName = "کاربر", OrganizationId = org.Id, Role = OrganizationRole.Recruiter,
+                    PhoneNumberConfirmed = true, FullName = invitedName ?? "کاربر", OrganizationId = org.Id, Role = OrganizationRole.Recruiter,
                     CreatedAtUtc = Now, UpdatedAtUtc = Now };
                 Check(await users.CreateAsync(u));
             }
             else
             {
                 if (await users.IsLockedOutAsync(u)) throw AppException.Unauthorized();
+                if (invitedName is not null) u.FullName = invitedName;
                 u.IsActive = true; u.PhoneNumberConfirmed = true; u.UpdatedAtUtc = Now;
                 Check(await users.UpdateSecurityStampAsync(u));
             }
