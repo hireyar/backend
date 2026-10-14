@@ -12,7 +12,7 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
     public async Task<InterviewDecisionResult> GenerateReportAsync(InterviewReportContext context, CancellationToken ct)
     {
         using var body = JsonContent.Create(new { model = config.EvaluationModel, response_format = new { type = "json_object" },
-            messages = new[] { new { role = "system", content = InterviewReportPrompt.System },
+            messages = new[] { new { role = "system", content = InterviewReportPrompt.For(context) },
                 new { role = "user", content = JsonSerializer.Serialize(context, new JsonSerializerOptions(JsonSerializerDefaults.Web)) } } });
         var bytes = await SendAsync("chat/completions", body, "report", config.EvaluationModel, config.EvaluationTimeoutSeconds, 128000, ct);
         try

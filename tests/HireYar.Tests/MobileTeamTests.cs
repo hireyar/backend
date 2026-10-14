@@ -100,7 +100,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         var reportResponse = await member.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/evaluation-report");
         Assert.Equal(HttpStatusCode.OK, reportResponse.StatusCode);
         var report = (await reportResponse.Content.ReadFromJsonAsync<InterviewReportDto>())!;
-        Assert.Equal("report-v3", report.PromptVersion);
+        Assert.Equal(InterviewReportPrompt.Version, report.PromptVersion);
         Assert.Equal(HttpStatusCode.OK, (await member.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/evaluation-report/print")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/evaluation-report")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await member.Send(HttpMethod.Post, "/api/auth/refresh")).StatusCode);

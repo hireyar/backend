@@ -1,3 +1,11 @@
+## تکمیل ADR-043 — بازیابی مستقل و deadline گزارش (2026-10-14)
+
+برای رفع امکان ماندن stage فعال بدون lease معتبر و وابستگی polling قبلی به پایان batch تولید، InterviewReportLifecycle معیار مشترک stale برای Generating/Validating/Saving دارد: نبود یا انقضای lease، یا رسیدن۱۵۰ثانیه از StartedAtUtc. status/retry/recovery زیر قفل سازمان و با reload همان معیار را اعمال می‌کنند. status سالم همچنان فقط read است؛ خواندن status منقضی اکنون failure را persist می‌کند. recovery worker هر۲ثانیه مستقل از generation، فقط با metadata و محدودیت زمان اجرا می‌شود؛ تولید همچنان چهار ظرفیت و صف PostgreSQL موجود دارد.
+
+deadline۱۳۰ثانیه پس از claim شامل provider و مراحل DB/commit است؛ WaitAsync انتظار مدل غیرهمکار را نیز محدود می‌کند. cleanup پنج‌ثانیه و کنترل مالکیت lease در commit/failure باقی‌اند؛ fault دیررس فقط observe می‌شود. restart، مرگ فرایند و legacy بدون lease معتبر به Failed قابل retry می‌روند. صف شلوغ به ظرفیت وابسته است و DB ناموجود تضمین بازیابی ندارد. سیاست retry دستی فقط پس از Failed، cached موفق و شواهد حفظ شدند؛ schema/migration، Repository یا زیرساخت توزیع‌شده تازه اضافه نشد.
+
+پرامپت report-v3.1 برای نوع جاری، تعداد ارزیابی پاسخ‌های نهایی و codeهای کامل۳/۷metric را صریح می‌کند؛ schema محصول همان v3 است. reason ثابت امن در لاگ علت رد validator را بدون متن مدل یا داوطلب مشخص می‌کند؛ failureCode API ثابت و message شفاف‌تر است. محافظ نقل‌قول دقیق، نمره و tenant و unknown بدون نمره حفظ شده‌اند. قرارداد [INTERVIEW_REPORT_LIFECYCLE_API](INTERVIEW_REPORT_LIFECYCLE_API.md) به‌روز است؛ تست مصنوعی تأیید کیفیت provider واقعی نیست.
+
 ## ADR-049 — کاربران تیم با ظرفیت خریدنی و قیمت ماهانه پویا (2026-10-14)
 
 طبق درخواست، هر پکیج includedTeamUsers/paidTeamUserLimit/teamUserMonthlyPriceIrt دارد؛ seed عمومی۳/پیشرفته۵ و آستانه۳۰ و۲۰۰۰۰۰تومان. آستانه آخرین نفر هزینه‌دار است، نه سقف عضویت؛ رسیدن ظرفیت به آستانه، افراد بعدی را رایگان می‌کند. تعداد شامل Owner و Recruiter فعال و رزرو Pending زنده است. ظرفیت مجوز سازمانی قابل استفاده مجدد تا انقضای همان اشتراک است؛ غیرفعال‌سازی عضو بازپرداخت خودکار ندارد. منطق runtime از code پکیج مستقل است.

@@ -26,6 +26,8 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
         var session = await StatusSessionAsync(id, ct);
         var available = session.Status == InterviewStatus.Completed && (await billing.CapabilitiesAsync(session, ct)).Contains("interview_report");
         var row = await db.InterviewEvaluationReports.AsNoTracking().SingleOrDefaultAsync(r => r.InterviewSessionId == id && r.OrganizationId == user.OrganizationId, ct);
+        if (row is not null && InterviewReportLifecycle.IsStale(row, time.GetUtcNow()))
+            row = await RecoverStaleAsync(user.OrganizationId, id, ct);
         return Status(session, row, available);
     }
 
@@ -64,6 +66,15 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
         return Status(session, row, true);
     }
 
+    public Task<InterviewEvaluationReport?> RecoverStaleAsync(Guid organizationId, Guid id, CancellationToken ct) =>
+        db.WithOrganizationBillingLockAsync(organizationId, async () => {
+            if (!await db.InterviewSessions.IgnoreAutoIncludes().AnyAsync(s => s.Id == id && s.OrganizationId == organizationId && s.DeletedAtUtc == null, ct))
+                throw AppException.NotFound();
+            var row = await db.InterviewEvaluationReports.SingleOrDefaultAsync(r => r.InterviewSessionId == id && r.OrganizationId == organizationId, ct);
+            if (row is not null) { await db.ReloadReportAsync(row, ct); Expire(row); }
+            return row;
+        }, ct);
+
     // Internal worker entry: organization comes from the persisted queue, never client input.
     public async Task ProcessQueuedAsync(Guid organizationId, Guid id, CancellationToken ct)
     {
@@ -76,18 +87,21 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
             if (row is null) return false;
             await db.ReloadReportAsync(row, ct);
             if (Expire(row) || row.GenerationStage != "Queued") return false;
-            row.LeaseId = lease; row.LeaseExpiresAtUtc = time.GetUtcNow().AddSeconds(150);
+            row.LeaseId = lease; row.LeaseExpiresAtUtc = time.GetUtcNow() + InterviewReportLifecycle.LeaseDuration;
             row.GenerationStage = "Generating"; row.GenerationAttempts++; row.StartedAtUtc = time.GetUtcNow();
             row.FinishedAtUtc = null; row.FailureCode = null; row.FailureStage = null;
             return true;
         }, ct);
         if (!claimed) return;
         db.DetachEntity(row!);
+        using var deadline = new CancellationTokenSource(InterviewReportLifecycle.AttemptTimeout, time);
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(ct, deadline.Token);
+        var attemptToken = attempt.Token;
         try
         {
             var settings = row!.GenerationSettingsJson is null ? null : JsonSerializer.Deserialize<GenerateInterviewReportRequest>(row.GenerationSettingsJson, Json);
             var position = session.PositionTitleSnapshot is null || session.PositionDescriptionSnapshot is null
-                ? await db.JobPositions.AsNoTracking().SingleAsync(p => p.Id == session.JobPositionId && p.OrganizationId == organizationId, ct) : null;
+                ? await db.JobPositions.AsNoTracking().SingleAsync(p => p.Id == session.JobPositionId && p.OrganizationId == organizationId, attemptToken) : null;
             var context = new InterviewReportContext(session.PositionTitleSnapshot ?? position!.Title, session.PositionDescriptionSnapshot ?? position!.Description,
                 session.ResumeTextSnapshot, session.CandidateIntroductionTranscript, session.Language, session.CompletionReason?.ToString(),
                 session.Answers.Where(a => a.Status == AnswerStatus.Processed).OrderBy(a => a.SubmittedAtUtc).ThenBy(a => a.ProcessedAtUtc).ThenBy(a => a.Id)
@@ -97,17 +111,19 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
                 session.Questions.Where(q => q.AskedAtUtc is not null || session.Answers.Any(a => a.QuestionId == q.QuestionId)).Select(q => new HrQuestionDto(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty)).ToArray(),
                 session.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized");
             if (context.InterviewType == "general") context = context with { Resume = null, Introduction = null };
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            deadline.CancelAfter(TimeSpan.FromSeconds(130));
-            var generated = await provider.GenerateReportAsync(context, deadline.Token);
-            await SetStageAsync(organizationId, id, lease, "Validating", ct);
+            var generation = provider.GenerateReportAsync(context, attemptToken);
+            // A provider that ignores cancellation must not occupy the queue indefinitely.
+            _ = generation.ContinueWith(task => { _ = task.Exception; }, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            var generated = await generation.WaitAsync(attemptToken);
+            await SetStageAsync(organizationId, id, lease, "Validating", attemptToken);
             var content = InterviewReportDetailsBuilder.Build(InterviewReportValidator.Validate(generated.Json, context, true, true), session, settings);
-            await SetStageAsync(organizationId, id, lease, "Saving", ct);
+            await SetStageAsync(organizationId, id, lease, "Saving", attemptToken);
             await db.WithOrganizationBillingLockAsync(organizationId, async () => {
-                await db.ReloadInterviewAsync(session, ct);
+                await db.ReloadInterviewAsync(session, attemptToken);
                 if (session.DeletedAtUtc is not null) throw AppException.NotFound();
-                var owner = await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == id && r.OrganizationId == organizationId, ct);
-                await db.ReloadReportAsync(owner, ct);
+                var owner = await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == id && r.OrganizationId == organizationId, attemptToken);
+                await db.ReloadReportAsync(owner, attemptToken);
                 if (owner.LeaseId != lease || owner.LeaseExpiresAtUtc <= time.GetUtcNow()) throw AppException.Conflict();
                 owner.ResultJson = JsonSerializer.Serialize(content, Json); owner.Model = generated.Model; owner.Provider = generated.Provider;
                 var now = time.GetUtcNow();
@@ -116,7 +132,7 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
                 owner.LeaseId = null; owner.LeaseExpiresAtUtc = null;
                 owner.GenerationStage = "Succeeded"; owner.FinishedAtUtc = owner.CreatedAtUtc; owner.FailureCode = null; owner.FailureStage = null;
                 return true;
-            }, ct);
+            }, attemptToken);
         }
         catch (Exception error)
         {
@@ -129,9 +145,10 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
                     await db.ReloadReportAsync(owner, cleanup.Token);
                     if (owner.LeaseId == lease) {
                         owner.FailureStage = owner.GenerationStage;
-                        owner.FailureCode = owner.GenerationStage == "Validating" ? "report_validation_failed" :
-                            error is OperationCanceledException ? "report_interrupted" :
+                        owner.FailureCode = error is OperationCanceledException
+                            ? deadline.IsCancellationRequested && !ct.IsCancellationRequested ? "report_timeout" : "report_interrupted" :
                             error is InterviewProviderException { Code: "report_timeout" } ? "report_timeout" :
+                            owner.GenerationStage == "Validating" && error is InterviewProviderException { Code: "report_invalid_response" } ? "report_validation_failed" :
                             error is InterviewProviderException { Code: "report_invalid_response" } ? "report_invalid_response" :
                             error is InterviewProviderException ? "evaluation_report_unavailable" : "report_generation_failed";
                         owner.GenerationStage = "Failed"; owner.FinishedAtUtc = time.GetUtcNow();
@@ -144,7 +161,8 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
             {
                 logger.LogWarning("Evaluation report lease cleanup failed errorType={ErrorType}", cleanupError.GetType().Name);
             }
-            logger.LogWarning("Evaluation report generation failed interviewId={InterviewId} errorType={ErrorType}", id, error.GetType().Name);
+            logger.LogWarning("Evaluation report generation failed interviewId={InterviewId} errorType={ErrorType} reason={Reason}",
+                id, error.GetType().Name, (error as InterviewProviderException)?.Reason);
             if (ct.IsCancellationRequested) throw;
         }
     }
@@ -162,7 +180,7 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
 
     private bool Expire(InterviewEvaluationReport row)
     {
-        if (row.LeaseId is null || row.LeaseExpiresAtUtc > time.GetUtcNow()) return false;
+        if (!InterviewReportLifecycle.IsStale(row, time.GetUtcNow())) return false;
         row.FailureStage = row.GenerationStage;
         row.GenerationStage = "Failed"; row.FailureCode = "report_interrupted"; row.FinishedAtUtc = time.GetUtcNow();
         row.LeaseId = null; row.LeaseExpiresAtUtc = null;
@@ -171,7 +189,7 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
 
     private InterviewReportGenerationDto Status(InterviewSession session, InterviewEvaluationReport? row, bool available)
     {
-        var expired = row?.LeaseId is not null && row.LeaseExpiresAtUtc <= time.GetUtcNow();
+        var expired = row is not null && InterviewReportLifecycle.IsStale(row, time.GetUtcNow());
         var stage = !available ? session.Status == InterviewStatus.Completed ? "Unavailable" : "WaitingForCompletion" :
             expired ? "Failed" : row?.GenerationStage ?? "Failed";
         var status = stage switch { "Queued" => "Queued", "Generating" or "Validating" or "Saving" => "Processing",
@@ -181,7 +199,8 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
             "Validating" => "خروجی گزارش در حال بررسی اعتبار و شواهد است.", "Saving" => "گزارش در حال ذخیره شدن است.",
             "Succeeded" => "گزارش آماده است.", "Failed" => (expired ? "report_interrupted" : row?.FailureCode) switch {
                 "report_timeout" => "سرویس تولید گزارش در زمان مجاز پاسخ نداد؛ می‌توانید دوباره درخواست دهید.",
-                "report_validation_failed" or "report_invalid_response" => "خروجی تولیدشده معتبر نبود؛ می‌توانید دوباره درخواست دهید.",
+                "report_validation_failed" => "خروجی مدل با ساختار گزارش یا شواهد پاسخ‌ها مطابقت نداشت و ذخیره نشد؛ می‌توانید دوباره درخواست دهید.",
+                "report_invalid_response" => "پاسخ سرویس تولید گزارش قابل خواندن نبود؛ می‌توانید دوباره درخواست دهید.",
                 "report_interrupted" => "پردازش گزارش قطع شد؛ می‌توانید دوباره درخواست دهید.",
                 "report_not_generated" => "این مصاحبه قدیمی گزارش تولیدشده ندارد؛ می‌توانید درخواست تولید دهید.",
                 _ => "تولید گزارش ناموفق بود؛ می‌توانید دوباره درخواست دهید." },

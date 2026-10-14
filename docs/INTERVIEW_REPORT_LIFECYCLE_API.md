@@ -51,3 +51,13 @@ failureCode امن: report_timeout، report_invalid_response، report_validation
 پیش از اجرای نسخه جدید، migration `20261013054737_AddReportGenerationLifecycle` در تسک انتشار لازم است. فیلدهای چرخه/index به جدول موجود افزوده می‌شوند؛ Repository/زیرساخت توزیع‌شده تازه نداریم. cached بدونlease→Succeeded؛ lease تاریخی→Generating؛ JSON/model/provider/version/زمان قدیمی محفوظ. رکورد خالی→Failed/report_not_generated. Completed قدیمی بدون رکورد هم همین وضعیت و canRetry=true دارد تا Owner درخواست کند؛ کل تاریخچه خودکار به صف نمی‌رود و زمان تاریخی حدسی ساخته نمی‌شود. downgrade دارای صف/تاریخچه تلاش با guard رد می‌شود.
 
 تنظیمات AI/secret، DB مقصد و انتشار تغییر نکرده‌اند. handler جاری HTTP/body را یکسان تنظیم می‌کند؛ report_processing در کد قبلی فقط POST بود و GET بدوننتیجه404. منشأ HTTP404 همراه body409 مقصد بدون نسخه/لاگ پراکسی تأیید نشده است.
+
+## محافظ‌های پردازش — تکمیل 2026-10-14
+
+سه مرحله Generating/Validating/Saving با lease غایب/منقضی یا گذشت۱۵۰ثانیه از start، Failed/report_interrupted می‌شوند. GET status این بازیابی را زیر قفل سازمان و با reload persist می‌کند؛ worker یک poll بازیابی مستقل از مدل‌های درحال‌اجرا دارد. بازیابی transcript را بارگذاری یا مدل را دوباره صدا نمی‌زند. DB و قفل باید در دسترس باشند؛ هر poll دارای batch۲۰ و چهار recovery با deadline۵ثانیه است. صف Queued به ظرفیت وابسته است و deadline تلاش شامل زمان صف نیست.
+
+deadline۱۳۰ثانیه کل تلاش پس از claim، شامل network و مرحله/commit است؛ انتظار provider غیرهمکار با WaitAsync قطع و timeout به Failed/report_timeout تبدیل می‌شود. shutdown به report_interrupted و مرگ فرایند به lease expiry می‌رود. retry دستی پابرجا و cached تاریخی در recovery/شکست محفوظ است؛ تلاش دیررس نتیجه تلاش جدید را عوض نمی‌کند. schema/config/migration تازه لازم نیست.
+
+promptVersion جدید report-v3.1 با schema گزارش v3، codeهای واقعی شاخص‌ها و تعداد ارزیابی پاسخ‌های نهایی را در هر request صریح می‌کند. فرانت نباید نسخه پرامپت را با نسخه schema یکی بداند؛ cached با promptVersion قبلی محفوظ است. محافظ نقل‌قول/answerId/نمره پابرجاست. failureCode و DTO status تغییر نکرده‌اند و message اعتبارسنجی شفاف‌تر است. لاگ شکست reason ثابتی مانند json_schema_invalid، metric_catalog_invalid، metric_value_invalid، metric_citation_invalid، answer_coverage_invalid، answer_evaluation_invalid یا finding_citation_invalid دارد؛ متن provider یا پاسخ داوطلب ثبت نمی‌شود. reason جزئی در DB/DTO ذخیره نمی‌شود و برای شکست قدیمی قابل بازیابی نیست.
+
+پنل باید وضعیت را از GET status تازه بگیرد، در Failed با canRetry=true دکمه retry را فعال و polling پردازش را متوقف کند. نمایش Processing از snapshot قبلی، وقتی status جاری Failed است، باید با polling/refresh اصلاح شود. Angular و انتشار مقصد در این تغییر انجام نشده‌اند.

@@ -32,6 +32,13 @@ public sealed class TestClock : TimeProvider
 {
     public TimeSpan Offset { get; set; }
     public override DateTimeOffset GetUtcNow() => DateTimeOffset.UtcNow + Offset;
+    public Action<TimerCallback, object?, TimeSpan>? TimerCreated { get; set; }
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = base.CreateTimer(callback, state, dueTime, period);
+        TimerCreated?.Invoke(callback, state, dueTime);
+        return timer;
+    }
 }
 public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
