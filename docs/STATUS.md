@@ -1,3 +1,13 @@
+## حذف تعارض فیلدهای شاهد — 2026-10-14: Verified با suite کامل
+
+لاگ کاربر HTTP200 برای هر دو تماس مدل و source_reference_conflicting_fields پس از repair را نشان داد. این شکست از شرط اعتبارسنجی شناخته‌شده می‌آمد، نه خطای runtime کنترل‌نشده. تبدیل قبلی دو مرجع حقیقت داشت: sourceRef معتبر سرور و کپی quote/answerId احتمالی مدل. هنوز معلوم نیست کدام کپی در خروجی قبلی تعارض داشته، ولی مسیر دقیق رد با reason مشخص است.
+
+اصلاح محدود: پس از حل sourceRef معتبر، کپی quote/answerId مدل کنار گذاشته و فقط متن و شناسه منبع اصلی سرور نوشته می‌شود. حتی null/نوع اشتباه/UUID یا متن ساختگی اضافی وارد نتیجه نمی‌شوند. مرجع ناشناخته، alias مبهم، interaction و source پاسخ دیگر همچنان مردودند؛ validator بر canonical report پابرجاست. promptVersion=report-v3.4، schema/API و Domain/EF ثابت؛ migration/فرانت لازم نیست. صف، deadline، repair دو-call، cache، retry، مدل/provider/config و مالی عوض نشدند. تکمیل ADR-050/051 و قرارداد چرخه گزارش مرجع‌اند.
+
+Build نهایی صفر warning/error؛ tool restore/restore موفق؛ suite کامل431/431 موفق، صفر Failed/Skipped روی PostgreSQL18 اختصاصی loopback55504 و FFmpeg واقعی محلی، provider/payment/S3/OTP مصنوعی و SMTP محلی؛ tests/HireYar.Tests/TestResults/report-authoritative-full.trx. سه case conflicting/null/wrong_type برای هر سه محل شاهد و یک case adapter بدون repair اضافه شدند؛ دو انتظار قدیمی رد کپی‌های اضافی به اثبات عدم ورود آن‌ها و جایگذاری داده اصلی تبدیل شدند. سایر تست‌های مرجع نامعتبر، source پاسخ دیگر، نمره/catalog، امنیت/مالی/رسانه و محافظ‌های قبلی هم اجرا شدند. چهار فایل کد/تست تغییر داشتند: resolver، نسخه پرامپت و دو فایل تست؛ تغییر runtime دیگری نیست.
+
+DB fixture صفر باقی ماند و cluster موقت متوقف/حذف شد. مدل واقعی یا DB مقصد این نوبت استفاده یا تغییر نشد؛ raw output یا لاگ کاربر در فایل/Git کپی نشد. گزارش واقعی هنوز بازتولید نشده و موفقیت تمام خروجی‌های مدل ادعا نمی‌شود. باقی: انتشار/restart مستقل بک‌اند و retry توسط Owner؛ commit/push/deploy/production و داده/تنظیمات مقصد تغییر نکردند.
+
 ## اصلاح خروجی نامعتبر با repair محدود — 2026-10-14: Verified محلی و smoke واقعی
 
 لاگ کاربر از Liara/openai/gpt-5.6-luna با HTTP200 و source_reference_invalid نشان داد ارجاع مدل هنوز گاهی قرارداد را نقض می‌کند. این reason قبلی سه حالت نبود/ناشناخته‌بودن reference یا اضافه‌بودن quote/answerId را یکسان می‌کرد؛ بدون خروجی قبلی نمی‌توان زیرعلت همان گزارش را تعیین کرد. کد، حتی فیلدهای اضافی دقیقاً مطابق منبع واقعی را رد می‌کرد؛ این سخت‌گیری شکلی اصلاح شد، ولی داده ساختگی پذیرفته نمی‌شود.

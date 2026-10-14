@@ -37,6 +37,7 @@ public sealed class InterviewReportRepairTests
             if(Calls==1||alwaysInvalid) {
                 var node=JsonNode.Parse(reply)!;
                 if(error=="reference") node["metrics"]![0]!["evidence"]![0]!["sourceRef"]="A999.1";
+                if(error=="conflicting") { node["metrics"]![0]!["evidence"]![0]!["quote"]="Invented quote"; node["metrics"]![0]!["evidence"]![0]!["answerId"]=Guid.NewGuid().ToString(); }
                 if(error=="numeric") node["metrics"]![0]!["score"]=99;
                 reply=error=="json"?"not-json":node.ToJsonString();
             }
@@ -97,5 +98,15 @@ public sealed class InterviewReportRepairTests
         using var stopped=new CancellationTokenSource();var pending=Provider(stoppedHttp).GenerateReportAsync(Context(),stopped.Token);
         await stoppedHandler.RepairEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));stopped.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(()=>pending);Assert.Equal(2,stoppedHandler.Calls);
+    }
+    [Fact]
+    public async Task Conflicting_model_copies_do_not_trigger_repair_or_enter_persisted_evidence()
+    {
+        var context=Context();var handler=new Handler("conflicting");using var http=new HttpClient(handler);
+        var result=await Provider(http).GenerateReportAsync(context,default);
+        Assert.Equal(1,handler.Calls);Assert.DoesNotContain("Invented quote",result.Json);
+        var content=InterviewReportValidator.Validate(result.Json,context,true,true);
+        Assert.Equal(context.Answers[0].AnswerId,content.Metrics![0].Evidence[0].AnswerId);
+        Assert.Equal(context.Answers[0].Transcript,content.Metrics[0].Evidence[0].Quote);
     }
 }

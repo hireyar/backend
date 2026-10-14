@@ -44,10 +44,8 @@ public sealed class InterviewReportSourceTests
     [Theory]
     [InlineData("unknown")]
     [InlineData("wrong_answer")]
-    [InlineData("invented_quote")]
-    [InlineData("invented_uuid")]
     [InlineData("interaction_uuid")]
-    public void Unknown_sources_and_injected_ids_quotes_and_cross_answer_evaluations_are_rejected(string invalid)
+    public void Unknown_sources_interaction_ids_and_cross_answer_evaluations_are_rejected(string invalid)
     {
         var context=Context(); var sources=new InterviewReportSources(context);
         var reply=JsonNode.Parse(Reply(context))!;
@@ -55,8 +53,6 @@ public sealed class InterviewReportSourceTests
         switch(invalid) {
             case "unknown": reply["metrics"]![0]!["evidence"]![0]!["sourceRef"]="A99.1"; break;
             case "wrong_answer": evaluation["sourceRef"]="A2.1"; break;
-            case "invented_quote": reply["metrics"]![0]!["evidence"]![0]!["quote"]="Fabricated quote"; break;
-            case "invented_uuid": evaluation["answerId"]=Guid.NewGuid(); break;
             case "interaction_uuid": reply["metrics"]![0]!["evidence"]![0]!["sourceRef"]=context.Answers[0].AnswerId.ToString(); break;
         }
         var error=Assert.Throws<InterviewProviderException>(()=>sources.Resolve(reply.ToJsonString()));
@@ -115,5 +111,25 @@ public sealed class InterviewReportSourceTests
         var ambiguous=new InterviewReportSources(longContext); var longReply=JsonNode.Parse(Reply(longContext))!;
         longReply["metrics"]![0]!["evidence"]![0]!["sourceRef"]="A1";
         Assert.Equal("source_reference_unknown",Assert.Throws<InterviewProviderException>(()=>ambiguous.Resolve(longReply.ToJsonString())).Reason);
+    }
+    [Theory]
+    [InlineData("conflicting")]
+    [InlineData("null")]
+    [InlineData("wrong_type")]
+    public void Valid_source_references_always_use_server_evidence_and_discard_model_owned_copies(string kind)
+    {
+        var context=Context();var sources=new InterviewReportSources(context);var reply=JsonNode.Parse(Reply(context))!;
+        var nodes=new[]{reply["findings"]![0]!,reply["metrics"]![0]!["evidence"]![0]!,reply["questionEvaluations"]![0]!};
+        foreach(var node in nodes) {
+            node["quote"]=kind=="null"?null:kind=="wrong_type"?new JsonObject{{"injected",true}}:JsonValue.Create("Fabricated text must never become report evidence");
+            node["answerId"]=kind=="null"?null:kind=="wrong_type"?new JsonArray(1,2):JsonValue.Create(context.Answers[0].AnswerId.ToString());
+        }
+        var resolved=sources.Resolve(reply.ToJsonString());var content=InterviewReportValidator.Validate(resolved,context,true,true);
+        Assert.DoesNotContain("Fabricated text",resolved);Assert.DoesNotContain("injected",resolved);
+        Assert.Equal(context.Answers[1].AnswerId,content.Metrics![0].Evidence[0].AnswerId);
+        Assert.Equal(context.Answers[1].Transcript,content.Metrics[0].Evidence[0].Quote);
+        Assert.Equal(context.Answers[1].AnswerId,content.QuestionEvaluations![0].AnswerId);
+        Assert.Equal(context.Answers[1].Transcript,content.Findings[0].Quote);
+        Assert.Throws<InterviewProviderException>(()=>sources.Resolve(reply.ToJsonString().Replace("A1.1","A999.1")));
     }
 }
