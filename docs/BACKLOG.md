@@ -1,3 +1,9 @@
+## HY-301 — رفع ارجاع نامعتبر شواهد شاخص‌ها — 2026-10-14
+
+لاگ واقعی metric_citation_invalid پس از HTTP200 علت شکست گزارش را مشخص کرد؛ تغییر report-v3.1 فقط محافظ پردازش/تشخیص را کامل کرده بود. اصلاح report-v3.2 با sourceRef/answerRef محلی و حل قطعی به متن شاهد و answerId اصلی پیاده شد؛ کنترل‌های strict و schema عمومی v3، cached، نمره و lifecycle حفظ شدند. build صفر warning/error؛137/137 تست مرتبط PostgreSQL واقعی موفق، صفر Skip/Failed و دو smoke داده مصنوعی با Liara/Gemini واقعی عمومی/تخصصی معتبر شدند. ADR-050 و قرارداد چرخه گزارش به‌روزند؛ migration و تغییر فرانت لازم نیست.
+
+باقی: انتشار مستقل API، retry گزارش‌های Failed توسط Owner و ارزیابی کیفیت معنایی گزارش‌های واقعی. مرجع نامعتبر یا JSON خراب همچنان شکست امن دارد؛ موفقیت تمام خروجی‌های مدل ادعا نمی‌شود. DB مقصد فقط خوانده شد؛ retry واقعی، config/model مقصد، push/deploy/production تغییر نکردند و backlog مجوز اجرای آن‌ها نیست.
+
 ## HY-301 — محافظ پردازش گزارش و تشخیص شکست — 2026-10-14
 
 مقاوم‌سازی بک‌اند Verified محلی: معیار مشترک lease غایب/منقضی و سقف۱۵۰ثانیه از start؛ persist بازیابی در GET status، polling مستقل recovery، deadline۱۳۰ثانیه شامل مراحل پس از claim و WaitAsync برای provider بی‌اعتنا به لغو. مالکیت lease، cached، retry فقط پس از Failed و محافظ‌های شواهد محفوظ‌اند. promptVersion=report-v3.1 و reason ثابت امن اعتبارسنجی اضافه شدند؛ schema/report-v3 و مدل/provider ثابت، migration تازه ندارد. build صفر warning/error و125/125 تست مرتبط PostgreSQL واقعی موفق، صفر Failed/Skipped؛ report-safety-verified.trx.

@@ -43,6 +43,6 @@ public sealed class InterviewReportSafetyRulesTests
         Assert.Contains("Required metric codes for this interview (include every code exactly once, even when unassessed): " +
             string.Join(", ", InterviewReportMetricCatalog.Codes(type)), prompt);
         Assert.Contains("Required questionEvaluations count: 1.", prompt);
-        Assert.Contains("do not correct spelling, punctuation or whitespace", prompt);
+        Assert.Contains("Never write UUIDs or quotes in the output", prompt);
     }
 }

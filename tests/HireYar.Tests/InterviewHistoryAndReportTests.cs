@@ -175,7 +175,8 @@ public sealed class InterviewHistoryAndReportTests
             var system = json.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
             if (Models.Count == 1) Assert.Contains("completed interview", system);
             else Assert.Contains("interview decision engine", system);
-            return new(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"{}\"}}]}") };
+            var reply = Models.Count == 1 ? "{\"findings\":[],\"metrics\":[],\"questionEvaluations\":[]}" : "{}";
+            return new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { choices = new[] { new { message = new { content = reply } } } })) };
         }
     }
 

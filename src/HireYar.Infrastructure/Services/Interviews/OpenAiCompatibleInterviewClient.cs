@@ -11,16 +11,17 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
 {
     public async Task<InterviewDecisionResult> GenerateReportAsync(InterviewReportContext context, CancellationToken ct)
     {
+        var sources = new InterviewReportSources(context);
         using var body = JsonContent.Create(new { model = config.EvaluationModel, response_format = new { type = "json_object" },
             messages = new[] { new { role = "system", content = InterviewReportPrompt.For(context) },
-                new { role = "user", content = JsonSerializer.Serialize(context, new JsonSerializerOptions(JsonSerializerDefaults.Web)) } } });
+                new { role = "user", content = sources.RequestJson(context) } } });
         var bytes = await SendAsync("chat/completions", body, "report", config.EvaluationModel, config.EvaluationTimeoutSeconds, 128000, ct);
         try
         {
             using var doc = JsonDocument.Parse(bytes);
             var json = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
             if (string.IsNullOrWhiteSpace(json) || json.Length > 32000) throw new JsonException();
-            return new(json, providerName, config.EvaluationModel);
+            return new(sources.Resolve(json), providerName, config.EvaluationModel);
         }
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException)
         { throw new InterviewProviderException("report_invalid_response"); }
