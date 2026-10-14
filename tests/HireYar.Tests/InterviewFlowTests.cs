@@ -226,7 +226,7 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
         Assert.Equal("openai/gpt-6-luna", report.Model); Assert.Single(report.Content.Findings); Assert.Single(f.ReportAi.LastContext!.Answers);
         Assert.Equal(2, f.ReportAi.LastContext.Questions.Count); // Answered question and next asked, unanswered question.
         var details = report.Content.Details!;
-        Assert.Equal("report-v3", report.PromptVersion);
+        Assert.Equal(InterviewReportPrompt.Version, report.PromptVersion);
         Assert.Equal(3, details.BankCount); Assert.Equal(2, details.AskedCount); Assert.Equal(1, details.EvaluatedCount);
         Assert.Equal(60m, details.OverallScore); Assert.True(details.RequiresHumanReview);
         Assert.Single(details.Questions, q => q.Score is null);

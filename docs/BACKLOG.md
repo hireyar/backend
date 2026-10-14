@@ -1,3 +1,9 @@
+## HY-301 — محافظ پردازش گزارش و تشخیص شکست — 2026-10-14
+
+مقاوم‌سازی بک‌اند Verified محلی: معیار مشترک lease غایب/منقضی و سقف۱۵۰ثانیه از start؛ persist بازیابی در GET status، polling مستقل recovery، deadline۱۳۰ثانیه شامل مراحل پس از claim و WaitAsync برای provider بی‌اعتنا به لغو. مالکیت lease، cached، retry فقط پس از Failed و محافظ‌های شواهد محفوظ‌اند. promptVersion=report-v3.1 و reason ثابت امن اعتبارسنجی اضافه شدند؛ schema/report-v3 و مدل/provider ثابت، migration تازه ندارد. build صفر warning/error و125/125 تست مرتبط PostgreSQL واقعی موفق، صفر Failed/Skipped؛ report-safety-verified.trx.
+
+باقی این مسئله: انتشار مستقل و بررسی status مستقیم/پنل Angular؛ metadata نمونه مقصد هنگام بررسی Failed در Validating بود. علت دقیق رد خروجی قبلی با metadata موجود تعیین نمی‌شود؛ بررسی reason امن تلاش بعدی نسخه جدید و کیفیت مدل واقعی باقی است. retry، تغییر داده یا تنظیمات مقصد، تماس AI واقعی، push/deploy/production انجام نشد. این فهرست مجوز انتشار یا بازتولید خودکار تاریخچه نیست.
+
 ## قیمت پویا کاربران تیم — 2026-10-14
 
 بک‌اند مجاز Verified محلی: سیاست پویای هرپکیج۳/۵، نرخ۲۰۰۰۰۰تومان ماهانه، proration۳۰روزه، رایگان‌شدن پس از۳۰، snapshot، checkout TeamSeats، کنترل دعوت/پذیرش و ظرفیت تمدید/ارتقا، فاکتور/تاریخچه آماده‌اند. Build صفرwarning/error و suite کامل۴۰۱/۴۰۱ موفق، صفرFailed/Skipped روی PostgreSQL واقعی؛ team-seat-verified.trx. SQL delta دوبار، legacy حفظ‌شده و EF drift=false تأیید شدند. [TEAM_SEAT_BILLING_API](TEAM_SEAT_BILLING_API.md) و ADR-049 مرجع‌اند.

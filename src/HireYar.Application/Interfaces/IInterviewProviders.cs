@@ -35,9 +35,10 @@ public interface ITextToSpeechService
     SpeechProfile Profile { get; }
     Task<TextToSpeechResult> GenerateAsync(string text, CancellationToken ct);
 }
-public sealed class InterviewProviderException(string code) : Exception("Interview provider unavailable.")
+public sealed class InterviewProviderException(string code, string? reason = null) : Exception("Interview provider unavailable.")
 {
     public string Code { get; } = code;
+    public string? Reason { get; } = reason;
 }
 public sealed record StoredAudio(string Key, long SizeBytes);
 public interface IInterviewMediaMetadata

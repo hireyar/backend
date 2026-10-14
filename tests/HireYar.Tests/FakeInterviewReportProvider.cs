@@ -8,14 +8,15 @@ public sealed class FakeInterviewReportProvider : IInterviewReportProvider
     public int Calls;
     public bool Fail;
     public bool Invalid;
+    public bool IgnoreCancellation;
     public InterviewReportContext? LastContext;
     public TaskCompletionSource? Entered;
     public TaskCompletionSource? Release;
-    public void Reset() { Calls = 0; Fail = Invalid = false; LastContext = null; Entered = Release = null; }
+    public void Reset() { Calls = 0; Fail = Invalid = IgnoreCancellation = false; LastContext = null; Entered = Release = null; }
     public async Task<InterviewDecisionResult> GenerateReportAsync(InterviewReportContext context, CancellationToken ct)
     {
         Interlocked.Increment(ref Calls); LastContext = context;
-        Entered?.TrySetResult(); if (Release is { } release) await release.Task.WaitAsync(ct);
+        Entered?.TrySetResult(); if (Release is { } release) await release.Task.WaitAsync(IgnoreCancellation ? CancellationToken.None : ct);
         if (Fail) throw new InterviewProviderException("report_timeout");
         if (Invalid) return new("not-json", "Test", "openai/gpt-6-luna");
         var answer = context.Answers.FirstOrDefault(a => !a.IsInteraction && a.Transcript is not null);

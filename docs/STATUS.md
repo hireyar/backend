@@ -1,3 +1,15 @@
+## مقاوم‌سازی گزارش ارزیابی — 2026-10-14: Verified محلی
+
+بررسی فقط‌خواندنی metadata دیتابیس نشان داد نمونه گزارش‌شده هنگام بررسی Failed/report_validation_failed در Validating و بدون نتیجه بود؛ Processing ارسالی وضعیت جاری DB نبود. خروجی ردشده قبلاً ذخیره نشده و نسخه قبلی reason جزئی ثبت نمی‌کرد. بنابراین علت دقیق رد خروجی و علت نمایش قدیمی پنل تأیید نشده‌اند. شناسه، متن مصاحبه و credential در مستندات یا artifactهای تازه ثبت نشدند؛ DB مقصد تغییر نکرد.
+
+InterviewReportLifecycle معیار مشترک برای سه مرحله فعال دارد: lease غایب یا منقضی، یا گذشت۱۵۰ثانیه از StartedAtUtc. GET status وضعیت stale را زیر قفل همان سازمان و با reload به Failed/report_interrupted تبدیل و persist می‌کند؛ retry و worker همان معیار را دارند. recovery مستقل هر۲ثانیه، بدون بارگذاری پاسخ‌ها یا مصرف ظرفیت تولید، اجرا می‌شود. deadline۱۳۰ثانیه به کل تلاش پس از claim و مراحل DB بعدی متصل است؛ WaitAsync انتظار provider بی‌اعتنا به لغو را قطع می‌کند. cleanup محدود۵ثانیه، کنترل مالکیت lease، retry دستی و حفظ cached پابرجا هستند. بازیابی به دسترسی DB و قفل وابسته است؛ زمان صف تضمین نشده است.
+
+promptVersion تازه report-v3.1 با schema همان report-v3، کاتالوگ واقعی۳/۷شاخص و تعداد پاسخ نهایی را برای هر درخواست صریح می‌کند. مثال metrics دیگر آرایه خالی نیست؛ نقل‌قول دقیق و تفاوت answerId/questionId روشن‌ترند. اعتبارسنجی شواهد و نمره‌ها ثابت است؛ reasonهای ثابت و امن schema/catalog/value/citation/coverage فقط به لاگ اضافه شدند. failureCodeهای API محفوظ و پیام validation شفاف‌تر است. schema، migration، تنظیمات، مدل و provider تغییر ندارند؛ کیفیت واقعی مدل با داده مصنوعی اثبات نشده است.
+
+Verification: tool restore/restore موفق، build نهایی صفر warning/error؛125/125 تست مرتبط گزارش، flow، review، team و provider موفق، صفر Failed/Skipped، PostgreSQL18 اختصاصی loopback55501 و AI مصنوعی؛ tests/HireYar.Tests/TestResults/report-safety-verified.trx. هشت case جدید شامل۹ترکیب stage/lease، lease سالم، تحریک TimerCallback واقعی deadline بدون انتظار۱۳۰ثانیه، provider بی‌اعتنا به لغو و نتیجه دیررس پس از retry، recovery hosted هنگام تولید مسدود بدون GET status، حفظ cached و diagnostics/prompt هستند. اجرای اول64/65 به انتظار ثابت نسخه قبلی پرامپت برخورد کرد؛ دو assertion به نسخه جاری متصل و هر125 تست نهایی بازاجرا شدند. suite کامل تکرار نشد. دیتابیس fixture باقی نماند و cluster موقت متوقف و حذف شد.
+
+باقی: انتشار/restart مستقل API و بررسی polling فرانت جدا. اگر GET status جاری Failed ولی UI همچنان Processing باشد، مصرف پاسخ تازه در فرانت باید بررسی شود. علت رد خروجی واقعی باید از reason امن لاگ نسخه جدید در تلاش بعدی مجاز مشخص شود؛ شواهد یا نمره فرضی جایگزین خروجی نامعتبر نمی‌شوند. push/deploy/production و داده یا تنظیمات مقصد تغییر نکردند.
+
 ## قیمت پویا کاربران تیم — 2026-10-14
 
 روی dev پاک آغاز شد؛ سهمیه پکیج۳/۵، ماهانه۲۰۰۰۰۰تومان، روزشمار۳۰روز و آستانه۳۰ (نفر۳۱ به بعد رایگان)، قابل ویرایش سوپرادمین با RowVersion، snapshot قرارداد، API ظرفیت/quote/checkout و تأیید پرداخت موجود، تاریخچه/فاکتور TeamSeats و هزینه ظرفیت در خرید/تمدید/ارتقا اضافه شدند. دعوت Pending ظرفیت رزرو و ایجاد/پذیرش زیر قفل سازمان کسری را رد می‌کند. Migration20261014060524 و [TEAM_SEAT_BILLING_API](TEAM_SEAT_BILLING_API.md)، ADR-049 مرجع‌اند. پرداخت‌های قبلی و ظرفیت موجود بدون شارژ بازگشتی محفوظ‌اند.
