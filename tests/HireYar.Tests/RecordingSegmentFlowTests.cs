@@ -72,6 +72,10 @@ public sealed partial class InterviewFlowTests
             Assert.False(db.Database.HasPendingModelChanges());
             var error = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261011120218_ConfigureRegistrationTrial"));
             Assert.Equal("P0001", error.SqlState);
+            // EF commits each migration separately: a guarded older Down can leave newer
+            // harmless migrations reverted. Restore the shared fixture before other tests.
+            await db.Database.MigrateAsync();
+            Assert.Contains("20261014060524_AddDynamicTeamSeatBilling", await db.Database.GetAppliedMigrationsAsync());
         });
     }
 

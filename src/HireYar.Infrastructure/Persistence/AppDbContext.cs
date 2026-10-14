@@ -45,6 +45,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<PackageFeature> PackageFeatures => Set<PackageFeature>();
     public DbSet<AiCreditPackage> AiCreditPackages => Set<AiCreditPackage>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<TeamSeatPurchase> TeamSeatPurchases => Set<TeamSeatPurchase>();
     public DbSet<SubscriptionPurchase> SubscriptionPurchases => Set<SubscriptionPurchase>();
     public DbSet<OrganizationSubscription> OrganizationSubscriptions => Set<OrganizationSubscription>();
     public DbSet<SubscriptionReplacement> SubscriptionReplacements => Set<SubscriptionReplacement>();

@@ -1,5 +1,7 @@
 # ورود سوپرادمین و مدیریت پکیج‌ها
 
+تکمیل2026-10-14: POST/PUT و GET پکیج‌ها includedTeamUsers، paidTeamUserLimit، teamUserMonthlyPriceIrt را دارند؛ عمومی۳/پیشرفته۵، آستانه۳۰ و ماهانه۲۰۰۰۰۰تومان. همان RowVersion و snapshot خرید؛ PUT باید هر سه فیلد را ارسال کند. [TEAM_SEAT_BILLING_API](TEAM_SEAT_BILLING_API.md) قرارداد ظرفیت/فرانت و migration تازه است؛ آستانه آخرین کاربر هزینه‌دار است، نه سقف عضویت.
+
 قرارداد بک‌اند روی `codex/super-admin` از `dev`، 2026-10-12. پنل Angular در این ریپو نیست؛ صفحهٔ ورود و جدول مدیریت باید در ریپوی فرانت ساخته شوند. بک‌اند HTML صفحهٔ `/admin/{randomkey}` را سرو نمی‌کند.
 
 ## آدرس و تنظیمات

@@ -22,6 +22,8 @@ public sealed class RegistrationTrialService(IApplicationDbContext db, IOptions<
         var features = packages.SelectMany(x => x.Features).Where(x => x.IsEnabled).GroupBy(x => x.Feature.Code)
             .Select(g => g.OrderByDescending(x => x.Feature.DataType == FeatureDataType.Integer && long.TryParse(x.Value, out var limit) ? limit : 0).First()).ToArray();
         var trial = new RegistrationTrial { Id = subscription.Id, OrganizationId = org, CreatedAtUtc = registeredAtUtc,
+            IncludedTeamUsers = packages.Max(x => x.IncludedTeamUsers), PaidTeamUserLimit = packages.Max(x => x.PaidTeamUserLimit),
+            TeamUserMonthlyPriceIrt = anchor.TeamUserMonthlyPriceIrt,
             CreditAmountUsd = settings.CreditAmountUsd,
             AiPricePerMinuteUsd = anchor.AiPricePerMinuteUsd, RetentionDays = packages.Max(x => x.InterviewRetentionDays),
             Entitlements = features.Select(x => new RegistrationTrialEntitlement { TrialId = subscription.Id, Code = x.Feature.Code,

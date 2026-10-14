@@ -71,7 +71,7 @@ public sealed partial class MobileTeamTests
             db.Users.Add(new ApplicationUser { Id = existingId, UserName = existingMobile, PhoneNumber = existingMobile, FullName = "نام قبلی عضو", OrganizationId = organization,
                 Role = OrganizationRole.Recruiter, IsActive = false, PhoneNumberConfirmed = true, CreatedAtUtc = now, UpdatedAtUtc = now });
             await db.SaveChangesAsync();
-            var previous = (await db.Database.GetAppliedMigrationsAsync()).Reverse().Skip(1).First();
+            const string previous = "20261013092724_AddMobileTeamInvitations";
             await db.GetService<IMigrator>().MigrateAsync(previous);
             await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"MobileTeamInvitations\" (\"Id\",\"OrganizationId\",\"Mobile\",\"CreatedAtUtc\",\"ExpiresAtUtc\") VALUES ({existingInvite},{organization},{existingMobile},{now},{now.AddDays(3)}), ({newInvite},{organization},{newMobile},{now},{now.AddDays(3)})");
             await db.GetService<IMigrator>().MigrateAsync();
@@ -83,9 +83,10 @@ public sealed partial class MobileTeamTests
         var existing = await Me(await Accept(list.Items.Single(x => x.Id == existingInvite)));
         Assert.Equal(existingId, existing.Id); Assert.Equal("نام قبلی عضو", existing.FullName);
         Assert.Equal("کاربر", (await Me(await Accept(list.Items.Single(x => x.Id == newInvite)))).FullName);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.Client.Send(HttpMethod.Post, $"/api/team/members/{existingId}/deactivate")).StatusCode);
         var named = await Invite(owner, Mobile(), "نام", "دعوت تازه");
         await f.Db(async db => {
-            var previous = (await db.Database.GetAppliedMigrationsAsync()).Reverse().Skip(1).First();
+            const string previous = "20261013092724_AddMobileTeamInvitations";
             var failure = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync(previous));
             Assert.Equal(PostgresErrorCodes.RaiseException, failure.SqlState);
             Assert.Equal("دعوت تازه", (await db.MobileTeamInvitations.AsNoTracking().SingleAsync(x => x.Id == named.Id)).LastName);

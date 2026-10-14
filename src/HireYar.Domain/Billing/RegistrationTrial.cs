@@ -9,6 +9,9 @@ public sealed class RegistrationTrial
     public decimal CreditAmountUsd { get; set; }
     public decimal AiPricePerMinuteUsd { get; set; }
     public int RetentionDays { get; set; }
+    public int IncludedTeamUsers { get; set; } = 5;
+    public int PaidTeamUserLimit { get; set; } = 30;
+    public decimal TeamUserMonthlyPriceIrt { get; set; } = 200_000m;
     public List<RegistrationTrialEntitlement> Entitlements { get; set; } = [];
 }
 

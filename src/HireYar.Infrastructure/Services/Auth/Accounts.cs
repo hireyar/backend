@@ -14,7 +14,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 namespace HireYar.Infrastructure.Auth;
 
-public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger, RegistrationTrialService trials) : IAccounts
+public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger, RegistrationTrialService trials, TeamSeatService seats) : IAccounts
 {
     private SecurityOptions Settings => options.Value;
     private DateTimeOffset Now => time.GetUtcNow();
@@ -77,8 +77,11 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 throw new AppException(409, "invitation_unavailable", "Invitation is no longer available.");
             var org = await db.Organizations.FromSqlInterpolated($"SELECT * FROM \"Organizations\" WHERE \"Id\" = {invitation.OrganizationId} FOR UPDATE").AsNoTracking().SingleOrDefaultAsync(ct)
                 ?? throw AppException.NotFound();
+            if (invitation.ExpiresAtUtc <= Now)
+                throw new AppException(409, "invitation_unavailable", "Invitation is no longer available.");
             if (u is not null && (u.OrganizationId != org.Id || u.Role != OrganizationRole.Recruiter || u.IsActive))
                 throw new AppException(409, "mobile_unavailable", "This mobile cannot accept the invitation.");
+            await seats.RequireInvitationCapacityLockedAsync(org.Id, true, ct);
             var invitedName = !string.IsNullOrWhiteSpace(invitation.FirstName) && !string.IsNullOrWhiteSpace(invitation.LastName)
                 ? $"{invitation.FirstName.Trim()} {invitation.LastName.Trim()}" : null;
             if (u is null)
@@ -95,6 +98,8 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 u.IsActive = true; u.PhoneNumberConfirmed = true; u.UpdatedAtUtc = Now;
                 Check(await users.UpdateSecurityStampAsync(u));
             }
+            if (invitation.ExpiresAtUtc <= Now)
+                throw new AppException(409, "invitation_unavailable", "Invitation is no longer available.");
             invitation.AcceptedAtUtc = Now;
         }
         else if (u is null)

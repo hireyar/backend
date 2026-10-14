@@ -26,11 +26,13 @@ public sealed class SubscriptionEntitlementService(IApplicationDbContext db, Tim
         {
             var trial = await db.RegistrationTrials.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == s.OrganizationId && x.Id == s.Id, ct);
             return new(s.Id, "registration_trial", "دوره آزمایشی همه پکیج‌ها", status, s.StartedAtUtc, s.ExpiresAtUtc,
-                trial.AiPricePerMinuteUsd, trial.RetentionDays, trial.Entitlements.OrderBy(x => x.Code).Select(x => new EntitlementDto(x.Code, x.Name, x.DataType, x.Value)).ToArray(), true);
+                trial.AiPricePerMinuteUsd, trial.RetentionDays, trial.Entitlements.OrderBy(x => x.Code).Select(x => new EntitlementDto(x.Code, x.Name, x.DataType, x.Value)).ToArray(), true,
+                trial.IncludedTeamUsers, trial.PaidTeamUserLimit, trial.TeamUserMonthlyPriceIrt, trial.IncludedTeamUsers);
         }
         var p = await db.SubscriptionPurchases.AsNoTracking().Include(x => x.Entitlements).SingleAsync(x => x.OrganizationId == s.OrganizationId && x.PaymentId == s.PaymentId, ct);
         return Map(s, p, status);
     }
     public static SubscriptionDto Map(OrganizationSubscription s, SubscriptionPurchase p, string status) => new(s.Id, p.PackageCodeSnapshot, p.PackageNameSnapshot, status, s.StartedAtUtc, s.ExpiresAtUtc,
-            p.AiPricePerMinuteUsdSnapshot, p.RetentionDaysSnapshot, p.Entitlements.OrderBy(x => x.Code).Select(x => new EntitlementDto(x.Code, x.Name, x.DataType, x.Value)).ToArray());
+            p.AiPricePerMinuteUsdSnapshot, p.RetentionDaysSnapshot, p.Entitlements.OrderBy(x => x.Code).Select(x => new EntitlementDto(x.Code, x.Name, x.DataType, x.Value)).ToArray(), false,
+            p.IncludedTeamUsersSnapshot, p.PaidTeamUserLimitSnapshot, p.TeamUserMonthlyPriceIrtSnapshot, p.TeamCapacitySnapshot);
 }
