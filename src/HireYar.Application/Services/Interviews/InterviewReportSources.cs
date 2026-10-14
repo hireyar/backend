@@ -64,11 +64,7 @@ public sealed class InterviewReportSources
                     if (candidates.Length == 1) source = candidates[0];
                 }
                 if (source is null) throw new JsonException();
-                reason = "source_reference_conflicting_fields";
-                if (citation.TryGetPropertyValue("answerId", out var id) &&
-                    (id is null || !Guid.TryParse(id.GetValue<string>(), out var suppliedId) || suppliedId != source.AnswerId)) throw new JsonException();
-                if (citation.TryGetPropertyValue("quote", out var quote) &&
-                    (quote is null || quote.GetValue<string>() != source.Quote)) throw new JsonException();
+                // These are server-owned output fields; model copies never define evidence.
                 citation.Remove("answerId"); citation.Remove("quote");
                 citation["answerId"] = source.AnswerId;
                 citation["quote"] = source.Quote;

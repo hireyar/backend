@@ -1,3 +1,9 @@
+## HY-301 — حذف دو مرجع حقیقت در شواهد گزارش — 2026-10-14
+
+source_reference_conflicting_fields پس از repair، شرط کنترل‌شده مقایسه فیلدهای اضافی مدل با sourceRef سرور بود. اصلاح محدود انجام شد: reference معتبر فقط به داده اصلی سرور تبدیل و quote/answerId مدل کنار گذاشته می‌شوند؛ داده ساختگی persist نمی‌شود. source ناشناخته/مبهم/interaction یا پاسخ دیگر و سایر کنترل‌های validator محفوظ‌اند. report-v3.4 با schema عمومی قبلی؛ migration/فرانت ندارد، صف/repair/timeout/cache/config ثابت‌اند.
+
+Build صفر warning/error؛ suite کامل431/431 موفق، صفر Failed/Skipped با PostgreSQL و FFmpeg واقعی محلی؛ report-authoritative-full.trx. حفاظت قابلیت‌های قبلی با اجرای کل suite بررسی شد. باقی: انتشار مستقل API و retry گزارش واقعی؛ تضمین همه خروجی‌های مدل یا صحت معنایی داده واقعی ادعا نمی‌شود. DB/config/model مقصد، push/deploy/production تغییر نکردند.
+
 ## HY-301 — repair محدود خروجی گزارش — 2026-10-14
 
 source_reference_invalid مقصد از مدل فعلی Luna، احتمال نقص شکلی یا reference ناشناخته را تأیید کرد؛ زیرعلت خروجی قبلی موجود نیست. پذیرش فقط معادل‌های قابل اثبات و فیلدهای اضافی دقیقاً منطبق، فهرست صریح مرجع‌ها و یک repair خودکار داخل همان claim با اعتبارسنجی کامل پیاده شدند. حداکثر دو تماس در بودجه مشترک، بدون تکرار HTTP failure/تغییر مدل/حدس شاهد؛ شکست نهایی Failed است. report-v3.3 با schema عمومی قبلی، بدون migration/فرانت؛ ADR-051 مرجع است.

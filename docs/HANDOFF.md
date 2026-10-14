@@ -1,3 +1,15 @@
+## تحویل مالکیت قطعی شواهد گزارش — 2026-10-14
+
+از dev پاک؛ مستندات و کد خوانده شدند. لاگ کاربر source_reference_conflicting_fields را بعد از خروجی اول و repair نشان داد. reason مستقیماً از مقایسه quote/answerId اضافی مدل با catalog می‌آمد؛ شکست کنترل‌شده اعتبارسنجی بود، نه کرش یا exception ناشناخته. بدون raw output تفکیک اینکه UUID یا متن کپی‌شده نادرست بود ممکن نیست. هشدار antiforgery درباره cache مربوط به این شرط نیست.
+
+تغییر runtime فقط در InterviewReportSources است: ابتدا reference معتبر همان catalog حل می‌شود، سپس quote/answerId احتمالی مدل بدون استفاده کنار گذاشته و مقادیر قطعی Source سرور نوشته می‌شوند. مدل منبع این دو فیلد نیست. reference ناشناخته یا alias مبهم، interaction و source پاسخ دیگر در ارزیابی همچنان reject؛ validator کامل داده canonical، نمره/کاتالوگ/تعداد پاسخ/فیلدهای تحلیلی را کنترل می‌کند. این روش نقل‌قول ساختگی مدل را ذخیره نمی‌کند؛ ارتباط معنایی تحلیل با شاهد همچنان موضوع بررسی انسانی است.
+
+promptVersion=report-v3.4 با schema همان v3. محافظ processing/deadline/lease، repair حداکثر یک‌بار و بودجه مشترک، HTTP failure بدونretry، cache و مجوزها بدون تغییرند. provider/model/config، Domain/EF/migration/API/مالی یا مسیر زنده تغییر نکردند؛ قرارداد عمومی و فرانت تغییر لازم ندارند. ADR-050/051 با دلیل این تصحیح تکمیل شده و سوابق تصمیم تاریخی حفظ شده‌اند.
+
+Tool restore/restore موفق؛ build نهایی صفر warning/error؛ suite کامل431/431 موفق، صفر Failed/Skipped روی PostgreSQL18 loopback55504 اختصاصی و FFmpeg واقعی، provider/payment/S3/OTP مصنوعی و SMTP محلی؛ tests/HireYar.Tests/TestResults/report-authoritative-full.trx. سه case بررسی conflicting/null/wrong_type در findings/metrics/questionEvaluations و یک case provider مبنی بر عدم repair برای کپی‌های اضافی اضافه شد. دو انتظار رد کپی قدیمی به اثبات جایگذاری دقیق شاهد واقعی و عدم خروج/ذخیره داده ساختگی تغییر کردند؛ سایر تست‌های مرجع/نمره/محدودیت تماس/timeout/cancellation و suite کامل مجوز، مالی، رسانه و ماژول‌ها موفق‌اند. هیچ تست نامرتبط حذف یا سیاست قبلی خارج از همین تبدیل تغییر نکرد.
+
+DB fixture صفر، cluster موقت متوقف و حذف شد؛ diff check انجام شد. تماس AI واقعی یا خواندن/تغییر DB مقصد این نوبت انجام نشد؛ raw output یا لاگ واقعی در فایل کپی نشد. گزارش مورد شکایت هنوز retry نشده است. باقی: انتشار/restart مستقل بک‌اند و retry توسط Owner؛ داده/config مقصد، commit/push/deploy و production تغییر نکردند. صحت معنایی همه گزارش‌ها و موفقیت تمام خروجی‌های LLM تضمین نشده‌اند.
+
 ## تحویل repair محدود گزارش — 2026-10-14
 
 از dev پاک، با خواندن مستندات/کد موجود و لاگ ارائه‌شده کاربر آغاز شد. HTTP200 از Liara/openai/gpt-5.6-luna و source_reference_invalid علت عمومی ارجاع نامعتبر بود. reason قبلی نبود/ناشناخته‌بودن reference و وجود فیلد اضافی را تفکیک نمی‌کرد؛ raw output موجود نیست، پس زیرعلت همان گزارش را حدس نمی‌زنیم. هشدار antiforgery درباره header در مسیر تولید این exception نقش ندارد.

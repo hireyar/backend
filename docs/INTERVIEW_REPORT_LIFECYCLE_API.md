@@ -77,3 +77,9 @@ promptVersion جاری report-v3.2 است و schema عمومی همان report-v
 فاصله لبه و case reference قابل یکسان‌سازی‌اند؛ answer alias فقط با یک شاهد، و quote/answerId اضافی فقط با تطابق دقیق با منبع واقعی پذیرفته می‌شوند. شاهد مبهم/ساختگی یا مرجع ناشناخته رد می‌شود. لاگ reasonهای source_reference_missing، source_reference_unknown و source_reference_conflicting_fields را جدا و repairAttempt=1 را برای تماس اصلاح ثبت می‌کند؛ هیچ متن مدل یا داوطلب در لاگ نیست.
 
 adapter اکنون validation کامل دارد؛ رد نهایی آن معمولاً failureStage=Generating/failureCode=report_invalid_response است. پیام این کد عدم پذیرش خروجی پس از بررسی را بیان می‌کند. JSON/schema/API/DTO قبلی و migration ثابت‌اند؛ تغییر اجباری فرانت ندارد. تضمین موفقیت همه پاسخ‌های مدل یا کیفیت معنایی از این اصلاح نتیجه نمی‌شود.
+
+## مالکیت فیلدهای شاهد — report-v3.4، 2026-10-14
+
+پس از حل sourceRef معتبر، quote و answerId صرفاً از catalog واقعی پاسخ نهایی ساخته می‌شوند. کپی احتمالی این فیلدها در خروجی مدل، حتی اگر متفاوت/null/نوع اشتباه باشد، کنار گذاشته می‌شود؛ مقدار آن‌ها در گزارش ذخیره یا نمایش داده نمی‌شود. اعتبار sourceRef همچنان الزامی است و شاهد ناشناخته/مبهم/interaction یا source پاسخ دیگر در questionEvaluation پذیرفته نمی‌شود. نمره/کاتالوگ/فیلدهای تحلیلی همچنان validator کامل دارند.
+
+این اصلاح reason تکراری source_reference_conflicting_fields را از مسیر فیلدهای server-owned حذف می‌کند؛ سایر شکست‌های خروجی مدل همچنان ممکن‌اند و همان repair محدود/Failed قابل retry را دارند. DTO/schema، وضعیت‌ها، migration و فرانت ثابت‌اند؛ cached موفق بازتولید نمی‌شود و مدل/provider/config خودکار تغییر نمی‌کنند.
