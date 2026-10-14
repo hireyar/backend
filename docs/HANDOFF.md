@@ -1,3 +1,17 @@
+## تحویل اصلاح citation گزارش — 2026-10-14
+
+از dev پاک و commit reporting آغاز شد؛ مستندات و کد بازخوانی و metadata دیتابیس فقط خوانده شد. لاگ ارائه‌شده کاربر HTTP200 از Liara/google/gemini-3.5-flash-lite و metric_citation_invalid را برای چند گزارش تأیید کرد. پاسخ‌های جلسه بررسی‌شده پردازش‌شده و غیرخالی بودند. خروجی قبلی ذخیره نشده، پس تفکیک شناسه نادرست/متن متفاوت/طول شاهد برای همان خروجی ممکن نیست؛ ادعای رفع کامل خطای واقعی بر اساس125 تست مصنوعی قبلی معتبر نبود.
+
+Application/InterviewReportSources برای final answers مرجع A1 و قطعات sourceRef=A1.1 می‌سازد؛ قطعات متن دقیق، حداکثر۵۰۰کاراکتر و بدون بریدن surrogate هستند. prompt report-v3.2 از مدل ارجاع کوتاه می‌گیرد؛ Infrastructure adapter یک تماس گزارش با context کامل و catalog می‌فرستد، سپس reference را به schema عمومی answerId/quote قبلی تبدیل می‌کند. interaction context باقی است و source ندارد. quote/UUID تزریق‌شده، source ناشناخته یا source پاسخ دیگر در questionEvaluation رد می‌شود. validator قبلی بر JSON تبدیل‌شده اجرا و نمره/کاتالوگ/تعداد پاسخ/فیلد اضافه/شواهد را کنترل می‌کند. این روش صحت متن و تعلق شاهد را enforce می‌کند؛ ارتباط معنایی شاهد با استنباط مدل همچنان به کیفیت مدل و بررسی انسان وابسته است.
+
+Schema، migration، API/DTO عمومی، cached، مسیر زنده، فرمول نمره و lifecycle/lease/retry تغییر نکردند. sourceRef فقط داخل تماس مدل است و به DB/فرانت نمی‌رود. مدل/provider/config مقصد یا fallback عوض نشد؛ نسخه پرامپت جدید v3.2 است، schema همان v3. علل امن تازه در adapter عبارت‌اند از source_reference_schema_invalid/source_reference_invalid/answer_reference_invalid/answer_source_mismatch و به failureCode موجود report_invalid_response نگاشت می‌شوند؛ raw output در لاگ یا فایل نیست.
+
+Tool restore/restore و build نهایی صفر warning/error؛137/137 تست مرتبط موفق، صفر Failed/Skipped روی PostgreSQL18 اختصاصی loopback55502، report-citation-verified.trx. ده case واحد جدید و دو integration برای ذخیره canonical/cache و عدم ذخیره مرجع نامعتبر اضافه شد؛25 تست قواعد مستقل نیز پیش‌تر موفق بودند. دو خطای compile میانی const و جایگزینی ناخواسته در SuggestAsync رفع شدند؛ diff نهایی فقط مسیر گزارش adapter را تغییر می‌دهد و suite نهایی پس از اصلاح اجرا شد. suite کامل تکرار نشد. صفر DB fixture باقی ماند و cluster موقت متوقف و حذف شد.
+
+ابزار ignored artifacts/report-citation-smoke با credential خوانده‌شده در حافظه و override مدل فقط برای همان فرایند، سه تماس روی داده کاملاً مصنوعی انجام داد. baseline پرامپت قبلی JSON نامعتبر داشت؛ smoke عمومی۷metric/۳evaluation و تخصصی۳metric/۳evaluation با reference جدید حدود۴٫۹/۵٫۱ثانیه، validator فعلی را پاس کردند. داده واقعی جلسه به مدل یا فایل تازه ارسال نشد و کیفیت معنایی واقعی تأیید نشده است. لاگ واقعی دریافت‌شده از کاربر نیز در Git/artifacts کپی نشد؛ فقط reason و نتیجه کلی مستند شد.
+
+ادامه: انتشار/restart مستقل API و retry گزارش Failed از POST قبلی با Owner. migration یا کار اجباری فرانت ندارد؛ promptVersion را معادل schema نگیرید. گزارش واقعی مورد شکایت هنوز بازتولید نشده؛ داده/تنظیمات/schema مقصد، commit/push/deploy و production تغییر نکردند.
+
 ## تحویل مقاوم‌سازی گزارش ارزیابی — 2026-10-14
 
 از dev پاک؛ sandbox راه‌اندازی نمی‌شد و read/edit/build/test از اجرای escalated مجاز انجام شدند. مستندات، کد، قرارداد چرخه گزارش و metadata دیتابیس به‌صورت فقط‌خواندنی بررسی شدند؛ نمونه جاری Failed/report_validation_failed در Validating و بدون cached بود. خروجی خام قبلی در DB موجود نیست و reason جزئی قبلاً ثبت نمی‌شد؛ ریشه دقیق رد خروجی یا نمایش Processing قدیمی پنل تأیید نشده است. شناسه یا متن واقعی و credential به فایل یا لاگ تازه نرفتند؛ خواندن مقصد محدود به metadata چرخه بود.

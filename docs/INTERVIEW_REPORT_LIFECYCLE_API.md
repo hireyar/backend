@@ -61,3 +61,11 @@ deadline۱۳۰ثانیه کل تلاش پس از claim، شامل network و م�
 promptVersion جدید report-v3.1 با schema گزارش v3، codeهای واقعی شاخص‌ها و تعداد ارزیابی پاسخ‌های نهایی را در هر request صریح می‌کند. فرانت نباید نسخه پرامپت را با نسخه schema یکی بداند؛ cached با promptVersion قبلی محفوظ است. محافظ نقل‌قول/answerId/نمره پابرجاست. failureCode و DTO status تغییر نکرده‌اند و message اعتبارسنجی شفاف‌تر است. لاگ شکست reason ثابتی مانند json_schema_invalid، metric_catalog_invalid، metric_value_invalid، metric_citation_invalid، answer_coverage_invalid، answer_evaluation_invalid یا finding_citation_invalid دارد؛ متن provider یا پاسخ داوطلب ثبت نمی‌شود. reason جزئی در DB/DTO ذخیره نمی‌شود و برای شکست قدیمی قابل بازیابی نیست.
 
 پنل باید وضعیت را از GET status تازه بگیرد، در Failed با canRetry=true دکمه retry را فعال و polling پردازش را متوقف کند. نمایش Processing از snapshot قبلی، وقتی status جاری Failed است، باید با polling/refresh اصلاح شود. Angular و انتشار مقصد در این تغییر انجام نشده‌اند.
+
+## اصلاح ارجاع شواهد — 2026-10-14
+
+promptVersion جاری report-v3.2 است و schema عمومی همان report-v3 باقی می‌ماند. sourceRef/answerRef صرفاً قرارداد داخلی مدل‌اند؛ adapter آن‌ها را از قطعات واقعی پاسخ نهایی به answerId/quote قبلی تبدیل می‌کند. هیچ فیلد عمومی جدید یا migration لازم نیست؛ فرانت sourceRef نمی‌گیرد و cached قبلی حفظ می‌شود.
+
+این اصلاح بازنویسی UUID/متن شاهد توسط مدل را حذف می‌کند. شاهد interaction، مرجع ناشناخته، متن/شناسه ساختگی و ارجاع به پاسخ دیگر در questionEvaluation قابل قبول نیستند؛ کنترل شواهد و نمره پابرجاست. پاسخ مدل همچنان می‌تواند از نظر JSON یا ارزیابی نامعتبر باشد؛ اصلاح ارجاع تضمین کیفیت معنایی مدل نیست. علت امن شکست مرجع می‌تواند source_reference_schema_invalid، source_reference_invalid، answer_reference_invalid یا answer_source_mismatch در لاگ باشد؛ خطای adapter با failureCode عمومی report_invalid_response عرضه می‌شود. خطاهای validator مرحله Validating همچنان report_validation_failed دارند.
+
+پس از انتشار مستقل API، Owner می‌تواند گزارش Failed موجود را با POST قبلی retry کند؛ بازیابی خودکار گزارش‌های Failed یا بازتولید گزارش موفق اضافه نشده است. تنظیمات مدل/provider مقصد خودکار تغییر نمی‌کنند.

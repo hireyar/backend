@@ -1,3 +1,15 @@
+## اصلاح شواهد شاخص‌های گزارش — 2026-10-14: Verified محلی و smoke واقعی
+
+لاگ ارسالی کاربر علت مشترک شکست سه گزارش را metric_citation_invalid پس از HTTP200 از Liara/google/gemini-3.5-flash-lite تأیید کرد. metadata فقط‌خواندنی دیتابیس نیز پاسخ‌های پردازش‌شده غیرخالی و گزارش Failed در Validating را نشان داد. این خطا محدود به ارجاع یا متن/طول شاهد شاخص‌هاست؛ زیرعلت دقیق خروجی قبلی ذخیره نشده است. مشکل با محافظ Processing قبلی حل نشده بود؛ از موفقیت125 تست مصنوعی آن نوبت، رفع خطای واقعی citation نتیجه نمی‌شد.
+
+InterviewReportSources و promptVersion=report-v3.2 اضافه شدند: مدل فقط sourceRef/answerRef کوتاه انتخاب می‌کند و سرور آن‌ها را به answerId و نقل‌قول اصلی پاسخ نهایی تبدیل می‌کند. تاریخچه کامل و interactions برای context باقی‌اند؛ interaction شاهد قابل انتخاب ندارد. مرجع ناشناخته، quote/UUID تزریق‌شده و ارجاع سؤال به شاهد پاسخ دیگر رد می‌شوند؛ validator strict، کاتالوگ، نمره، عدم‌قطعیت، cached و چرخه قبلی محفوظ‌اند. Domain/EF/schema، مدل/provider/config مقصد و API عمومی تغییر ندارند؛ migration و تغییر فرانت لازم نیست. [INTERVIEW_REPORT_LIFECYCLE_API](INTERVIEW_REPORT_LIFECYCLE_API.md) و ADR-050 مرجع‌اند.
+
+Verification: tool restore/restore و build صفر warning/error؛137/137 تست مرتبط گزارش/flow/review/team/provider موفق، صفر Failed/Skipped روی PostgreSQL18 اختصاصی loopback55502؛ tests/HireYar.Tests/TestResults/report-citation-verified.trx. ده case واحد جدید برای حل reference، Unicode و مرز۵۰۰، حذف interaction، رد injection و حفظ validation؛ دو integration تازه adapter→ذخیره→GET/cache و رد مرجع نامعتبر اضافه شدند. suite کامل تکرار نشد. DB fixture صفر، cluster موقت متوقف و حذف شد.
+
+سه تماس واقعی با همان مدل گزارش‌شده و فقط داده فارسی مصنوعی، بدون DB یا متن داوطلب: baseline پرامپت قبلی JSON نامعتبر داد؛ دو smoke اصلاح‌شده عمومی۷شاخص/۳پاسخ و تخصصی۳شاخص/۳پاسخ به‌ترتیب حدود۴٫۹ و۵٫۱ثانیه، validator فعلی را کامل پاس کردند. نتیجه محدود به این smokeهاست و تضمین کیفیت معنایی یا موفقیت تمام گزارش‌های واقعی نیست. ابزار مستقل در artifacts/report-citation-smoke، فقط metadata امن ثبت کرد؛ تنظیم runtime تغییر نکرد. دو خطای compile میانی مربوط به const پرامپت و جایگزینی بیش‌ازحد adapter اصلاح و build/suite نهایی پس از آن‌ها اجرا شدند.
+
+باقی محصول: انتشار/restart مستقل بک‌اند و retry توسط Owner برای گزارش Failed موجود؛ آن گزارش واقعی این نوبت بازتولید نشد. هیچ داده/تنظیمات/schema مقصد، گزارش موفق، commit/push/deploy یا production تغییر نکرد؛ دیتابیس مقصد فقط خوانده شد و لاگ واقعی کاربر در فایل یا Git ذخیره نشد.
+
 ## مقاوم‌سازی گزارش ارزیابی — 2026-10-14: Verified محلی
 
 بررسی فقط‌خواندنی metadata دیتابیس نشان داد نمونه گزارش‌شده هنگام بررسی Failed/report_validation_failed در Validating و بدون نتیجه بود؛ Processing ارسالی وضعیت جاری DB نبود. خروجی ردشده قبلاً ذخیره نشده و نسخه قبلی reason جزئی ثبت نمی‌کرد. بنابراین علت دقیق رد خروجی و علت نمایش قدیمی پنل تأیید نشده‌اند. شناسه، متن مصاحبه و credential در مستندات یا artifactهای تازه ثبت نشدند؛ DB مقصد تغییر نکرد.

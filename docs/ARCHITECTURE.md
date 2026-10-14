@@ -1,3 +1,11 @@
+## ADR-050 — ارجاع قطعی شواهد گزارش (2026-10-14)
+
+لاگ مقصد با HTTP200 از Liara/Gemini، رد گزارش با metric_citation_invalid را تأیید کرد؛ تکرار راهنمای نقل‌قول دقیق در report-v3.1 مشکل را رفع نکرد. علت فرعی هر خروجی قبلی (شناسه، طول یا متن نقل‌قول) بدون خروجی خام قابل تعیین نیست. بازنویسی UUID و نقل‌قول توسط مدل برای شواهد شاخص‌ها حذف می‌شود؛ صحت معنا و ارزیابی همچنان به مدل و بررسی انسان وابسته است.
+
+InterviewReportSources در Application برای هر پاسخ نهایی یک answerRef کوتاه و برای قطعات پیوسته transcript، sourceRef محلی همان درخواست می‌سازد. قطعات حداکثر۵۰۰کاراکتر با حفظ مرز surrogate و حذف فقط فضای لبه هستند؛ متن استخراج‌شده باید عیناً در پاسخ اصلی موجود باشد. interactions در تاریخچه context باقی‌اند، ولی منبع قابل ارجاع ندارند. تمام تاریخچه به مدل فرستاده می‌شود؛ نمونه متن شاهد نیز همراه مرجع عرضه می‌شود.
+
+پرامپت report-v3.2 از مدل sourceRef برای findings/metrics و answerRef+sourceRef برای questionEvaluations می‌خواهد. adapter همان یک تماس گزارش را انجام و مرجع را با catalog همان درخواست به answerId و quote اصلی تبدیل می‌کند. مرجع ناشناخته، UUID/quote تزریق‌شده یا شاهد پاسخ دیگری برای ارزیابی یک پاسخ رد می‌شود؛ کنترل strict قبلی روی نمره، کاتالوگ، تعداد پاسخ‌ها، فیلد اضافی و نقل‌قول همچنان اجرا می‌شود. مرجع‌ها به DB/API عمومی نمی‌روند؛ schema v3، cached قبلی، فرمول نمره و lease/retry/deadline محفوظ‌اند. Domain/EF/schema/provider/model/config و مسیر زنده تغییری ندارند؛ migration یا تغییر فرانت لازم نیست.
+
 ## تکمیل ADR-043 — بازیابی مستقل و deadline گزارش (2026-10-14)
 
 برای رفع امکان ماندن stage فعال بدون lease معتبر و وابستگی polling قبلی به پایان batch تولید، InterviewReportLifecycle معیار مشترک stale برای Generating/Validating/Saving دارد: نبود یا انقضای lease، یا رسیدن۱۵۰ثانیه از StartedAtUtc. status/retry/recovery زیر قفل سازمان و با reload همان معیار را اعمال می‌کنند. status سالم همچنان فقط read است؛ خواندن status منقضی اکنون failure را persist می‌کند. recovery worker هر۲ثانیه مستقل از generation، فقط با metadata و محدودیت زمان اجرا می‌شود؛ تولید همچنان چهار ظرفیت و صف PostgreSQL موجود دارد.
