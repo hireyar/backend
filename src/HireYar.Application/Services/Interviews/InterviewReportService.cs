@@ -200,7 +200,7 @@ public sealed class InterviewReportService(IApplicationDbContext db, ICurrentUse
             "Succeeded" => "گزارش آماده است.", "Failed" => (expired ? "report_interrupted" : row?.FailureCode) switch {
                 "report_timeout" => "سرویس تولید گزارش در زمان مجاز پاسخ نداد؛ می‌توانید دوباره درخواست دهید.",
                 "report_validation_failed" => "خروجی مدل با ساختار گزارش یا شواهد پاسخ‌ها مطابقت نداشت و ذخیره نشد؛ می‌توانید دوباره درخواست دهید.",
-                "report_invalid_response" => "پاسخ سرویس تولید گزارش قابل خواندن نبود؛ می‌توانید دوباره درخواست دهید.",
+                "report_invalid_response" => "خروجی سرویس تولید گزارش پس از بررسی قابل پذیرش نبود؛ می‌توانید دوباره درخواست دهید.",
                 "report_interrupted" => "پردازش گزارش قطع شد؛ می‌توانید دوباره درخواست دهید.",
                 "report_not_generated" => "این مصاحبه قدیمی گزارش تولیدشده ندارد؛ می‌توانید درخواست تولید دهید.",
                 _ => "تولید گزارش ناموفق بود؛ می‌توانید دوباره درخواست دهید." },

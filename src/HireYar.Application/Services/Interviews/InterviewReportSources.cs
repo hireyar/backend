@@ -17,7 +17,7 @@ public sealed class InterviewReportSources
     public InterviewReportSources(InterviewReportContext context)
     {
         var sources = new List<Source>();
-        byAnswer = new(StringComparer.Ordinal);
+        byAnswer = new(StringComparer.OrdinalIgnoreCase);
         var number = 0;
         foreach (var answer in context.Answers.Where(a => !a.IsInteraction)) {
             var answerRef = "A" + (++number).ToString(CultureInfo.InvariantCulture);
@@ -35,7 +35,7 @@ public sealed class InterviewReportSources
             }
         }
         Entries = sources;
-        bySource = sources.ToDictionary(s => s.SourceRef, StringComparer.Ordinal);
+        bySource = sources.ToDictionary(s => s.SourceRef, StringComparer.OrdinalIgnoreCase);
     }
 
     public string RequestJson(InterviewReportContext context) => JsonSerializer.Serialize(new {
@@ -53,10 +53,23 @@ public sealed class InterviewReportSources
             JsonArray Array(JsonObject parent, string key) => parent[key] as JsonArray ?? throw new JsonException();
             JsonObject Object(JsonNode? node) => node as JsonObject ?? throw new JsonException();
             Source Citation(JsonObject citation) {
-                reason = "source_reference_invalid";
-                if (citation.ContainsKey("answerId") || citation.ContainsKey("quote") ||
-                    !citation.Remove("sourceRef", out var reference) || reference is null ||
-                    !bySource.TryGetValue(reference.GetValue<string>(), out var source)) throw new JsonException();
+                reason = "source_reference_missing";
+                if (!citation.Remove("sourceRef", out var reference) || reference is null) throw new JsonException();
+                reason = "source_reference_unknown";
+                var key = reference.GetValue<string>().Trim();
+                bySource.TryGetValue(key, out var source);
+                // An answer alias is safe only when it identifies exactly one supplied excerpt.
+                if (source is null) {
+                    var candidates = Entries.Where(s => string.Equals(s.AnswerRef, key, StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();
+                    if (candidates.Length == 1) source = candidates[0];
+                }
+                if (source is null) throw new JsonException();
+                reason = "source_reference_conflicting_fields";
+                if (citation.TryGetPropertyValue("answerId", out var id) &&
+                    (id is null || !Guid.TryParse(id.GetValue<string>(), out var suppliedId) || suppliedId != source.AnswerId)) throw new JsonException();
+                if (citation.TryGetPropertyValue("quote", out var quote) &&
+                    (quote is null || quote.GetValue<string>() != source.Quote)) throw new JsonException();
+                citation.Remove("answerId"); citation.Remove("quote");
                 citation["answerId"] = source.AnswerId;
                 citation["quote"] = source.Quote;
                 return source;
@@ -68,7 +81,7 @@ public sealed class InterviewReportSources
                 var evaluation = Object(evaluationNode);
                 reason = "answer_reference_invalid";
                 if (!evaluation.Remove("answerRef", out var reference) || reference is null ||
-                    !byAnswer.TryGetValue(reference.GetValue<string>(), out var answerId)) throw new JsonException();
+                    !byAnswer.TryGetValue(reference.GetValue<string>().Trim(), out var answerId)) throw new JsonException();
                 var source = Citation(evaluation);
                 reason = "answer_source_mismatch";
                 if (source.AnswerId != answerId) throw new JsonException();

@@ -1,3 +1,17 @@
+## تحویل repair محدود گزارش — 2026-10-14
+
+از dev پاک، با خواندن مستندات/کد موجود و لاگ ارائه‌شده کاربر آغاز شد. HTTP200 از Liara/openai/gpt-5.6-luna و source_reference_invalid علت عمومی ارجاع نامعتبر بود. reason قبلی نبود/ناشناخته‌بودن reference و وجود فیلد اضافی را تفکیک نمی‌کرد؛ raw output موجود نیست، پس زیرعلت همان گزارش را حدس نمی‌زنیم. هشدار antiforgery درباره header در مسیر تولید این exception نقش ندارد.
+
+InterviewReportSources فاصله/case reference را یکسان می‌کند؛ answer alias فقط با یک قطعه قابل حل است. quote/answerId اضافی فقط با برابری دقیق با منبع پذیرفته می‌شوند؛ اشتباه یا تناقض همچنان reject. reasonهای missing/unknown/conflicting_fields جدا شدند. report-v3.3 sourceRefهای کامل را به‌صراحت فهرست می‌کند. مرجع خارج جلسه، شاهد interaction، alias مبهم و ارجاع پاسخ دیگر به questionEvaluation همچنان مردود هستند.
+
+GenerateReportAsync حداکثر دو تماس دارد: resolve و validator کامل، سپس فقط پس از JSON/reference/schema/numeric نامعتبر یک repair با همان مدل و context و خروجی قبلی در حافظه و reason ثابت. خروجی قبلی untrusted است و در لاگ/DB/فایل نیست؛ repair body صرفاً مانند prompt موجود در diagnostics حافظه‌ای مجاز نمایش داده می‌شود. EvaluationTimeoutSeconds بودجه مشترک هر دو تماس است؛ caller cancellation و deadline۱۳۰ثانیه سرویس حفظ شدند. HTTP/network failure یا timeout برای repair تکرار نمی‌شوند. خروجی نامعتبر دوم Failed، cached محفوظ و retry بیرونی همچنان دستی است؛ GenerationAttempts شمارش claim است، نه تعداد تماس مدل. log repairAttempt=1 مربوط به اصلاح خروجی است؛ retryCount=0 لاگ HTTP درباره retry انتقال شبکه باقی می‌ماند.
+
+Public DTO/schema، Domain/EF/migration، runtime config/model/provider، تصمیم نمره‌گذاری و مسیر مصاحبه زنده تغییر نکردند. پیام report_invalid_response اکنون عدم پذیرش پس از بررسی را بیان می‌کند؛ validator داخل adapter نیز اجرا می‌شود، بنابراین رد خروجی مدل از adapter معمولاً Failed در Generating با report_invalid_response است. providerهای مصنوعی دیگر همچنان ممکن است در مرحله Validating رد شوند. قرارداد چرخه گزارش و ADR-051 به‌روزند؛ تغییر فرانت لازم نیست.
+
+tool restore/restore و build نهایی صفر warning/error؛145/145 تست مرتبط PostgreSQL18 محلی loopback55503 موفق، صفر Failed/Skipped، tests/HireYar.Tests/TestResults/report-repair-verified.trx. هفت case repair و یک case alias/فیلد اضافی واقعی افزوده شدند؛ integration adapter→repair→DB→GET/cache دو تماس و یک attempt را تأیید می‌کند.33 تست قواعد مستقل نیز پیش‌تر موفق بودند؛ suite کامل تکرار نشد. صفر DB fixture باقی ماند، cluster موقت متوقف و حذف شد.
+
+دو smoke Liara/openai/gpt-5.6-luna واقعی با داده مصنوعی فارسی: عمومی۷metric/۳evaluation یک تماس۱۹٫۴ثانیه، تخصصی۳metric/۳evaluation پس از تزریق reference نامعتبر A999.1 فقط در helper، دو تماس۳۱٫۴ثانیه و validator کامل موفق. helper ignored artifacts/report-citation-smoke فقط metadata امن می‌نویسد؛ credential در حافظه، config اصلی ثابت. کیفیت معنایی/موفقیت همه داده واقعی تأیید نشده است. DB مقصد این نوبت خوانده یا تغییر نکرد؛ گزارش واقعی هنوز retry نشده. commit/push/deploy و production انجام نشدند؛ انتشار مستقل نسخه API و retry توسط Owner باقی است.
+
 ## تحویل اصلاح citation گزارش — 2026-10-14
 
 از dev پاک و commit reporting آغاز شد؛ مستندات و کد بازخوانی و metadata دیتابیس فقط خوانده شد. لاگ ارائه‌شده کاربر HTTP200 از Liara/google/gemini-3.5-flash-lite و metric_citation_invalid را برای چند گزارش تأیید کرد. پاسخ‌های جلسه بررسی‌شده پردازش‌شده و غیرخالی بودند. خروجی قبلی ذخیره نشده، پس تفکیک شناسه نادرست/متن متفاوت/طول شاهد برای همان خروجی ممکن نیست؛ ادعای رفع کامل خطای واقعی بر اساس125 تست مصنوعی قبلی معتبر نبود.
