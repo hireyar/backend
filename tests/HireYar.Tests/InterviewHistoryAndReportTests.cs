@@ -175,7 +175,16 @@ public sealed class InterviewHistoryAndReportTests
             var system = json.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
             if (Models.Count == 1) Assert.Contains("completed interview", system);
             else Assert.Contains("interview decision engine", system);
-            var reply = Models.Count == 1 ? "{\"findings\":[],\"metrics\":[],\"questionEvaluations\":[]}" : "{}";
+            var reply = "{}";
+            if (Models.Count == 1) {
+                using var payload = JsonDocument.Parse(json.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!);
+                var context = payload.RootElement.GetProperty("interview").Deserialize<InterviewReportContext>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+                reply = JsonSerializer.Serialize(new {
+                    summary = "Synthetic report", findings = Array.Empty<object>(), limitations = new[] { "Limited evidence" }, nextRoundFocus = Array.Empty<string>(),
+                    questionEvaluations = new[] { new { answerRef = "A1", sourceRef = "A1.1", score = 3, confidence = 0.8m, feedback = "Feedback", highlights = Array.Empty<string>(), gaps = Array.Empty<string>() } },
+                    metrics = InterviewReportMetricCatalog.Codes(context.InterviewType).Select(code => new { code, score = (int?)null, confidence = (decimal?)null, explanation = "No evidence", evidence = Array.Empty<object>() })
+                });
+            }
             return new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { choices = new[] { new { message = new { content = reply } } } })) };
         }
     }

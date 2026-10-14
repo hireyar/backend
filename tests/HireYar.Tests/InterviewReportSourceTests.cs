@@ -103,4 +103,17 @@ public sealed class InterviewReportSourceTests
         Assert.Empty(content.QuestionEvaluations!); Assert.All(content.Metrics!,m=>Assert.Null(m.Score));
         Assert.Throws<InterviewProviderException>(()=>new InterviewReportSources(Context(transcript:" ")));
     }
+    [Fact]
+    public void Proven_redundant_fields_and_unambiguous_aliases_resolve_without_guessing_evidence()
+    {
+        var context=Context(); var sources=new InterviewReportSources(context); var reply=JsonNode.Parse(Reply(context))!;
+        var citation=reply["metrics"]![0]!["evidence"]![0]!;
+        citation["sourceRef"]=" a1 "; citation["answerId"]=context.Answers[1].AnswerId; citation["quote"]=context.Answers[1].Transcript;
+        var result=InterviewReportValidator.Validate(sources.Resolve(reply.ToJsonString()),context,true,true);
+        Assert.Equal(context.Answers[1].Transcript,result.Metrics![0].Evidence[0].Quote);
+        var longContext=Context(transcript:new string('a',501));
+        var ambiguous=new InterviewReportSources(longContext); var longReply=JsonNode.Parse(Reply(longContext))!;
+        longReply["metrics"]![0]!["evidence"]![0]!["sourceRef"]="A1";
+        Assert.Equal("source_reference_unknown",Assert.Throws<InterviewProviderException>(()=>ambiguous.Resolve(longReply.ToJsonString())).Reason);
+    }
 }

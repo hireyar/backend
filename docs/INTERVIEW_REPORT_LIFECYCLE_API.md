@@ -69,3 +69,11 @@ promptVersion جاری report-v3.2 است و schema عمومی همان report-v
 این اصلاح بازنویسی UUID/متن شاهد توسط مدل را حذف می‌کند. شاهد interaction، مرجع ناشناخته، متن/شناسه ساختگی و ارجاع به پاسخ دیگر در questionEvaluation قابل قبول نیستند؛ کنترل شواهد و نمره پابرجاست. پاسخ مدل همچنان می‌تواند از نظر JSON یا ارزیابی نامعتبر باشد؛ اصلاح ارجاع تضمین کیفیت معنایی مدل نیست. علت امن شکست مرجع می‌تواند source_reference_schema_invalid، source_reference_invalid، answer_reference_invalid یا answer_source_mismatch در لاگ باشد؛ خطای adapter با failureCode عمومی report_invalid_response عرضه می‌شود. خطاهای validator مرحله Validating همچنان report_validation_failed دارند.
 
 پس از انتشار مستقل API، Owner می‌تواند گزارش Failed موجود را با POST قبلی retry کند؛ بازیابی خودکار گزارش‌های Failed یا بازتولید گزارش موفق اضافه نشده است. تنظیمات مدل/provider مقصد خودکار تغییر نمی‌کنند.
+
+## اصلاح محدود خروجی — 2026-10-14، report-v3.3
+
+داخل یک generation حداکثر دو تماس مدل انجام می‌شود: خروجی اول کامل بررسی و فقط در صورت نامعتبر بودن، یک درخواست اصلاح با همان context/model/provider ارسال می‌شود. بودجه EvaluationTimeoutSeconds بین تماس‌ها مشترک است و deadline۱۳۰ثانیه قبلی نیز برقرار است. HTTP/network failure برای repair تکرار نمی‌شوند؛ خروجی دوم نامعتبر به Failed می‌رود. attempts همچنان تعداد claimهاست و با تماس repair افزایش نمی‌یابد. retry گزارش Failed از پنل دستی باقی است؛ گزارش موفق بازتولید نمی‌شود.
+
+فاصله لبه و case reference قابل یکسان‌سازی‌اند؛ answer alias فقط با یک شاهد، و quote/answerId اضافی فقط با تطابق دقیق با منبع واقعی پذیرفته می‌شوند. شاهد مبهم/ساختگی یا مرجع ناشناخته رد می‌شود. لاگ reasonهای source_reference_missing، source_reference_unknown و source_reference_conflicting_fields را جدا و repairAttempt=1 را برای تماس اصلاح ثبت می‌کند؛ هیچ متن مدل یا داوطلب در لاگ نیست.
+
+adapter اکنون validation کامل دارد؛ رد نهایی آن معمولاً failureStage=Generating/failureCode=report_invalid_response است. پیام این کد عدم پذیرش خروجی پس از بررسی را بیان می‌کند. JSON/schema/API/DTO قبلی و migration ثابت‌اند؛ تغییر اجباری فرانت ندارد. تضمین موفقیت همه پاسخ‌های مدل یا کیفیت معنایی از این اصلاح نتیجه نمی‌شود.

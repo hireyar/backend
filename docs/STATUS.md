@@ -1,3 +1,15 @@
+## اصلاح خروجی نامعتبر با repair محدود — 2026-10-14: Verified محلی و smoke واقعی
+
+لاگ کاربر از Liara/openai/gpt-5.6-luna با HTTP200 و source_reference_invalid نشان داد ارجاع مدل هنوز گاهی قرارداد را نقض می‌کند. این reason قبلی سه حالت نبود/ناشناخته‌بودن reference یا اضافه‌بودن quote/answerId را یکسان می‌کرد؛ بدون خروجی قبلی نمی‌توان زیرعلت همان گزارش را تعیین کرد. کد، حتی فیلدهای اضافی دقیقاً مطابق منبع واقعی را رد می‌کرد؛ این سخت‌گیری شکلی اصلاح شد، ولی داده ساختگی پذیرفته نمی‌شود.
+
+report-v3.3 مرجع کامل مجاز را صریح فهرست می‌کند. فاصله لبه/case ارجاع قابل‌اثبات یکسان‌سازی می‌شود؛ alias پاسخ فقط با دقیقاً یک قطعه شاهد پذیرفته می‌شود و alias مبهم رد می‌شود. quote و answerId اضافی فقط با برابری دقیق با منبع اصلی پذیرفته و از schema داخلی حذف می‌شوند. reasonهای امن source_reference_missing/unknown/conflicting_fields اکنون جدا هستند.
+
+adapter ابتدا خروجی تبدیل‌شده را کامل با validator موجود بررسی می‌کند. تنها پس از خروجی نامعتبر، حداکثر یک تماس اصلاح به همان مدل/provider با context، خروجی قبلی در حافظه و reason ثابت انجام می‌شود. هر دو تماس در بودجه مشترک EvaluationTimeoutSeconds و deadline تلاش۱۳۰ثانیه قرار دارند؛ HTTP failure تکرار نمی‌شود و لغو caller محترم است. خروجی دوم نیز باید تمام کنترل‌ها را پاس کند؛ پس از شکست آن، Failed قابل retry باقی است. GenerationAttempts یک claim را می‌شمارد، نه تماس داخلی مدل. schema/API، Domain/EF، تنظیمات/model مقصد، cached و retry دستی محفوظ؛ migration/فرانت لازم نیست. ADR-051 و قرارداد چرخه گزارش مرجع‌اند.
+
+tool restore/restore و build نهایی صفر warning/error؛145/145 تست مرتبط گزارش، provider، flow، review و team موفق، صفر Failed/Skipped روی PostgreSQL18 اختصاصی loopback55503؛ report-repair-verified.trx. هفت case repair برای JSON/reference/numeric، محدودیت دو تماس، HTTP failure، timeout مشترک/cancellation و adapterها؛ یک case alias/فیلد اضافی قابل‌اثبات و alias مبهم افزوده شد. integration ذخیره گزارش اکنون repair واقعی adapter را با یک GenerationAttempt و دو تماس بررسی می‌کند. suite کامل تکرار نشد؛ DB fixture صفر و cluster موقت متوقف و حذف شد.
+
+دو smoke واقعی همان openai/gpt-5.6-luna با داده فارسی کاملاً مصنوعی: عمومی۷شاخص/۳پاسخ در۱۹٫۴ثانیه با یک تماس؛ تخصصی۳شاخص/۳پاسخ با تزریق عمدی A999.1 فقط در ابزار تست، در۳۱٫۴ثانیه و دو تماس اصلاح و کامل معتبر شد. محتوا/credential در لاگ یا Git نرفت؛ config runtime تغییر نکرد. این‌ها موفقیت تمام گزارش‌های واقعی یا صحت معنایی مدل را تضمین نمی‌کنند. DB/گزارش واقعی این نوبت خوانده یا retry نشد؛ لاگ کاربر در فایل کپی نشد. باقی: انتشار/restart مستقل API و retry توسط Owner؛ commit/push/deploy/production و داده/تنظیمات مقصد تغییر نکردند.
+
 ## اصلاح شواهد شاخص‌های گزارش — 2026-10-14: Verified محلی و smoke واقعی
 
 لاگ ارسالی کاربر علت مشترک شکست سه گزارش را metric_citation_invalid پس از HTTP200 از Liara/google/gemini-3.5-flash-lite تأیید کرد. metadata فقط‌خواندنی دیتابیس نیز پاسخ‌های پردازش‌شده غیرخالی و گزارش Failed در Validating را نشان داد. این خطا محدود به ارجاع یا متن/طول شاهد شاخص‌هاست؛ زیرعلت دقیق خروجی قبلی ذخیره نشده است. مشکل با محافظ Processing قبلی حل نشده بود؛ از موفقیت125 تست مصنوعی آن نوبت، رفع خطای واقعی citation نتیجه نمی‌شد.
