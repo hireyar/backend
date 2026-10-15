@@ -26,6 +26,9 @@ public interface IApplicationDbContext
     DbSet<HireYar.Domain.Billing.InterviewBilling> InterviewBillings { get; }
     // Provider-specific locking stays in Infrastructure. Callback must contain no network I/O.
     Task<T> WithOrganizationBillingLockAsync<T>(Guid organizationId, Func<Task<T>> action, CancellationToken ct);
+    DbSet<HireYar.Domain.Support.SupportTicket> SupportTickets { get; }
+    DbSet<HireYar.Domain.Support.TicketMessage> TicketMessages { get; }
+    DbSet<HireYar.Domain.Support.TicketAttachment> TicketAttachments { get; }
     DbSet<Organization> Organizations { get; }
     DbSet<JobPosition> JobPositions { get; }
     DbSet<InterviewTemplate> InterviewTemplates { get; }

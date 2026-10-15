@@ -2335,6 +2335,141 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.ToTable("Organizations");
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Support.SupportTicket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("OrganizationId", "UpdatedAtUtc", "Id");
+
+                    b.HasIndex("Status", "UpdatedAtUtc", "Id");
+
+                    b.ToTable("SupportTickets", t =>
+                        {
+                            t.HasCheckConstraint("CK_SupportTicket_Subject", "length(btrim(\"Subject\")) BETWEEN 1 AND 200");
+
+                            t.HasCheckConstraint("CK_SupportTicket_Values", "\"Status\" BETWEEN 0 AND 2 AND \"Priority\" BETWEEN 0 AND 2 AND \"Revision\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Support.TicketAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)");
+
+                    b.Property<int>("Length")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(73)
+                        .HasColumnType("character varying(73)");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "TicketId", "MessageId");
+
+                    b.ToTable("TicketAttachments", t =>
+                        {
+                            t.HasCheckConstraint("CK_TicketAttachment_Length", "\"Length\" BETWEEN 1 AND 5242880");
+
+                            t.HasCheckConstraint("CK_TicketAttachment_Type", "\"ContentType\" IN ('image/png','image/jpeg','application/pdf','text/plain')");
+                        });
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Support.TicketMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AuthorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsStaff")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorUserId");
+
+                    b.HasIndex("OrganizationId", "TicketId", "CreatedAtUtc", "Id");
+
+                    b.ToTable("TicketMessages", t =>
+                        {
+                            t.HasCheckConstraint("CK_TicketMessage_Body", "length(btrim(\"Body\")) BETWEEN 1 AND 8000");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Infrastructure.Auth.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3263,6 +3398,47 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Organizations.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Support.SupportTicket", b =>
+                {
+                    b.HasOne("HireYar.Infrastructure.Auth.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Support.TicketAttachment", b =>
+                {
+                    b.HasOne("HireYar.Domain.Support.TicketMessage", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "TicketId", "MessageId")
+                        .HasPrincipalKey("OrganizationId", "TicketId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Support.TicketMessage", b =>
+                {
+                    b.HasOne("HireYar.Infrastructure.Auth.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Support.SupportTicket", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "TicketId")
+                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

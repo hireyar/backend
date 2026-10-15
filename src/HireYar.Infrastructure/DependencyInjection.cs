@@ -62,6 +62,18 @@ public static class DependencyInjection
         services.AddScoped<ITeamSeatUsage, HireYar.Infrastructure.Organizations.TeamSeatUsage>();
         services.AddScoped<ISubscriptionEntitlementService, SubscriptionEntitlementService>(); services.AddScoped<InterviewBillingService>(); services.AddScoped<BillingQueryService>();
         services.AddSingleton<IPaymentGateway, DisabledPaymentGateway>();
+        services.AddOptions<HireYar.Infrastructure.Support.TicketStorageOptions>().Bind(config.GetSection("TicketStorage"))
+            .Validate(x => x.IsValid(), "TicketStorage requires a private dedicated ticket bucket, HTTPS service endpoint, region and credentials.");
+        services.AddKeyedSingleton<Amazon.S3.IAmazonS3>("ticketing", (sp, _) => {
+            var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HireYar.Infrastructure.Support.TicketStorageOptions>>().Value;
+            return new Amazon.S3.AmazonS3Client(new Amazon.Runtime.BasicAWSCredentials(o.AccessKey, o.SecretKey), new Amazon.S3.AmazonS3Config {
+                ServiceURL = o.Endpoint, AuthenticationRegion = o.Region, ForcePathStyle = true,
+                RequestChecksumCalculation = Amazon.Runtime.RequestChecksumCalculation.WHEN_REQUIRED,
+                ResponseChecksumValidation = Amazon.Runtime.ResponseChecksumValidation.WHEN_REQUIRED,
+                MaxErrorRetry = 1, Timeout = TimeSpan.FromSeconds(30)
+            });
+        });
+        services.AddSingleton<HireYar.Application.Support.ITicketAttachmentStorage, HireYar.Infrastructure.Support.TicketS3Storage>();
         services.AddSingleton(TimeProvider.System); services.AddInterviews(config); return services;
     }
 }

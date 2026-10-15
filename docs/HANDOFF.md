@@ -1,4 +1,28 @@
-﻿## تکمیل تمام بخش‌های بک‌اند گزارش — 2026-10-15
+## تحویل تیکتینگ با پیوست خصوصی اروان — 2026-10-16
+
+شروع روی dev با تغییرات کاربر در STATUS/BACKLOG/HANDOFF؛ همگی حفظ شدند. API جدید سازمان و سوپرادمین در [TICKETING_API](TICKETING_API.md) است. کاربر باکت مستقل و عدم ذخیره محتوا در دیتابیس را صریحاً خواست؛ طرح اولیه پیش از اعمال migration با StorageKey جایگزین شد و هیچ migration دارای bytea منتشر/اعمال نشد. migration نهایی افزایشی20261015205303_AddSupportTickets فقط سه جدول تیکت/پیام/metadata پیوست با FK مرکب، index، check و محافظ Down تاریخچه دارد؛ ADR-056 و PROJECT به‌روزند.
+
+ساخت باکت واقعی با SDK و credential موجود بدون چاپ secret انجام شد: ticketing خارج حساب اشغال بود، کاربر hireyar-ticketing را تأیید کرد؛ ساخت Private، بررسی ACL/policy، PUT/GET بایت‌های کاملاً ساختگی، رد anonymous و حذف همان شیء موفق بودند. ابزار موقت در artifacts ignored و credential فقط در فایل Development.local ignored استفاده شد؛ API bucket جدید را خودکار ایجاد نمی‌کند و client/keyed/config مستقل از ویدیو دارد. هیچ داده واقعی تیکت/کارجو آپلود نشد.
+
+باقی تحویل محصول: migration و تنظیم TicketStorage سرور، deploy/restart مستقل، UI Angular و دانلود authenticated Blob طبق قرارداد. شبکه بیرون قفل و recheck پیش از commit است؛ failure cleanup محدود و guard نتیجه نامشخص commit دارد، ولی crash/outage ممکن است orphan خصوصی بگذارد و reconciliation عملیاتی لازم است. signature/MIME/نوع/نام/حجم/quota/دانلود خصوصی کنترل می‌شوند؛ اسکن malware/parse کامل تصویر و PDF انجام نمی‌شود. پیام‌ها در فرانت text باشند و پیوست inline نشود. commit/push/deploy/production و داده مقصد تغییر نکردند؛ تنها اثر خارجی مجاز ساخت باکت و smoke ساختگی حذف‌شده است.
+
+
+
+### اعتبارسنجی نهایی تیکتینگ
+
+Tool restore/restore و build نهایی موفق، صفر warning/error؛ تست نهایی۱۱/۱۱ با صفر شکست/Skip، شامل۱۰تست تیکتینگ و تست اصلاح‌شده گزارش است. suite کامل اولیه۴۴۵موفق،۱شکست از فرض ثابت آخرین migration در تست گزارش و۷Skip به علت نبود HIREYAR_TEST_FFMPEG داشت؛ تست گزارش به migration خودش و predecessor واقعی هدف‌گذاری شد، idempotence و محافظ audit تضعیف نشد و همراه همه تست‌های تیکتینگ دوباره پاس شد. هفت تست encoder/صوت مرحله‌ای جداگانه با PostgreSQL18 و FFmpeg واقعی۴+۳پاس شدند. آخرین outcome هر یک از۴۵۳شناسه تست موفق است؛ کل suite واحد بعد از اصلاح فقط تست قدیمی تکرار نشده است. TestResults: ticketing-full.trx، ticketing-encoder.trx، ticketing-stage-audio.trx و ticketing-final-focused.trx.
+
+پوشش تیکت: گفت‌وگوی واقعی HTTP پنل/سوپرادمین، نویسنده staff، دانلود و هدرهای امن، scope و401/404، جعل فیلد، Recruiter همان سازمان، فایل نامعتبر/بزرگ/تعداد اضافه، کنترل نوع/MIME/signature/UTF-8 در مسیر، private ACL/policy، PUT با پاسخ گم‌شده و cleanup، بستن حین upload خارج قفل، پاسخ‌های هم‌زمان و revision، quota۲۰تیکت باز/۱۰۰MiB تیکت/۵۰۰MiB سازمان/۲۰۰پیام، limiter/OpenAPI و نبود property/ستون Content در EF. اندازه quotaهای بزرگ با metadata ساختگی آزموده شد، نه فایل حجیم واقعی. Migration در fixture واقعی PostgreSQL18 روی loopback55516 اعمال و downgrade دارای تیکت رد شد؛ EF has-pending-model-changes بدون drift. SQL delta idempotent artifacts/ticketing-migrations.sql تولید ولی مستقیم جداگانه اجرا نشد.
+
+دور نخست۱۰تست تازه، ایراد validation attribute روی property رکورد MVC و catch نشدن AmazonS3Exception را آشکار کرد؛ هر دو اصلاح و همه موارد بازاجرا شدند. داده واقعی، credential، token یا لینک حساس به مستندات/Git/لاگ جدید افزوده نشد. تنظیم مشترک TicketStorage credential خالی دارد و تنظیم Development.local ignored با باکت جدید تکمیل است؛ محیط سرور هنوز تنظیم/منتشر نشده است. باکت تازه باقی می‌ماند؛ شیء smoke حذف شده است. DBهای fixture صفر، cluster اختصاصی متوقف و حذف و ابزار موقت ساخت باکت پاک شد؛ diff check موفق.
+
+## بررسی عملیاتی خطای ارزیابی — 2026-10-16
+
+بررسی read-only مقصد نشان داد نصب migration جدید به‌تنهایی موفقیت مدل را تضمین نمی‌کند: جلسه کامل و transcript موجود می‌تواند با شکست همه assessmentها، امتیاز/پروفایل فاقد داده داشته باشد. در اتصال محلی تنظیم‌شده به provider، probe کاملاً ساختگی HTTP402 با نشانه خطای اعتبار/موجودی برگشت؛ تنظیمات runtime سرور از این probe قابل اثبات نیست. داده واقعی، متن پاسخ و secret در این یادداشت ثبت نشده‌اند؛ هیچ رکورد مقصد، تنظیمات سرور یا deployment تغییر نکرد.
+
+نقص تشخیصی تأییدشده در کد: HTTP402 و سایر ردهای دائمی provider به assessment_provider_rejected عمومی تبدیل می‌شوند؛ Provider/Model نیز فقط در موفقیت ذخیره می‌شوند. Failed خودکار دوباره اجرا نمی‌شود؛ retry دستی حداکثر سه تلاش کل دارد، پس retry پیش از رفع علت می‌تواند بودجه را تمام کند. کار باز: تفکیک کدهای امن اعتبار/احراز هویت/مدل، نمایش علت عملیاتی روشن، و طراحی بازیابی کنترل‌شده پس از رفع تنظیمات بدون دورزدن بی‌صدای سقف تلاش. این نوبت صرفاً تشخیص است؛ کد اجرایی تغییر نکرده و build/test suite مجدد اجرا نشده است.
+
+## تکمیل تمام بخش‌های بک‌اند گزارش — 2026-10-15
 
 کار روی dev با حفظ تمام تغییرات uncommitted اصلاح readiness قبلی ادامه یافت. با دستور صریح «همه بخش‌ها»، تمام۱۲بخش جدید به داده واقعی وصل شدند؛ دیگر بخش جاری NotStarted/NotImplemented وجود ندارد و HasUnimplementedSections=false است. امتیاز تخصصی میانگین وزن‌دار مهارت‌ها، عمومی میانگین پاسخ‌های نمره‌دار، تناسب براساس سطح هدف snapshot و پوشش، پروفایل موضوعی/شاخص‌ها، توزیع نمرات، summary محاسباتی، قوت/بهبود با شاهد و dataGaps مستقل پیاده شدند. مقادیر فاقد شاهد null/InsufficientEvidence و نمره ناقص Partial است؛ این‌ها نتیجه معتبرِ کمبود داده‌اند، نه قابلیت باقی‌مانده.
 

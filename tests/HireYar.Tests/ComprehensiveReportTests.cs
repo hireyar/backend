@@ -134,17 +134,41 @@ public sealed partial class InterviewFlowTests
     [PostgresFact]
     public async Task Complete_report_migration_is_idempotent_and_refuses_to_erase_review_audit()
     {
-        var isolated=new ApiFixture();await isolated.InitializeAsync();
-        try {
-            var flow=new InterviewFlowTests(isolated);var x=await flow.CompletedForAssessment();var report=await NewReport(x.Hr,x.Session);
-            await isolated.Db(async db=> {
-                var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var latest=migrations[^1];Assert.EndsWith("_CompleteSessionReports",latest);var migrator=db.GetService<IMigrator>();
-                await migrator.MigrateAsync(migrations[^2]);var script=migrator.GenerateScript(migrations[^2],latest,MigrationsSqlGenerationOptions.Idempotent);await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);
-                Assert.False(db.Database.HasPendingModelChanges());Assert.True(await db.InterviewSessions.AnyAsync(s=>s.Id==x.Session));
+        var isolated = new ApiFixture(); await isolated.InitializeAsync();
+        try
+        {
+            var flow = new InterviewFlowTests(isolated);
+            var x = await flow.CompletedForAssessment();
+            var report = await NewReport(x.Hr, x.Session);
+            string reportMigration = "", previousMigration = "";
+            await isolated.Db(async db =>
+            {
+                var migrations = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
+                var reportIndex = Array.FindIndex(migrations, m => m.EndsWith("_CompleteSessionReports", StringComparison.Ordinal));
+                Assert.True(reportIndex > 0);
+                reportMigration = migrations[reportIndex]; previousMigration = migrations[reportIndex - 1];
+                var migrator = db.GetService<IMigrator>();
+                await migrator.MigrateAsync(previousMigration);
+                var script = migrator.GenerateScript(previousMigration, reportMigration, MigrationsSqlGenerationOptions.Idempotent);
+                await db.Database.ExecuteSqlRawAsync(script);
+                await db.Database.ExecuteSqlRawAsync(script);
+                // Restore later migrations before exercising the current API/model.
+                await db.Database.MigrateAsync();
+                Assert.False(db.Database.HasPendingModelChanges());
+                Assert.True(await db.InterviewSessions.AnyAsync(s => s.Id == x.Session));
             });
-            Assert.Equal(HttpStatusCode.OK,(await x.Hr.Client.Send(HttpMethod.Post,$"/api/interviews/{x.Session}/report/review",new ReportDecisionRequest(Guid.NewGuid(),"review",report.Fingerprint))).StatusCode);
-            await isolated.Db(async db=> {var applied=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var error=await Assert.ThrowsAsync<PostgresException>(()=>db.GetService<IMigrator>().MigrateAsync(applied[^2]));Assert.Equal("P0001",error.SqlState);Assert.Contains(applied[^1],await db.Database.GetAppliedMigrationsAsync());});
-            Assert.Equal("Reviewed",(await NewReport(x.Hr,x.Session)).HumanReview.State);
-        } finally {await((IAsyncLifetime)isolated).DisposeAsync();}
+            Assert.Equal(HttpStatusCode.OK, (await x.Hr.Client.Send(HttpMethod.Post, $"/api/interviews/{x.Session}/report/review",
+                new ReportDecisionRequest(Guid.NewGuid(), "review", report.Fingerprint))).StatusCode);
+            await isolated.Db(async db =>
+            {
+                var error = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync(previousMigration));
+                Assert.Equal("P0001", error.SqlState);
+                Assert.Contains(reportMigration, await db.Database.GetAppliedMigrationsAsync());
+                await db.Database.MigrateAsync();
+            });
+            Assert.Equal("Reviewed", (await NewReport(x.Hr, x.Session)).HumanReview.State);
+        }
+        finally { await ((IAsyncLifetime)isolated).DisposeAsync(); }
     }
+
 }
