@@ -1,4 +1,4 @@
-﻿namespace HireYar.Domain.Interviews;
+namespace HireYar.Domain.Interviews;
 
 // Independent post-interview assessment; never modifies the live answer or its billing.
 public sealed class AnswerReportAssessment
@@ -16,10 +16,11 @@ public sealed class AnswerReportAssessment
     public DateTimeOffset? NextAttemptAtUtc { get; set; }
     public string? FailureCode { get; set; }
     public string? InputHash { get; set; }
-    public string EvaluatorVersion { get; set; } = "answer-quality/1";
+    public string EvaluatorVersion { get; set; } = "answer-quality/2";
     public decimal? Score { get; set; }
     public decimal? Confidence { get; set; }
     public string? Explanation { get; set; }
+    public string DimensionsJson { get; set; } = "[]";
     public string EvidenceJson { get; set; } = "[]";
     public string? Provider { get; set; }
     public string? Model { get; set; }

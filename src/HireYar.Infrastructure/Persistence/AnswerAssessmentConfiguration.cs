@@ -1,4 +1,4 @@
-﻿using HireYar.Domain.Interviews;
+using HireYar.Domain.Interviews;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,6 +20,7 @@ public sealed class AnswerAssessmentConfiguration : IEntityTypeConfiguration<Ans
         b.Property(a => a.Explanation).HasMaxLength(1500);
         b.Property(a => a.Provider).HasMaxLength(100); b.Property(a => a.Model).HasMaxLength(100);
         b.Property(a => a.Score).HasPrecision(7, 4); b.Property(a => a.Confidence).HasPrecision(7, 6);
+        b.Property(a => a.DimensionsJson).HasColumnType("jsonb").HasDefaultValue("[]");
         b.Property(a => a.EvidenceJson).HasColumnType("jsonb");
         b.ToTable(t => {
             t.HasCheckConstraint("CK_AnswerAssessment_State", "\"State\" IN ('Queued','Processing','Succeeded','InsufficientEvidence','Failed','Unavailable') AND \"Attempts\" BETWEEN 0 AND 3");

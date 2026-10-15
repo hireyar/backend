@@ -10,5 +10,7 @@ public sealed class InterviewReviewEntry
     public string Kind { get; init; } = "";
     public string? Note { get; init; }
     public DateTimeOffset? ClientOccurredAtUtc { get; init; }
+    public string? ReportSnapshotJson { get; init; }
+    public string? ReportFingerprint { get; init; }
     public DateTimeOffset RecordedAtUtc { get; init; }
 }

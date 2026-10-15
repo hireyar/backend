@@ -31,7 +31,8 @@ public sealed partial class InterviewFlowTests
             Assert.Equal(12,report.Sections.Count);Assert.Equal(3,report.Statistics.BankQuestions);
             Assert.Equal(2,report.Questions.Count);Assert.Equal(1,report.Statistics.SubmittedAnswers);
             Assert.Equal(1,report.Statistics.ProcessedAnswers);Assert.Equal(1,report.Statistics.UnansweredQuestions);
-            Assert.Equal("NotStarted",report.OverallScore.State);Assert.Null(report.OverallScore.Value);Assert.Null(report.Summary.Text);
+            Assert.Equal("InsufficientEvidence",report.OverallScore.State);Assert.Null(report.OverallScore.Value);Assert.NotNull(report.Summary.Text);
+            Assert.False(report.Processing.HasUnimplementedSections);
             Assert.All(report.Questions,q=>Assert.Null(q.Assessment.Value));Assert.Contains(report.Questions,q=>q.AnswerState=="Unanswered");
             Assert.Equal("NotApplicable",report.Sections.Single(s=>s.Code=="generalProfile").State);
             var first=await(await hr.Client.Send(HttpMethod.Get,$"/api/interviews/{invite.InterviewId}/report")).Content.ReadAsStringAsync();
@@ -106,7 +107,7 @@ public sealed partial class InterviewFlowTests
         Assert.Equal(HttpStatusCode.OK,response.StatusCode);var html=await response.Content.ReadAsStringAsync();
         Assert.Contains("&lt;script&gt;",html);Assert.DoesNotContain("<script>",html);Assert.DoesNotContain("<img",html);
         Assert.Contains("data-section='questions'",html);Assert.Contains("data-section='summary'",html);
-        Assert.Contains("هنوز",html);Assert.Contains("default-src 'none'",response.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.Contains("جمع‌بندی",html);Assert.Contains("default-src 'none'",response.Headers.GetValues("Content-Security-Policy").Single());
     }
 
     [PostgresFact]

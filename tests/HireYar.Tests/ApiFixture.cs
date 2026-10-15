@@ -53,6 +53,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public bool UseFixedOtp { get; init; }
     public bool DisabledPayments { get; init; }
     public bool DiagnosticsEnabled { get; init; }
+    public bool AssessmentWorkerEnabled { get; init; }
     public int TrialDurationDays { get; init; } = 3;
     public decimal TrialCreditAmountUsd { get; init; } = 1m;
     public FakePaymentGateway PaymentGateway { get; } = new();
@@ -86,7 +87,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("AuthRateLimit:PermitLimit", "1000");
         b.UseSetting("CandidateRateLimit:PermitLimit", "10000");
         b.UseSetting("AI:Provider", "Disabled");
-        b.UseSetting("AnswerAssessments:WorkerEnabled", "false");
+        b.UseSetting("AnswerAssessments:WorkerEnabled", AssessmentWorkerEnabled.ToString());
         b.UseSetting("AnswerAssessments:AttemptTimeoutSeconds", "1");
         b.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
         b.UseSetting("AI:NetArz:ApiKey", "");

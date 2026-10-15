@@ -1,4 +1,8 @@
-﻿> به‌روزرسانی مرحله دوم 2026-10-15: ارزیابی مستقل هر پاسخ اکنون پیاده شده است؛ [ANSWER_ASSESSMENT_API](ANSWER_ASSESSMENT_API.md) قرارداد وضعیت/شواهد/retry/config است. GET همچنان فقط خواندن است؛ توضیح‌های «هنوز پیاده نشده» پایین برای ارزیابی پاسخ‌ها، سابقه مرحله اول‌اند. تحلیل‌های کلی هنوز مرحله بعد هستند.
+﻿> تکمیل جامع 2026-10-15: تمام بخش‌های بک‌اند اکنون پیاده شده‌اند و هیچ بخش جاری NotImplemented نیست. [COMPREHENSIVE_REPORT_API](COMPREHENSIVE_REPORT_API.md) مرجع نهایی قرارداد، فرمول‌ها، policy و تصمیم نسخه‌دار است؛ محدودیت‌های مرحله‌ایِ پایین تاریخی‌اند.
+
+> اصلاح قرارداد آمادگی 2026-10-15: بخش پیاده‌نشده NotImplemented است و در صف نیست؛ processing.shouldPoll مرجع polling و Swagger retry دارای مدل پاسخ صریح202 شد. [REPORT_READINESS_API](REPORT_READINESS_API.md) بر توضیح‌های تاریخی NotStarted پایین اولویت دارد.
+
+> به‌روزرسانی مرحله دوم 2026-10-15: ارزیابی مستقل هر پاسخ اکنون پیاده شده است؛ [ANSWER_ASSESSMENT_API](ANSWER_ASSESSMENT_API.md) قرارداد وضعیت/شواهد/retry/config است. GET همچنان فقط خواندن است؛ توضیح‌های «هنوز پیاده نشده» پایین برای ارزیابی پاسخ‌ها، سابقه مرحله اول‌اند. تحلیل‌های کلی هنوز مرحله بعد هستند.
 
 # گزارش مصاحبه جدید — قرارداد مرحله اول
 
@@ -13,7 +17,7 @@
 
 `schemaVersion=session-report/1`؛ `state=BaseReady` برای جلسه Completed و `InterviewIncomplete` برای بقیه وضعیت‌ها. BaseReady فقط آماده بودن اطلاعات پایه است و به معنی کامل بودن تحلیل نیست. تکمیل جلسه بلافاصله قابل خواندن است؛ GET منتظر مدل نمی‌ماند. شکست احراز هویت/دیتابیس همچنان خطای واقعی است؛ تضمین دسترسی در قطعی زیرساخت یا ساختن نمره بدون ارزیابی مطرح نیست.
 
-ریشه JSON: `identity`, `statistics`, `access`, `questions`, `media`, `signals`, `overallScore`, `summary`, `strengths`, `improvements`, `sections` و interviewId/schemaVersion/state.
+ریشه JSON: `identity`, `statistics`, `access`, `questions`, `media`, `signals`, `overallScore`, `summary`, `strengths`, `improvements`, `sections`, `processing` و interviewId/schemaVersion/state.
 
 ## بخش‌های طراحی و ترتیب ساخت
 
@@ -21,18 +25,18 @@
 |---|---|---|
 | navigation | دسترسی‌ها، چاپ و رسانه | URL چاپ و رسانه خصوصی؛ کنترل‌های صفحه در Angular |
 | identity | شناسنامه کارجو و مصاحبه | نام، عنوان snapshot موقعیت، نوع، وضعیت و زمان‌های UTC |
-| score | امتیاز کل و اطمینان | NotStarted؛ مقدار و فرمول null |
-| positionFit | تناسب با موقعیت | NotStarted |
+| score | امتیاز کل و اطمینان | NotImplemented؛ مقدار و فرمول null |
+| positionFit | تناسب با موقعیت | NotImplemented |
 | statistics | آمار مصاحبه | محاسبه از داده واقعی |
-| summary | جمع‌بندی | NotStarted؛ متن null |
-| strengthsAndImprovements | نقاط قوت و زمینه‌های بهبود | NotStarted؛ فهرست‌های خالی |
-| specializedProfile | پروفایل تخصصی | NotStarted در تخصصی، NotApplicable در عمومی |
-| generalProfile | شاخص‌های عمومی | NotStarted در عمومی، NotApplicable در تخصصی |
+| summary | جمع‌بندی | NotImplemented؛ متن null |
+| strengthsAndImprovements | نقاط قوت و زمینه‌های بهبود | NotImplemented؛ فهرست‌های خالی |
+| specializedProfile | پروفایل تخصصی | NotImplemented در تخصصی، NotApplicable در عمومی |
+| generalProfile | شاخص‌های عمومی | NotImplemented در عمومی، NotApplicable در تخصصی |
 | questions | سؤال، پاسخ، تعامل و ارزیابی | داده واقعی و ارزیابی مستقل پاسخ آماده؛ قرارداد مرحله دوم را ببینید |
 | signals | رسانه، رضایت و رویدادها | داده ثبت‌شده، همراه وضعیت نامشخص/مفقود/منقضی |
-| humanReview | بررسی و تصمیم کارشناس در گزارش | طراحی جدید هنوز NotStarted |
+| humanReview | بررسی و تصمیم کارشناس در گزارش | بخش گزارش هنوز NotImplemented |
 
-فرانت باید همه بخش‌های applicable را از اولین پاسخ نمایش دهد؛ برای NotStarted پیام صریح «هنوز ارزیابی نشده» نمایش دهد و از نمایش صفر به جای null یا spinner سراسری خودداری کند. schema قبلی را به این DTO نگاشت نکند. نمونه HTML کاربر مرجع بصری و ترتیب بخش‌هاست؛ عددها، نمره‌ها و متن‌های نمایشی آن، داده واقعی یا دستور تولید نیستند. چاپ فعلی پوسته اولیه مستقل است؛ تعامل‌های داشبورد در ریپوی Angular ساخته می‌شوند.
+فرانت باید همه بخش‌های applicable را از اولین پاسخ نمایش دهد؛ برای NotImplemented پیام صریح «در نسخه فعلی پیاده‌سازی نشده و در صف نیست» نمایش دهد و از نمایش صفر به جای null یا spinner سراسری خودداری کند. فقط processing.shouldPoll=true درخواست بعدی خودکار می‌خواهد؛ قرارداد readiness مرجع است. schema قبلی را به این DTO نگاشت نکند. نمونه HTML کاربر مرجع بصری و ترتیب بخش‌هاست؛ عددها، نمره‌ها و متن‌های نمایشی آن، داده واقعی یا دستور تولید نیستند. چاپ فعلی پوسته اولیه مستقل است؛ تعامل‌های داشبورد در ریپوی Angular ساخته می‌شوند.
 
 ## داده‌های پایه و رفتار نقص داده
 

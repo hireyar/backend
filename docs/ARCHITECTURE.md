@@ -1,4 +1,22 @@
-﻿## ADR-053 — ارزیابی مستقل، محدود و ماندگار هر پاسخ (2026-10-15)
+﻿## ADR-055 — گزارش جامع قطعی و بررسی انسانی نسخه‌دار (2026-10-15)
+
+دستور صریح تکمیل همه بخش‌ها، محدودیت مراحل قبلی را برداشته است. گزارش از ارزیابی مستقل پاسخ‌ها read model کامل می‌سازد: score تخصصی با میانگین per-skill و وزن snapshot/مالک، عمومی equal-answer mean، fit تنها در سطح هدف و با پوشش وزن/مهارت الزامی، پروفایل‌ها و توزیع، جمع‌بندی محاسباتی و یافته‌های آستانه‌دار با شاهد. مقدار نامعلوم حذف از میانگین و شکاف داده است، نه صفر یا ضعف فرد. تمام فرمول‌ها و آستانه‌ها در API آشکارند؛ تصمیم استخدام خودکار ساخته نمی‌شود.
+
+شاخص‌ها توسط rubricهای محدودِ شغلی برای همان پاسخ به answer-quality/2 افزوده شدند؛ quote/offset/answerId سرور و شکست هر شاخص مستقل است. نمره موفق قبلی immutable در مسیر سرویس باقی می‌ماند؛ داده legacy بدون شاخص ناشناخته است. GET/خلاصه/محاسبات تماس مدل جدید ندارند و به موفقیت یک JSON بزرگ وابسته نیستند. Partial/InsufficientEvidence نتیجه داده است؛ هیچ بخش پیاده‌نشده در خروجی جاری وجود ندارد. مرجع [COMPREHENSIVE_REPORT_API](COMPREHENSIVE_REPORT_API.md) است.
+
+SessionReportPolicies فقط Owner، نسخه optimistic با Revision در قفل سازمان، آستانه‌های60/80 و حداقل پوشش0.6 پیش‌فرض آشکار با قابلیت تغییر دارد. وزن‌های الزامی مثبت و مجموعه دقیق snapshot لازم است. سیاست خراب با warning و default آشکار بازیابی می‌شود. تصمیم انسانی جدید با fingerprint canonical نقش/سؤال/ارزیابی/policy در همان قفل recheck و append می‌شود؛ اعداد/تنظیمات بررسی‌شده snapshot دارند، history append-only در API و requestId idempotent است. مشاهده‌کننده/تاریخ خواندن/سابقه تصمیم جزو fingerprint نیست تا ثبت تصمیم خودش گزارش را عوض نکند. تغییر ارزیابی یا policy تصمیم قبلی را ReviewOutdated می‌کند.
+
+Migration صرفاً افزایشی است و Down داده استفاده‌شده را پاک نمی‌کند. چاپ HTML همه بخش‌ها و نمودارها را با همان DTO و escape می‌سازد؛ Angular جدا این DTO را متصل می‌کند. نیازی به زیرساخت توزیع‌شده، repository یا موتور گزارش قدیمی نیست.
+
+## ADR-054 — جداسازی بخش پیاده‌نشده از پردازش فعال گزارش (2026-10-15)
+
+NotStarted ثابت برای تحلیل‌های جامع با waiting job اشتباه گرفته شد؛ در runtime هیچ worker برای آن بخش‌ها وجود ندارد. بخش‌های score/fit/profiles/summary/strengths/improvements/humanReview در قرارداد جدید NotImplemented و shouldPoll=false هستند؛ فرمول/عدد ساختگی یا تکمیل خودکار برایشان اضافه نشده است. پروفایل نامرتبط NotApplicable محفوظ است.
+
+processing در ریشه وضعیت Pending/Paused/Idle، شمارنده‌ها و shouldPoll/pollAfterSeconds صریح دارد؛ فقط ارزیابی سؤال Queued/Processing/RecoveryPending با WorkerEnabled روشن نیاز به polling دارد. WorkerEnabled خاموش و کار ناتمام برابر Paused/assessment_worker_disabled است؛ Failed/Unavailable/InsufficientEvidence و بخش پیاده‌نشده تایمر فعال نمی‌سازند. این metadata تشخیص heartbeat نیست؛ GET همچنان read-only و مستقل از AI است. [REPORT_READINESS_API](REPORT_READINESS_API.md) قرارداد جاری فرانت است.
+
+RetryAssessment اکنون DTO نام‌دار و پاسخ202 صریح OpenAPI دارد؛ wire shape قبلی حفظ و status/body توسط تست endpoint و سند تولیدشده بررسی می‌شود. تغییر schema/migration یا موتور ارزیابی وجود ندارد؛ تکمیل تحلیل‌های جامع همچنان مرحله جداست.
+
+## ADR-053 — ارزیابی مستقل، محدود و ماندگار هر پاسخ (2026-10-15)
 
 مرحله دوم گزارش جدید، بر پایه ADR-052، ارزیابی مستقل هر پاسخ است. AnswerReportAssessment در جدول AnswerAssessments با FK مرکب سازمان/جلسه و جلسه/پاسخ ذخیره می‌شود. GET گزارش فقط read است؛ worker پاسخ نهایی دارای متن در جلسه Completed را کشف می‌کند. موفقیت هر پاسخ immutable در سرویس است؛ شکست یک پاسخ مانع خواندن پایه یا موفقیت دیگران نیست. نمره‌های لحظه‌ای مسیر زنده استفاده نمی‌شوند و جدول/پرامپت/validator/repair گزارش قبلی بازنگشته‌اند.
 

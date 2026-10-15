@@ -2,7 +2,7 @@ namespace HireYar.Application.Interviews;
 
 public sealed record AnswerExcerpt(int Id, int Start, string Text);
 public sealed record AnswerAssessmentInput(string PositionTitle, string InterviewType, string Question,
-    string Topic, int Difficulty, IReadOnlyList<AnswerExcerpt> Excerpts);
+    string Topic, int Difficulty, IReadOnlyList<AnswerExcerpt> Excerpts, string? PositionDescription = null, IReadOnlyList<AnswerDimensionDefinition>? Dimensions = null);
 public sealed record AnswerAssessmentResponse(string Json, string Provider, string Model);
 public interface IAnswerAssessmentProvider
 {
@@ -14,5 +14,5 @@ public sealed class AnswerAssessmentOptions
     public int PollSeconds { get; set; } = 2;
     public int AttemptTimeoutSeconds { get; set; } = 75;
     public const int MaxAttempts = 3;
-    public const string Version = "answer-quality/1";
+    public const string Version = "answer-quality/2";
 }

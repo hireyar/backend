@@ -56,6 +56,8 @@ public static class InterviewDependencyInjection
                 "InterviewInvitations:CandidateLinkPath must be a relative page path containing {id} without query or fragment.").ValidateOnStart();
         services.AddSingleton<IInterviewInvitationSecurity, ProtectedInterviewInvitationSecurity>();
         services.AddScoped<SessionReportService>();
+        services.AddScoped<SessionReportPolicyService>();
+        services.AddScoped<SessionReportDecisionService>();
         services.AddOptions<AnswerAssessmentOptions>().Bind(config.GetSection("AnswerAssessments"))
             .Validate(o => o.PollSeconds is >= 1 and <= 60 && o.AttemptTimeoutSeconds is >= 1 and <= 120,
                 "Invalid answer assessment timing.").ValidateOnStart();
