@@ -14,6 +14,9 @@ namespace HireYar.Infrastructure.Persistence;
 public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options), IApplicationDbContext
 {
     public DbSet<RegistrationTrial> RegistrationTrials => Set<RegistrationTrial>();
+    public DbSet<HireYar.Domain.Support.SupportTicket> SupportTickets => Set<HireYar.Domain.Support.SupportTicket>();
+    public DbSet<HireYar.Domain.Support.TicketMessage> TicketMessages => Set<HireYar.Domain.Support.TicketMessage>();
+    public DbSet<HireYar.Domain.Support.TicketAttachment> TicketAttachments => Set<HireYar.Domain.Support.TicketAttachment>();
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<JobPosition> JobPositions => Set<JobPosition>();
     public DbSet<InterviewTemplate> InterviewTemplates => Set<InterviewTemplate>();

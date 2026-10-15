@@ -50,6 +50,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public bool Production { get; init; }
     public bool UseS3VideoStorage { get; init; }
     public FakeVideoS3 VideoS3 { get; } = new();
+    public FakeTicketS3 TicketS3 { get; } = new();
     public bool UseFixedOtp { get; init; }
     public bool DisabledPayments { get; init; }
     public bool DiagnosticsEnabled { get; init; }
@@ -70,6 +71,9 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddConsole(); });
         b.UseEnvironment(Production ? "Production" : "Development");
         b.UseSetting("SkipLocalSettings", "true");
+        b.UseSetting("TicketStorage:AccessKey", "synthetic");
+        b.UseSetting("TicketStorage:SecretKey", "synthetic");
+        b.UseSetting("TicketStorage:Bucket", "hireyar-ticketing");
         b.UseSetting("SuperAdmin:Enabled", AdminEnabled.ToString());
         b.UseSetting("SuperAdmin:RandomKey", AdminEntry);
         b.UseSetting("SuperAdmin:AuthRequestsPerMinute", AdminRateLimit.ToString());
@@ -103,6 +107,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
             s.RemoveAll<IAdminCaptcha>(); s.AddSingleton<IAdminCaptcha>(AdminCaptcha);
             if (UseS3VideoStorage) { s.RemoveAll<Amazon.S3.IAmazonS3>(); s.AddSingleton<Amazon.S3.IAmazonS3>(VideoS3); }
             if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }
+            s.AddKeyedSingleton<Amazon.S3.IAmazonS3>("ticketing", TicketS3);
             s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
             s.RemoveAll<IPhoneOtpSender>(); s.AddSingleton<IPhoneOtpSender>(PhoneOtp);
             s.RemoveAll<HireYar.Application.Interviews.IInterviewInvitationNotifier>(); s.AddSingleton<HireYar.Application.Interviews.IInterviewInvitationNotifier>(Invitations);

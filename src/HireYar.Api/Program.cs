@@ -39,6 +39,7 @@ builder.Services.AddHttpContextAccessor(); builder.Services.AddScoped<ICurrentUs
 builder.Services.AddScoped<AdminAccountValidation>(); builder.Services.AddScoped<AdminEntryFilter>();
 builder.Services.AddScoped<ICurrentInterviewAccess, CurrentInterviewAccess>();
 builder.Services.AddScoped<PanelWizardService>();
+builder.Services.AddScoped<HireYar.Application.Support.TicketService>();
 builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
 builder.Services.AddControllers().AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
 builder.Services.Configure<ApiBehaviorOptions>(o => o.InvalidModelStateResponseFactory = c =>
@@ -96,6 +97,7 @@ builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.N
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
+    o.AddPolicy("tickets", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("admin-auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("SuperAdmin:AuthRequestsPerMinute") ?? 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("candidate", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("CandidateRateLimit:PermitLimit") ?? 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("AuthRateLimit:PermitLimit") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -160,7 +162,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                 } } }
         } };
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
-        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminPricing" or "AdminUsers" ? "SuperAdmin" : "Bearer", context.Document)] = [] }];
+        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminPricing" or "AdminUsers" or "AdminTickets" ? "SuperAdmin" : "Bearer", context.Document)] = [] }];
     if (controller == "AdminAuth")
     {
         operation.Parameters ??= [];

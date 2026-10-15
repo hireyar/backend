@@ -17,6 +17,13 @@ internal static class OpenApiText
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("Tickets" or "AdminTickets", "List") => "فهرست صفحه‌بندی‌شده تیکت‌ها با فیلتر وضعیت و اولویت",
+        ("Tickets" or "AdminTickets", "Get") => "جزئیات تیکت با کنترل دسترسی",
+        ("Tickets" or "AdminTickets", "Messages") => "گفت‌وگوی تیکت و مشخصات پیوست‌ها",
+        ("Tickets" or "AdminTickets", "Reply") => "ارسال پیام و حداکثر سه پیوست خصوصی",
+        ("Tickets" or "AdminTickets", "Status") => "بستن یا بازکردن تیکت با کنترل نسخه",
+        ("Tickets" or "AdminTickets", "Download") => "دانلود احرازشده پیوست خصوصی تیکت از اروان",
+        ("Tickets", "Create") => "ثبت تیکت سازمان و نخستین پیام با پیوست اختیاری",
         ("Organization", "Features") => "قابلیت‌های فعال سازمان برای مالک و زیرمجموعه، بدون اطلاعات مالی",
         ("TeamMembers", "Members") => "فهرست اعضای سازمان جاری؛ فقط مالک",
         ("TeamMembers", "Invitations") => "فهرست و وضعیت دعوت‌های موبایلی سازمان جاری",
