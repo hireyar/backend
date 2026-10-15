@@ -1,4 +1,4 @@
-﻿namespace HireYar.Api.OpenApi;
+namespace HireYar.Api.OpenApi;
 
 internal static class OpenApiText
 {
@@ -35,6 +35,8 @@ internal static class OpenApiText
         ("CandidateInterviews", "RecordingProgress") => "بازیابی بخش‌های ضبط‌شده و شماره بخش بعدی پس از رفرش",
         ("CandidateInterviews", "RecordingSegment") => "آپلود بخش مستقل ویدیو با قابلیت ارسال مجدد",
         ("SessionReports", "RetryAssessment") => "درخواست محدود ارزیابی مجدد یک پاسخ ناموفق؛ فقط مالک",
+        ("SessionReports", "UpdatePolicy") => "تنظیم آستانه‌ها و وزن‌های گزارش با کنترل نسخه؛ فقط مالک",
+        ("SessionReports", "RecordDecision") => "ثبت تصمیم انسانی مستند به همین نسخه گزارش؛ فقط مالک",
         ("SessionReports", "Read") => "گزارش پایه مستقل از AI؛ اطلاعات جلسه و پاسخ‌ها و وضعیت بخش‌های آینده",
         ("SessionReports", "Print") => "نسخه چاپی گزارش پایه جدید",
         ("SessionReports", "RetiredCommand") => "عملیات تولید گزارش قبلی بازنشسته شده است",

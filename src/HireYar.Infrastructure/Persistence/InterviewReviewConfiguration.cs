@@ -12,6 +12,8 @@ public sealed class InterviewReviewConfiguration : IEntityTypeConfiguration<Inte
         b.HasIndex(e => new { e.OrganizationId, e.InterviewSessionId, e.RequestId }).IsUnique();
         b.HasOne<InterviewSession>().WithMany().HasForeignKey(e => new { e.OrganizationId, e.InterviewSessionId })
             .HasPrincipalKey(s => new { s.OrganizationId, s.Id });
+        b.Property(e => e.ReportSnapshotJson).HasColumnType("jsonb");
+        b.Property(e => e.ReportFingerprint).HasMaxLength(64);
         b.Property(e => e.Kind).HasMaxLength(40); b.Property(e => e.Note).HasMaxLength(2000);
         b.ToTable(t => t.HasCheckConstraint("CK_Review_KindActor",
             "(\"ActorUserId\" IS NOT NULL AND \"Kind\" IN ('advance','review','reject') AND \"ClientOccurredAtUtc\" IS NULL) OR (\"ActorUserId\" IS NULL AND \"Kind\" IN ('consent_accepted','consent_revoked','microphone_disconnected','camera_disconnected','page_hidden','recording_started','recording_stopped') AND \"ClientOccurredAtUtc\" IS NOT NULL)"));

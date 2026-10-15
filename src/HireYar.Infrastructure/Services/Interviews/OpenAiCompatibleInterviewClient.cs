@@ -15,11 +15,11 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
             new { role = "system", content = AnswerAssessmentProtocol.Prompt },
             new { role = "user", content = JsonSerializer.Serialize(input, new JsonSerializerOptions(JsonSerializerDefaults.Web)) }
         } });
-        var bytes = await SendAsync("chat/completions", body, "answer_assessment", config.AnswerAssessmentModel, config.AnswerAssessmentTimeoutSeconds, 32000, ct);
+        var bytes = await SendAsync("chat/completions", body, "answer_assessment", config.AnswerAssessmentModel, config.AnswerAssessmentTimeoutSeconds, 64000, ct);
         try {
             using var doc = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 16 });
             var json = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
-            if (string.IsNullOrWhiteSpace(json) || json.Length > 8000) throw new JsonException();
+            if (string.IsNullOrWhiteSpace(json) || json.Length > 16000) throw new JsonException();
             return new(json, providerName, config.AnswerAssessmentModel);
         }
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException)

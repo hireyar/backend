@@ -1110,6 +1110,12 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasPrecision(7, 6)
                         .HasColumnType("numeric(7,6)");
 
+                    b.Property<string>("DimensionsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("[]");
+
                     b.Property<string>("EvaluatorVersion")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -1739,6 +1745,13 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("RecordedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ReportFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReportSnapshotJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<Guid>("RequestId")
                         .HasColumnType("uuid");
 
@@ -2120,6 +2133,51 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasKey("OrganizationId", "AudioHash");
 
                     b.ToTable("QuestionAudios");
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.SessionReportPolicy", b =>
+                {
+                    b.Property<Guid>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("MinimumCoverage")
+                        .HasPrecision(7, 6)
+                        .HasColumnType("numeric(7,6)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PassingScore")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("StrongScore")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WeightsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("InterviewSessionId");
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId");
+
+                    b.ToTable("SessionReportPolicies", t =>
+                        {
+                            t.HasCheckConstraint("CK_ReportPolicy_Thresholds", "\"PassingScore\" BETWEEN 0 AND \"StrongScore\" AND \"StrongScore\" <= 100 AND \"MinimumCoverage\" > 0 AND \"MinimumCoverage\" <= 1");
+
+                            t.HasCheckConstraint("CK_ReportPolicy_Weights", "jsonb_typeof(\"WeightsJson\") = 'array'");
+                        });
                 });
 
             modelBuilder.Entity("HireYar.Domain.Interviews.Skill", b =>
@@ -3149,6 +3207,16 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Organizations.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.SessionReportPolicy", b =>
+                {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

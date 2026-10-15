@@ -48,7 +48,7 @@ public sealed partial class InterviewFlowTests
         var success=report.Questions[1];Assert.Equal("Succeeded",success.Assessment.State);Assert.Equal(80,success.Assessment.Value);
         var evidence=Assert.Single(success.Assessment.Evidence);Assert.Equal(success.Answer!.AnswerId,evidence.AnswerId);
         Assert.Equal(evidence.Quote,success.Answer.Transcript!.Substring(evidence.Start,evidence.Length));
-        Assert.Equal("answer-quality/1",success.Assessment.EvaluatorVersion);Assert.Null(report.OverallScore.Value);
+        Assert.Equal("answer-quality/2",success.Assessment.EvaluatorVersion);Assert.Equal(80,report.OverallScore.Value);Assert.True(report.Coverage.IsProvisional);
         await Assess(f,x.Org,x.Answers[1]);Assert.Equal(2,f.AssessmentAi.Calls);
         Assert.Equal(HttpStatusCode.Conflict,(await x.Hr.Client.Send(HttpMethod.Post,RetryUrl(x.Session,x.Answers[1]))).StatusCode);
         var html=await(await x.Hr.Client.Send(HttpMethod.Get,$"/api/interviews/{x.Session}/report/print")).Content.ReadAsStringAsync();
@@ -167,9 +167,9 @@ public sealed partial class InterviewFlowTests
             var flow=new InterviewFlowTests(isolated);var x=await flow.CompletedForAssessment();
             await isolated.Db(async db=> {
                 Assert.Empty(await db.AnswerAssessments.ToArrayAsync());
-                var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var latest=migrations[^1];Assert.EndsWith("_AddAnswerReportAssessments",latest);
-                var migrator=db.GetService<IMigrator>();await migrator.MigrateAsync(migrations[^2]);var script=migrator.GenerateScript(migrations[^2],latest,MigrationsSqlGenerationOptions.Idempotent);
-                await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);Assert.False(db.Database.HasPendingModelChanges());
+                var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var index=Array.FindIndex(migrations,m=>m.EndsWith("_AddAnswerReportAssessments",StringComparison.Ordinal));var latest=migrations[index];Assert.EndsWith("_AddAnswerReportAssessments",latest);
+                var migrator=db.GetService<IMigrator>();await migrator.MigrateAsync(migrations[index-1]);var script=migrator.GenerateScript(migrations[index-1],latest,MigrationsSqlGenerationOptions.Idempotent);
+                await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);await migrator.MigrateAsync(migrations[^1]);Assert.False(db.Database.HasPendingModelChanges());
             });
             var worker=new AnswerAssessmentWorker(isolated.Services.GetRequiredService<IServiceScopeFactory>(),new(),isolated.Clock,Microsoft.Extensions.Logging.Abstractions.NullLogger<AnswerAssessmentWorker>.Instance);
             await worker.RunOnceAsync(default);Assert.Equal(1,isolated.AssessmentAi.Calls);

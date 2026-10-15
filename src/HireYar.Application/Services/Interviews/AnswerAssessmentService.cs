@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using HireYar.Application.Billing;
@@ -34,7 +34,7 @@ public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewB
         var q = s.Questions.Single(q => q.QuestionId == a.QuestionId);
         var title = s.PositionTitleSnapshot ?? await db.JobPositions.Where(p => p.OrganizationId == s.OrganizationId && p.Id == s.JobPositionId).Select(p => p.Title).SingleAsync(ct);
         return new(title, s.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized", q.Text, q.Topic, q.Difficulty,
-            AnswerAssessmentProtocol.Excerpts(a.Transcript!));
+            AnswerAssessmentProtocol.Excerpts(a.Transcript!), s.PositionDescriptionSnapshot, AnswerDimensionProtocol.Catalog(s.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized"));
     }
     private static string Hash(AnswerAssessmentInput input) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
         AnswerAssessmentOptions.Version + JsonSerializer.Serialize(input, Json))));
@@ -65,7 +65,7 @@ public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewB
             if (row.State != "Queued" || row.NextAttemptAtUtc > now) return null;
             if (row.Attempts >= AnswerAssessmentOptions.MaxAttempts) { row.State = "Failed"; row.FinishedAtUtc = now; return null; }
             var input = await InputAsync(data.Session, data.Answer, ct);
-            row.State = "Processing"; row.Attempts++; row.AttemptId = Guid.NewGuid(); row.InputHash = Hash(input);
+            row.EvaluatorVersion = AnswerAssessmentOptions.Version; row.State = "Processing"; row.Attempts++; row.AttemptId = Guid.NewGuid(); row.InputHash = Hash(input);
             row.StartedAtUtc = now; row.FinishedAtUtc = null; row.NextAttemptAtUtc = null; row.FailureCode = null;
             row.LeaseExpiresAtUtc = now.AddSeconds(options.AttemptTimeoutSeconds + 15);
             return new(row.AttemptId.Value, input, row.InputHash);
@@ -115,6 +115,7 @@ public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewB
                 row.Score = result.Score is null ? null : Math.Round(result.Score.Value, 4);
                 row.Confidence = result.Confidence is null ? null : Math.Round(result.Confidence.Value, 6);
                 row.Explanation = result.Explanation; row.EvidenceJson = JsonSerializer.Serialize(result.Evidence, Json);
+                row.DimensionsJson = JsonSerializer.Serialize(AnswerDimensionProtocol.Parse(response!.Json, answerId, claim.Input), Json);
                 row.Provider = response!.Provider; row.Model = response.Model;
             } else {
                 row.FailureCode = failure ?? "assessment_internal_error";
@@ -144,7 +145,7 @@ public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewB
             row.State = "Queued"; row.NextAttemptAtUtc = time.GetUtcNow(); return true;
         }, ct);
 
-    public static ReportAnswerAssessment View(InterviewAnswer? answer, bool completed, AnswerReportAssessment? row, DateTimeOffset now)
+    public static ReportAnswerAssessment View(InterviewAnswer? answer, bool completed, AnswerReportAssessment? row, DateTimeOffset now, string type = "specialized")
     {
         string state; string? failure = row?.FailureCode; AnswerAssessmentEvidence[] evidence = [];
         if (answer is null) state = "NotApplicable";
@@ -163,6 +164,7 @@ public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewB
             state == "Succeeded" ? "answer-quality/100/v1" : null, available ? row!.Explanation : null, evidence,
             row?.Attempts ?? 0, state == "Failed" && row!.Attempts < AnswerAssessmentOptions.MaxAttempts, failure,
             row?.RequestedAtUtc, row?.StartedAtUtc, row?.FinishedAtUtc, row?.NextAttemptAtUtc,
-            row?.EvaluatorVersion, row?.Provider, row?.Model);
+            row?.EvaluatorVersion, row?.Provider, row?.Model,
+            available ? AnswerDimensionProtocol.Read(row!.DimensionsJson, type, answer!.Id, answer.Transcript!) : []);
     }
 }
