@@ -55,12 +55,17 @@ public static class InterviewDependencyInjection
                 !o.CandidateLinkPath.Any(char.IsWhiteSpace) && !o.CandidateLinkPath.Contains('?') && !o.CandidateLinkPath.Contains('#'),
                 "InterviewInvitations:CandidateLinkPath must be a relative page path containing {id} without query or fragment.").ValidateOnStart();
         services.AddSingleton<IInterviewInvitationSecurity, ProtectedInterviewInvitationSecurity>();
-        services.AddScoped<InterviewReportService>();
+        services.AddScoped<SessionReportService>();
+        services.AddOptions<AnswerAssessmentOptions>().Bind(config.GetSection("AnswerAssessments"))
+            .Validate(o => o.PollSeconds is >= 1 and <= 60 && o.AttemptTimeoutSeconds is >= 1 and <= 120,
+                "Invalid answer assessment timing.").ValidateOnStart();
+        services.AddSingleton(s => s.GetRequiredService<IOptions<AnswerAssessmentOptions>>().Value);
+        services.AddScoped<AnswerAssessmentService>();
+        services.AddHostedService<AnswerAssessmentWorker>();
         services.AddScoped<InterviewReviewService>();
         services.AddScoped<InterviewAccessStatusService>();
         services.AddSingleton<IResumeTextExtractor, ResumeTextExtractor>();
         services.AddHostedService<InterviewRecoveryWorker>();
-        services.AddHostedService<InterviewReportWorker>();
         services.AddSingleton<LocalInterviewAudioStorage>();
         services.AddOptions<InterviewStorageOptions>()
             .Validate(o => o.VideoProvider is "Local" or "ArvanS3", "Invalid video storage provider.")
@@ -99,16 +104,16 @@ public static class InterviewDependencyInjection
             .Validate(o => Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out var u) && u.Scheme == "https" &&
                 string.IsNullOrEmpty(u.UserInfo) && string.IsNullOrEmpty(u.Query) && string.IsNullOrEmpty(u.Fragment),
                 $"AI:{provider}:BaseUrl must be HTTPS.")
-            .Validate(o => new[] { o.SttModel, o.LlmModel, o.EvaluationModel, o.TtsModel, o.TtsVoice }.All(x => !string.IsNullOrWhiteSpace(x) && x.Length <= 100) &&
+            .Validate(o => new[] { o.SttModel, o.LlmModel, o.AnswerAssessmentModel, o.TtsModel, o.TtsVoice }.All(x => !string.IsNullOrWhiteSpace(x) && x.Length <= 100) &&
                 o.TtsSpeed is >= 0.25m and <= 4 && o.SttTimeoutSeconds is >= 1 and <= 120 &&
-                o.LlmTimeoutSeconds is >= 1 and <= 120 && o.TtsTimeoutSeconds is >= 1 and <= 120 && o.EvaluationTimeoutSeconds is >= 1 and <= 120,
+                o.LlmTimeoutSeconds is >= 1 and <= 120 && o.AnswerAssessmentTimeoutSeconds is >= 1 and <= 120 && o.TtsTimeoutSeconds is >= 1 and <= 120,
                 "Invalid AI model, voice, speed or timeout configuration.").ValidateOnStart();
     }
 
     private static void RegisterProvider<TClient>(IServiceCollection services)
-        where TClient : class, ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IInterviewReportProvider
+        where TClient : class, ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IAnswerAssessmentProvider
     {
-        services.AddScoped<IInterviewReportProvider>(s => s.GetRequiredService<TClient>());
+        services.AddScoped<IAnswerAssessmentProvider>(s => s.GetRequiredService<TClient>());
         services.AddScoped<IQuestionSuggestionProvider>(s => s.GetRequiredService<TClient>());
         services.AddScoped<ISpeechToTextService>(s => s.GetRequiredService<TClient>());
         services.AddScoped<IInterviewDecisionService>(s => s.GetRequiredService<TClient>());

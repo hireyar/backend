@@ -40,7 +40,6 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
     {
         var amount = await db.WithOrganizationBillingLockAsync(session.OrganizationId, async () => {
             var settled = await wallet.SettleLockedAsync(session, release, ct);
-            await QueueReportLockedAsync(session, ct);
             return settled;
         }, ct);
         if (amount > 0) BillingMetrics.Consumed.Add(amount);
@@ -50,7 +49,7 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
         decimal amount = 0;
         var value = await db.WithOrganizationBillingLockAsync(session.OrganizationId, async () => {
             var result = await finish(); amount = await wallet.SettleLockedAsync(session, release, ct);
-            await QueueReportLockedAsync(session, ct); return result;
+            return result;
         }, ct);
         if (amount > 0) BillingMetrics.Consumed.Add(amount); return value;
     }
@@ -58,15 +57,6 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
     {
         if (!await db.InterviewBillings.AnyAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == s.Id && x.Status == InterviewBillingStatus.Reserved, ct))
             throw new AppException(409, "interview_billing_closed", "Interview billing is closed.");
-    }
-    private async Task QueueReportLockedAsync(InterviewSession session, CancellationToken ct)
-    {
-        // The completion and queue entry commit in the same organization transaction.
-        if (session.Status != InterviewStatus.Completed || session.DeletedAtUtc is not null ||
-            !(await CapabilitiesAsync(session, ct)).Contains("interview_report") ||
-            await db.InterviewEvaluationReports.AnyAsync(r => r.OrganizationId == session.OrganizationId && r.InterviewSessionId == session.Id, ct)) return;
-        db.InterviewEvaluationReports.Add(new() { OrganizationId = session.OrganizationId, InterviewSessionId = session.Id,
-            GenerationStage = "Queued", RequestedAtUtc = time.GetUtcNow() });
     }
     public async Task<IReadOnlySet<string>> CapabilitiesAsync(InterviewSession s, CancellationToken ct)
     {

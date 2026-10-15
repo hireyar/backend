@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using HireYar.Application.Auth;
@@ -62,9 +62,10 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, $"/api/team/members/{owner.Id}/deactivate")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new { packagePeriodId = Guid.NewGuid() })).StatusCode);
         var randomId = Guid.NewGuid();
-        foreach (var path in new[] { $"/api/interviews/{randomId}/evaluation-report", $"/api/interviews/{randomId}/review", $"/api/interviews/{randomId}/evaluation-report/print" })
+        foreach (var path in new[] { $"/api/interviews/{randomId}/report", $"/api/interviews/{randomId}/review", $"/api/interviews/{randomId}/report/print" })
             Assert.Equal(HttpStatusCode.NotFound, (await member.Send(HttpMethod.Get, path)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, $"/api/interviews/{randomId}/evaluation-report")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, $"/api/interviews/{randomId}/report/answers/{Guid.NewGuid()}/assessment/retry")).StatusCode);
         var jobResponse = await member.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("Member job", "Synthetic job"));
         Assert.Equal(HttpStatusCode.OK, jobResponse.StatusCode);
         var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
@@ -96,13 +97,12 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         audio.Headers.ContentType = new("audio/webm"); answer.Add(audio, "audio", "answer.webm");
         Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{interview.InterviewId}/answers", answer)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{interview.InterviewId}/complete", null)).StatusCode);
-        await f.ProcessReportAsync(interview.InterviewId);
-        var reportResponse = await member.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/evaluation-report");
+        var reportResponse = await member.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/report");
         Assert.Equal(HttpStatusCode.OK, reportResponse.StatusCode);
-        var report = (await reportResponse.Content.ReadFromJsonAsync<InterviewReportDto>())!;
-        Assert.Equal(InterviewReportPrompt.Version, report.PromptVersion);
-        Assert.Equal(HttpStatusCode.OK, (await member.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/evaluation-report/print")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/evaluation-report")).StatusCode);
+        var report = (await reportResponse.Content.ReadFromJsonAsync<SessionReportDocument>())!;
+        Assert.Equal("session-report/1", report.SchemaVersion);
+        Assert.Equal(HttpStatusCode.OK, (await member.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/report/print")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}/report")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await member.Send(HttpMethod.Post, "/api/auth/refresh")).StatusCode);
         await f.SignInAsync(f.Browser(), mobile);
     }

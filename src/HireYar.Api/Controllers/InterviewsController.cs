@@ -5,40 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Authorize(Roles = "Owner,Recruiter")]
-public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel, InterviewReportService reports, InterviewReviewService reviews) : ControllerBase
+public sealed class InterviewsController(InterviewManagementService service, IInterviewAudioStorage storage, QuestionAudioService audio, PanelWizardService panel, InterviewReviewService reviews) : ControllerBase
 {
-    [Authorize(Roles = "Owner")]
-    [HttpPost("api/interviews/{id:guid}/evaluation-report")]
-    public async Task<IActionResult> GenerateReport(Guid id, CancellationToken ct) => Accepted(
-        $"/api/interviews/{id}/evaluation-report/status", await reports.RetryAsync(id, null, ct));
-    [HttpGet("api/interviews/{id:guid}/evaluation-report")]
-    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> EvaluationReport(Guid id, CancellationToken ct)
-    {
-        var status = await reports.GetStatusAsync(id, ct);
-        if (status.ReportAvailable) return Ok(await reports.GetAsync(id, ct));
-        if (status.Status is "Queued" or "Processing") {
-            Response.Headers.RetryAfter = "3";
-            return Accepted($"/api/interviews/{id}/evaluation-report/status", status);
-        }
-        return Ok(status);
-    }
-    [HttpGet("api/interviews/{id:guid}/evaluation-report/status")]
-    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public Task<InterviewReportGenerationDto> ReportStatus(Guid id, CancellationToken ct) => reports.GetStatusAsync(id, ct);
-    [HttpGet("api/interviews/{id:guid}/evaluation-report/print")]
-    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> PrintReport(Guid id, CancellationToken ct)
-    {
-        var report = await reports.GetAsync(id, ct);
-        Response.Headers.ContentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'";
-        Response.Headers["X-Content-Type-Options"] = "nosniff";
-        return Content(InterviewReportPrint.Render(report, await reviews.GetAsync(id, ct)), "text/html; charset=utf-8");
-    }
-    [Authorize(Roles = "Owner")]
-    [HttpPost("api/interviews/{id:guid}/evaluation-report/regenerate")]
-    public async Task<IActionResult> RegenerateReport(Guid id, GenerateInterviewReportRequest r, CancellationToken ct) => Accepted(
-        $"/api/interviews/{id}/evaluation-report/status", await reports.RetryAsync(id, r, ct));
     [HttpGet("api/interviews/{id:guid}/review")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<InterviewReviewDto> Review(Guid id, CancellationToken ct) => reviews.GetAsync(id, ct);

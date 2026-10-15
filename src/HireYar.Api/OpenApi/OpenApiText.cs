@@ -1,4 +1,4 @@
-namespace HireYar.Api.OpenApi;
+﻿namespace HireYar.Api.OpenApi;
 
 internal static class OpenApiText
 {
@@ -34,10 +34,13 @@ internal static class OpenApiText
         ("CandidateInterviews", "Recording") => "آپلود خصوصی ویدیوی جلسه و زمان‌بندی پاسخ‌ها",
         ("CandidateInterviews", "RecordingProgress") => "بازیابی بخش‌های ضبط‌شده و شماره بخش بعدی پس از رفرش",
         ("CandidateInterviews", "RecordingSegment") => "آپلود بخش مستقل ویدیو با قابلیت ارسال مجدد",
+        ("SessionReports", "RetryAssessment") => "درخواست محدود ارزیابی مجدد یک پاسخ ناموفق؛ فقط مالک",
+        ("SessionReports", "Read") => "گزارش پایه مستقل از AI؛ اطلاعات جلسه و پاسخ‌ها و وضعیت بخش‌های آینده",
+        ("SessionReports", "Print") => "نسخه چاپی گزارش پایه جدید",
+        ("SessionReports", "RetiredCommand") => "عملیات تولید گزارش قبلی بازنشسته شده است",
+        ("SessionReports", "Retired") => "قرارداد قبلی حذف شده؛ از report استفاده کنید",
         ("Interviews", "RecordingSegments") => "فهرست مرتب بخش‌های خصوصی ضبط جلسه",
         ("Interviews", "RecordingSegment") => "پخش یا دانلود خصوصی یک بخش ضبط جلسه",
-        ("Interviews", "RegenerateReport") => "درخواست مجدد پس از شکست با وزن موضوعات و آستانه بررسی انسانی",
-        ("Interviews", "PrintReport") => "دریافت نسخه چاپی گزارش برای ذخیره PDF در مرورگر",
         ("Interviews", "Review") => "مشاهده سابقه تصمیم انسانی، رضایت و رویدادهای ضبط",
         ("Interviews", "Decide") => "ثبت تصمیم انسانی مرحله بعد، بررسی یا رد با حفظ سابقه",
         ("Interviews", "Recording") => "دریافت خصوصی ویدیوی کامل آپلودشده جلسه",
@@ -87,11 +90,8 @@ internal static class OpenApiText
         ("Interviews", "Revoke") => "ابطال دسترسی داوطلب",
         ("Interviews", "AnswerAudio") => "دریافت خصوصی صوت پاسخ داوطلب",
         ("Interviews", "AnswerVideo") => "دریافت خصوصی ویدیوی پاسخ داوطلب",
-        ("Interviews", "GenerateReport") => "درخواست مجدد تولید گزارش فقط پس از شکست؛ پردازش پس‌زمینه",
-        ("Interviews", "ReportStatus") => "وضعیت و مرحله تولید گزارش و امکان درخواست مجدد",
         ("Interviews", "Access") => "مشاهده لینک و کد شش‌رقمی دسترسی مصاحبه سازمان جاری",
         ("CandidateInterviews", "AccessStatus") => "وضعیت عمومی دسترسی لینک مصاحبه بدون اطلاعات کارجو",
-        ("Interviews", "EvaluationReport") => "دریافت گزارش ارزیابی ذخیره‌شده سازمان جاری",
         ("Interviews", "IntroductionAudio") => "دریافت خصوصی صوت معرفی کارجو برای سازمان جاری",
         ("Interviews", "IntroductionVideo") => "دریافت خصوصی ویدیوی معرفی کارجو برای سازمان جاری",
         ("Interviews", "QuestionAudio") => "دریافت خصوصی صوت سؤال مصاحبه",

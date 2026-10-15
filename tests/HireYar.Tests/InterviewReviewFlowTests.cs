@@ -144,44 +144,5 @@ public sealed partial class InterviewFlowTests
         });
     }
 
-    [PostgresFact]
-    public async Task Retry_requires_failure_preserves_legacy_cached_report_and_accepts_explicit_settings()
-    {
-        f.ReportAi.Reset(); var (hr, invite) = await Invite(); using var c = Candidate(invite);
-        var start = await Start(c, invite.InterviewId); await Submit(c, invite.InterviewId, start.Question!.Id);
-        await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null);
-        var url = $"/api/interviews/{invite.InterviewId}/evaluation-report";
-        await f.ProcessReportAsync(invite.InterviewId);
-        var first = (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
-        Assert.Equal(HttpStatusCode.BadRequest, (await hr.Client.Send(HttpMethod.Post, url + "/regenerate", new GenerateInterviewReportRequest(new Dictionary<string, decimal> { ["invented"] = 10 }))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, url + "/regenerate", new GenerateInterviewReportRequest())).StatusCode);
-        // An interrupted legacy regeneration can have both a cached result and a failure.
-        await f.Db(async db => {
-            var row = await db.InterviewEvaluationReports.SingleAsync(r => r.InterviewSessionId == invite.InterviewId);
-            row.GenerationStage = "Failed"; row.FailureCode = "report_interrupted"; await db.SaveChangesAsync();
-        });
-        f.ReportAi.Entered = new(TaskCreationOptions.RunContinuationsAsynchronously); f.ReportAi.Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        f.ReportAi.Fail = true;
-        Assert.Equal(HttpStatusCode.Accepted, (await hr.Client.Send(HttpMethod.Post, url + "/regenerate", new GenerateInterviewReportRequest())).StatusCode);
-        var running = f.ProcessReportAsync(invite.InterviewId);
-        await f.ReportAi.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        try
-        {
-            Assert.Equal(HttpStatusCode.Conflict, (await hr.Client.Send(HttpMethod.Post, url + "/regenerate", new GenerateInterviewReportRequest())).StatusCode);
-            Assert.Equal(first.CreatedAtUtc, (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!.CreatedAtUtc);
-        }
-        finally { f.ReportAi.Release.TrySetResult(); }
-        await running;
-        Assert.Equal(first.CreatedAtUtc, (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!.CreatedAtUtc);
-        f.ReportAi.Reset();
-        var askedTopic = first.Content.Details!.Questions.First(q => q.Score is not null).Topic;
-        var next = await hr.Client.Send(HttpMethod.Post, url + "/regenerate", new GenerateInterviewReportRequest(new Dictionary<string, decimal> { [askedTopic] = 2 }, 70));
-        Assert.Equal(HttpStatusCode.Accepted, next.StatusCode);
-        await f.ProcessReportAsync(invite.InterviewId);
-        var latest = (await (await hr.Client.Send(HttpMethod.Get, url)).Content.ReadFromJsonAsync<InterviewReportDto>())!;
-        Assert.Equal(2, latest.Content.Details!.TopicWeights![askedTopic]); Assert.Equal(70m, latest.Content.Details.ReviewThreshold);
-        var print = await hr.Client.Send(HttpMethod.Get, url + "/print"); Assert.Equal(HttpStatusCode.OK, print.StatusCode);
-        Assert.Contains("text/html", print.Content.Headers.ContentType!.ToString());
-        Assert.Contains("default-src 'none'", print.Headers.GetValues("Content-Security-Policy").Single());
-    }
+
 }
