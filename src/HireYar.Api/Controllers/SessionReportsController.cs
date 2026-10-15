@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Authorize(Roles = "Owner,Recruiter"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class SessionReportsController(SessionReportService reports, IApplicationDbContext db, ICurrentUser user) : ControllerBase
+public sealed class SessionReportsController(SessionReportService reports, IApplicationDbContext db, ICurrentUser user, AnswerAssessmentService assessments) : ControllerBase
 {
     [HttpGet("api/interviews/{id:guid}/report")]
     public Task<SessionReportDocument> Read(Guid id, CancellationToken ct) => reports.ReadAsync(id, ct);
@@ -19,6 +19,15 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
         Response.Headers.ContentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'";
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return Content(SessionReportPage.Render(report), "text/html; charset=utf-8");
+    }
+    [Authorize(Roles = "Owner")]
+    [HttpPost("api/interviews/{id:guid}/report/answers/{answerId:guid}/assessment/retry")]
+    public async Task<IActionResult> RetryAssessment(Guid id, Guid answerId, CancellationToken ct)
+    {
+        await reports.ReadAsync(id, ct); // Same tenant, soft-delete and purchased capability checks as reading.
+        await assessments.RetryAsync(user.OrganizationId, id, answerId, ct);
+        var report = await reports.ReadAsync(id, ct);
+        return Accepted($"/api/interviews/{id}/report", new { interviewId = id, answerId, assessment = report.Questions.Single(q => q.Answer?.AnswerId == answerId).Assessment });
     }
     [HttpGet("api/interviews/{id:guid}/evaluation-report")]
     [HttpGet("api/interviews/{id:guid}/evaluation-report/status")]

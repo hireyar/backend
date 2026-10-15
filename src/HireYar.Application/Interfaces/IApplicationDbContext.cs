@@ -37,6 +37,8 @@ public interface IApplicationDbContext
     DbSet<QuestionAudio> QuestionAudios { get; }
     DbSet<InterviewSession> InterviewSessions { get; }
     DbSet<InterviewAnswer> InterviewAnswers { get; }
+    DbSet<AnswerReportAssessment> AnswerAssessments { get; }
+    Task ReloadAnswerAssessmentAsync(AnswerReportAssessment assessment, CancellationToken ct);
     DbSet<InterviewIntroduction> InterviewIntroductions { get; }
     DbSet<InterviewReviewEntry> InterviewReviewEntries { get; }
     DbSet<InterviewSessionRecording> InterviewSessionRecordings { get; }

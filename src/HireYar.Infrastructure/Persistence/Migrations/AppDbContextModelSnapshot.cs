@@ -1095,6 +1095,98 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Interviews.AnswerReportAssessment", b =>
+                {
+                    b.Property<Guid>("AnswerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("Confidence")
+                        .HasPrecision(7, 6)
+                        .HasColumnType("numeric(7,6)");
+
+                    b.Property<string>("EvaluatorVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("EvidenceJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Explanation")
+                        .HasMaxLength(1500)
+                        .HasColumnType("character varying(1500)");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InputHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("RequestedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("Score")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("AnswerId");
+
+                    b.HasIndex("InterviewSessionId", "AnswerId");
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId");
+
+                    b.HasIndex("State", "NextAttemptAtUtc");
+
+                    b.ToTable("AnswerAssessments", t =>
+                        {
+                            t.HasCheckConstraint("CK_AnswerAssessment_Lease", "(\"State\" = 'Processing' AND \"AttemptId\" IS NOT NULL AND \"LeaseExpiresAtUtc\" IS NOT NULL AND \"StartedAtUtc\" IS NOT NULL) OR (\"State\" <> 'Processing' AND \"AttemptId\" IS NULL AND \"LeaseExpiresAtUtc\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_AnswerAssessment_Result", "jsonb_typeof(\"EvidenceJson\") = 'array' AND ((\"State\" = 'Succeeded' AND \"Score\" IS NOT NULL AND \"Score\" BETWEEN 0 AND 100 AND \"Confidence\" IS NOT NULL AND \"Confidence\" BETWEEN 0 AND 1 AND \"Explanation\" IS NOT NULL AND jsonb_array_length(\"EvidenceJson\") BETWEEN 1 AND 5) OR (\"State\" <> 'Succeeded' AND \"Score\" IS NULL AND \"Confidence\" IS NULL AND jsonb_array_length(\"EvidenceJson\") = 0))");
+
+                            t.HasCheckConstraint("CK_AnswerAssessment_State", "\"State\" IN ('Queued','Processing','Succeeded','InsufficientEvidence','Failed','Unavailable') AND \"Attempts\" BETWEEN 0 AND 3");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Domain.Interviews.BankQuestion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2862,6 +2954,23 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.JobPositions.JobPosition", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId", "JobPositionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.AnswerReportAssessment", b =>
+                {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewAnswer", null)
+                        .WithMany()
+                        .HasForeignKey("InterviewSessionId", "AnswerId")
+                        .HasPrincipalKey("InterviewSessionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
                         .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

@@ -18,7 +18,7 @@ public sealed record ReportText(string State, string? Text);
 public sealed record ReportNotes(string State, IReadOnlyList<string> Items);
 public sealed record ReportQuestion(Guid QuestionId, int Number, string Text, string Topic, int Difficulty,
     DateTimeOffset? AskedAtUtc, string AnswerState, ReportTurn? Answer, IReadOnlyList<ReportTurn> Clarifications,
-    ReportScore Assessment);
+    ReportAnswerAssessment Assessment);
 public sealed record ReportTurn(Guid AnswerId, string State, string? Transcript, string? AssistantMessage,
     DateTimeOffset SubmittedAtUtc, int? DurationSeconds, string? AudioUrl, string? VideoUrl);
 public sealed record ReportMedia(string State, ReportRecording? Recording, IReadOnlyList<ReportRecording> Segments);

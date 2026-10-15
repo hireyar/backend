@@ -65,6 +65,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         foreach (var path in new[] { $"/api/interviews/{randomId}/report", $"/api/interviews/{randomId}/review", $"/api/interviews/{randomId}/report/print" })
             Assert.Equal(HttpStatusCode.NotFound, (await member.Send(HttpMethod.Get, path)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, $"/api/interviews/{randomId}/evaluation-report")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, $"/api/interviews/{randomId}/report/answers/{Guid.NewGuid()}/assessment/retry")).StatusCode);
         var jobResponse = await member.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("Member job", "Synthetic job"));
         Assert.Equal(HttpStatusCode.OK, jobResponse.StatusCode);
         var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;

@@ -1,8 +1,20 @@
-﻿## ترتیب ادامه گزارش جدید — پس از مرحله اول 2026-10-15
+﻿## گزارش جدید، مرحله دوم — 2026-10-15: ارزیابی مستقل پاسخ‌ها
+
+شروع از dev تمیز پس از اعلام push مرحله اول توسط کاربر؛ موتور قبلی بازنگشت. AnswerReportAssessment/AnswerAssessmentService/Protocol/Worker/Provider و DTO مستقل اضافه شدند. worker جلسه Completed و پاسخ نهایی دارای transcript را از PostgreSQL کشف می‌کند؛ بازکردن گزارش یا تولید یکپارچه لازم نیست. GET /report فقط خواندن داده پایه و نتایج ذخیره‌شده است؛ assessment هر سؤال وضعیت/تلاش/علت/شاهد خود را دارد. چاپ جدید نیز نمره پاسخ، توضیح و شواهد را encode می‌کند. امتیاز کل/fit/پروفایل/summary هنوز پیاده نشده‌اند.
+
+هر پاسخ حداکثر سه تلاش؛ transient با فاصله۵/۳۰ثانیه، deadline پیش‌فرض۷۵ و HTTP۶۰ثانیه. lease و AttemptId جلوی commit تلاش دیررس/قدیمی را می‌گیرند؛ hash ورودی قبل commit دوباره کنترل می‌شود. expiry در GET فقط نمایش RecoveryPending/Failed دارد و worker بعد restart بازیابی می‌کند. Provider غیرهمکار با WaitAsync محدود و fault دیررس observe می‌شود. خطای خروجی/شبکه/پیکربندی/غیرمنتظره کد ثابت امن دارد؛ هیچ متن پاسخ/خروجی/exception message در لاگ جدید نیست. POST retry مخصوص Owner و بدون reset سقف، تکراری idempotent، نتیجه موفق/InsufficientEvidence بازتولید نمی‌شود.
+
+سرور قطعات همان پاسخ و شناسه/offset/quote شواهد را می‌سازد؛ مدل فقط شماره قطعه را انتخاب می‌کند. اثر خارج بازه یا مرجع نامعتبر فقط همان پاسخ Failed است. کمبود شواهد InsufficientEvidence/null و خرابی شاهد ذخیره‌شده Unavailable/null است. کیفیت معنایی مدل واقعی بررسی نشده؛ همه تماس‌های تست مصنوعی با fake/HTTP handler بوده‌اند. قرارداد مالی، org scope، رسانه/retention، مصاحبه زنده و نمره لحظه‌ای تغییر کاربرد نداشته‌اند.
+
+Migration 20261015083205_AddAnswerReportAssessments فقط جدول مستقل و FK/check/indexهای آن را اضافه می‌کند؛ روی مقصد اعمال نشده است. SQL idempotent از migration بلافاصله قبل در artifacts/add-answer-report-assessments.sql ساخته شده. [ANSWER_ASSESSMENT_API](ANSWER_ASSESSMENT_API.md) قرارداد کامل حالت‌ها/کدها/فرانت/config/retry است. در provider منتخب AnswerAssessmentModel و AnswerAssessmentTimeoutSeconds مستقل افزوده شدند؛ تنظیمات محرمانه و مدل‌های زنده حفظ شده‌اند. Angular در ریپوی جدا باید وضعیت‌های هر پاسخ، polling و retry را متصل کند. push/deploy/production انجام نشده‌اند.
+
+Build نهایی صفر warning/error. suite کامل 419/419 Passed، صفر Failed/Skipped، PostgreSQL18 اختصاصی loopback55507 و FFmpeg واقعی موفق شد (artifacts/test-results/answer-assessment/answer-assessment.trx). پس از اضافه‌شدن یک تست fencing/cancellation و حذف GET از setup تست کشف worker، build و اجرای مرتبط 72/72 نیز موفق بود (artifacts/test-results/answer-assessment-final/answer-assessment-final.trx)؛ این دو اجرا همپوشانی دارند و مجموع آن‌ها تعداد تست یکتا نیست. 32 case جدید پروتکل/provider/flow در خروجی نهایی وجود دارد. تست‌ها شامل همزمانی claim و retry، حفظ نتیجه موفق کنار خروجی نامعتبر، timeout غیرهمکار، نتیجه دیررس، lease منقضی و سقف تلاش سوم، backoff، تغییر ورودی حین پردازش، FK چندسازمانی، خرابی شواهد ذخیره، InsufficientEvidence و کشف worker بدون GET هستند. migration افزایشی دوبار idempotent اجرا و model drift صفر شد؛ تست حذف جدول گزارش قبلی نیز با هدف صریح همان migration حفظ شد. خطای compile میانی به‌علت تداخل نام AnswerAssessment با DTO مسیر زنده بود و entity جدید AnswerReportAssessment نام گرفت؛ کد زنده عوض نشد. پس از تست صفر DB fixture باقی بود و کلاستر موقت متوقف و حذف شد.
+
+## ترتیب ادامه گزارش جدید — پس از مرحله اول 2026-10-15
 
 - [x] حذف موتور قبلی و ارتباط تولید گزارش با completion/billing؛ قرارداد و چاپ مستقل اطلاعات پایه.
 - [x] طراحی ۱۲ بخش و وضعیت صریح تحلیل انجام‌نشده؛ migration محدود حذف نتیجه قدیمی.
-- [ ] مرحله دوم: ارزیابی مستقل هر پاسخ با شواهد متعلق به همان پاسخ، وضعیت/بازیابی محدود و ماندگار هر بخش.
+- [x] مرحله دوم: ارزیابی مستقل هر پاسخ با شواهد متعلق به همان پاسخ، وضعیت/بازیابی محدود و ماندگار هر بخش.
 - [ ] مرحله سوم: محاسبات قطعی، امتیاز با پوشش معلوم، پروفایل‌ها و تناسب/نمودار.
 - [ ] مرحله چهارم: جمع‌بندی مستند، قوت/بهبود و بخش جدید بررسی انسانی.
 - [ ] Angular در ریپوی جدا: نمایش تمام بخش‌ها از اولین پاسخ، بدون spinner سراسری یا صفر ساختگی، اتصال schema جدید؛ چاپ/PDF نهایی و QA بصری.

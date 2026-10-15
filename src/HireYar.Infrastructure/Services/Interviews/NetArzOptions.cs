@@ -7,6 +7,8 @@ public sealed class NetArzOptions : IOpenAiInterviewOptions
     public string ApiKey { get; set; } = "";
     public string SttModel { get; set; } = "gpt-transcribe";
     public string LlmModel { get; set; } = "gpt-5.6-luna";
+    public string AnswerAssessmentModel { get; set; } = "gpt-5.6-luna";
+    public int AnswerAssessmentTimeoutSeconds { get; set; } = 60;
     public string TtsModel { get; set; } = "tts-1-hd";
     public string TtsVoice { get; set; } = "nova";
     public decimal TtsSpeed { get; set; } = 1;

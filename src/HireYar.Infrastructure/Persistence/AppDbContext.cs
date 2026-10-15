@@ -29,6 +29,8 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<QuestionAudio> QuestionAudios => Set<QuestionAudio>();
     public DbSet<InterviewSession> InterviewSessions => Set<InterviewSession>();
     public DbSet<InterviewAnswer> InterviewAnswers => Set<InterviewAnswer>();
+    public DbSet<AnswerReportAssessment> AnswerAssessments => Set<AnswerReportAssessment>();
+    public Task ReloadAnswerAssessmentAsync(AnswerReportAssessment assessment, CancellationToken ct) => Entry(assessment).ReloadAsync(ct);
     public DbSet<InterviewIntroduction> InterviewIntroductions => Set<InterviewIntroduction>();
     public DbSet<InterviewReviewEntry> InterviewReviewEntries => Set<InterviewReviewEntry>();
     public DbSet<InterviewSessionRecording> InterviewSessionRecordings => Set<InterviewSessionRecording>();

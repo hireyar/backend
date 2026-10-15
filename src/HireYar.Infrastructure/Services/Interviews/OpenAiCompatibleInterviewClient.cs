@@ -7,8 +7,24 @@ using Microsoft.Extensions.Logging;
 namespace HireYar.Infrastructure.Interviews;
 
 public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiInterviewOptions config, ILogger logger, string providerName, IPcmSpeechEncoder? encoder = null)
-    : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider
+    : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IAnswerAssessmentProvider
 {
+    public async Task<AnswerAssessmentResponse> AssessAnswerAsync(AnswerAssessmentInput input, CancellationToken ct)
+    {
+        using var body = JsonContent.Create(new { model = config.AnswerAssessmentModel, response_format = new { type = "json_object" }, messages = new[] {
+            new { role = "system", content = AnswerAssessmentProtocol.Prompt },
+            new { role = "user", content = JsonSerializer.Serialize(input, new JsonSerializerOptions(JsonSerializerDefaults.Web)) }
+        } });
+        var bytes = await SendAsync("chat/completions", body, "answer_assessment", config.AnswerAssessmentModel, config.AnswerAssessmentTimeoutSeconds, 32000, ct);
+        try {
+            using var doc = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 16 });
+            var json = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+            if (string.IsNullOrWhiteSpace(json) || json.Length > 8000) throw new JsonException();
+            return new(json, providerName, config.AnswerAssessmentModel);
+        }
+        catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException)
+        { throw new InterviewProviderException("assessment_invalid_envelope"); }
+    }
     public SpeechProfile Profile => new(config.TtsModel, config.TtsVoice, config.TtsSpeed);
     internal static bool RequiresPcmEncoding(string provider, string model) => provider == "Liara" &&
         model.StartsWith("google/gemini-", StringComparison.OrdinalIgnoreCase) && model.Contains("-tts", StringComparison.OrdinalIgnoreCase);
@@ -107,6 +123,7 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
         var watch = Stopwatch.StartNew(); int? status = null; string outcome = "success";
         var operationId = Guid.NewGuid().ToString("N");
         var purpose = operation switch {
+            "answer_assessment" => "ارزیابی مستقل یک پاسخ برای گزارش جدید",
             "stt" => "تبدیل فایل صوتی به متن؛ این مرحله LLM ارزیابی نیست",
             "llm" => "LLM: بررسی پاسخ، ارزیابی مهارت و تصمیم درباره ادامه سؤال یا انتخاب سؤال بعدی",
             _ => "TTS: تبدیل متن پیام یا سؤال به صوت"
@@ -146,9 +163,9 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
             InterviewTrace.Emit("provider", operation, outcome == "success" ? "httpSucceeded" : outcome, purpose, operationId,
                 "POST", path, providerName, model, watch.Elapsed.TotalMilliseconds, status,
                 outcome == "success" ? null : $"{operation}_{outcome}");
-            var duration = operation switch { "stt" => InterviewMetrics.SttDuration, "llm" => InterviewMetrics.LlmDuration, _ => InterviewMetrics.TtsDuration };
+            var duration = operation switch { "stt" => InterviewMetrics.SttDuration, "llm" => InterviewMetrics.LlmDuration, "answer_assessment" => InterviewMetrics.AnswerAssessmentDuration, _ => InterviewMetrics.TtsDuration };
             duration.Record(watch.Elapsed.TotalMilliseconds, new KeyValuePair<string, object?>("provider", providerName));
-            if (outcome != "success") (operation switch { "stt" => InterviewMetrics.SttFailure, "llm" => InterviewMetrics.LlmFailure, _ => InterviewMetrics.TtsFailure }).Add(1);
+            if (outcome != "success") (operation switch { "stt" => InterviewMetrics.SttFailure, "llm" => InterviewMetrics.LlmFailure, "answer_assessment" => InterviewMetrics.AnswerAssessmentFailure, _ => InterviewMetrics.TtsFailure }).Add(1);
             logger.LogInformation("Interview provider operation={Operation} provider={Provider} model={Model} status={Status} httpStatusCode={HttpStatusCode} durationMs={DurationMs} retryCount=0", operation, providerName, model, outcome, status, watch.Elapsed.TotalMilliseconds);
         }
     }

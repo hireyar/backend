@@ -118,7 +118,7 @@ public sealed partial class InterviewFlowTests
             using var candidate=flow.Candidate(invite);
             await candidate.PostAsJsonAsync($"/api/candidate/interviews/{invite.InterviewId}/events",new InterviewEventRequest(Guid.NewGuid(),"consent_accepted",DateTimeOffset.UtcNow,"synthetic-consent"));
             await using var scope=isolated.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<HireYar.Infrastructure.Persistence.AppDbContext>();
-            var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var latest=migrations[^1];var previous=migrations[^2];
+            var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var index=Array.FindIndex(migrations,m=>m.EndsWith("_RemoveLegacyEvaluationReports",StringComparison.Ordinal));var latest=migrations[index];var previous=migrations[index-1];
             Assert.Contains("RemoveLegacyEvaluationReports",latest);var migrator=db.GetService<IMigrator>();await migrator.MigrateAsync(previous);
             var org=await db.InterviewSessions.Where(s=>s.Id==invite.InterviewId).Select(s=>s.OrganizationId).SingleAsync();
             await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"InterviewEvaluationReports\" (\"InterviewSessionId\",\"OrganizationId\",\"GenerationStage\",\"GenerationAttempts\") VALUES ({invite.InterviewId},{org},'Failed',0)");

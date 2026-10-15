@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HireYar.Application.Interviews;
 
-// Stage one is a read model of persisted interview facts. It has no AI or legacy report dependency.
-public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser user, InterviewBillingService billing)
+// Reading persisted facts and assessments never invokes AI or mutates report state.
+public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser user, InterviewBillingService billing, TimeProvider time)
 {
     public async Task<SessionReportDocument> ReadAsync(Guid id, CancellationToken ct)
     {
@@ -24,13 +24,15 @@ public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser 
         ReportTurn Turn(InterviewAnswer a) => new(a.Id, a.Status.ToString(), a.Transcript, a.AssistantMessage,
             a.SubmittedAtUtc, a.DurationSeconds, mediaAllowed ? $"/api/interviews/{id}/answers/{a.Id}/audio" : null,
             mediaAllowed && a.VideoStorageKey is not null ? $"/api/interviews/{id}/answers/{a.Id}/video" : null);
+        var assessments = await db.AnswerAssessments.AsNoTracking().Where(a => a.OrganizationId == user.OrganizationId && a.InterviewSessionId == id).ToDictionaryAsync(a => a.AnswerId, ct);
         var questions = session.Questions.Where(q => q.AskedAtUtc is not null || session.Answers.Any(a => a.QuestionId == q.QuestionId))
             .OrderBy(q => q.AskedAtUtc).ThenBy(q => q.Order).Select((q, index) => {
                 var turns = session.Answers.Where(a => a.QuestionId == q.QuestionId).OrderBy(a => a.SubmittedAtUtc).ThenBy(a => a.Id).ToArray();
                 var answer = turns.SingleOrDefault(a => !a.IsInteraction);
                 return new ReportQuestion(q.QuestionId, index + 1, q.Text, q.Topic, q.Difficulty, q.AskedAtUtc,
                     answer?.Status.ToString() ?? "Unanswered", answer is null ? null : Turn(answer),
-                    turns.Where(a => a.IsInteraction).Select(Turn).ToArray(), new("NotStarted", null, null, null));
+                    turns.Where(a => a.IsInteraction).Select(Turn).ToArray(), AnswerAssessmentService.View(answer, session.Status == InterviewStatus.Completed,
+                        answer is not null ? assessments.GetValueOrDefault(answer.Id) : null, time.GetUtcNow()));
             }).ToArray();
         var answered = questions.Count(q => q.Answer is { State: "Processed", Transcript: not null });
         var durations = questions.Where(q => q.Answer?.DurationSeconds is not null).Select(q => (decimal)q.Answer!.DurationSeconds!.Value).ToArray();

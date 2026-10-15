@@ -61,6 +61,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public FakeInvitationNotifier Invitations { get; } = new();
     public FakeQuestionSuggestionProvider QuestionAi { get; } = new();
     public FakeInterviewProvider InterviewAi { get; } = new();
+    public FakeAnswerAssessmentProvider AssessmentAi { get; } = new();
     private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
     private string? connection;
     protected override void ConfigureWebHost(IWebHostBuilder b)
@@ -85,6 +86,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("AuthRateLimit:PermitLimit", "1000");
         b.UseSetting("CandidateRateLimit:PermitLimit", "10000");
         b.UseSetting("AI:Provider", "Disabled");
+        b.UseSetting("AnswerAssessments:WorkerEnabled", "false");
+        b.UseSetting("AnswerAssessments:AttemptTimeoutSeconds", "1");
         b.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
         b.UseSetting("AI:NetArz:ApiKey", "");
         b.UseSetting("InterviewStorage:VideoProvider", UseS3VideoStorage ? "ArvanS3" : "Local");
@@ -95,6 +98,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
+            s.RemoveAll<IAnswerAssessmentProvider>(); s.AddSingleton<IAnswerAssessmentProvider>(AssessmentAi);
             s.RemoveAll<IAdminCaptcha>(); s.AddSingleton<IAdminCaptcha>(AdminCaptcha);
             if (UseS3VideoStorage) { s.RemoveAll<Amazon.S3.IAmazonS3>(); s.AddSingleton<Amazon.S3.IAmazonS3>(VideoS3); }
             if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }

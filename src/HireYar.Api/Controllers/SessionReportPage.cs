@@ -28,7 +28,12 @@ public static class SessionReportPage
                         .Append("</small><h3>").Append(E(q.Text)).Append("</h3>");
                     foreach (var turn in q.Clarifications) page.Append("<p>تعامل: ").Append(E(turn.Transcript)).Append("</p><p>").Append(E(turn.AssistantMessage)).Append("</p>");
                     page.Append("<div class='answer'>").Append(q.Answer is null ? "این سؤال پاسخ نهایی ندارد." : E(q.Answer.Transcript))
-                        .Append("</div><small>وضعیت پاسخ: ").Append(E(q.AnswerState)).Append(" — ارزیابی: هنوز انجام نشده</small></article>");
+                        .Append("</div><small>وضعیت پاسخ: ").Append(E(q.AnswerState)).Append(" — ارزیابی: ").Append(E(q.Assessment.State)).Append("</small>");
+                    if (q.Assessment.Value is { } score) page.Append("<p>امتیاز پاسخ: ").Append(score).Append(" از ۱۰۰</p>");
+                    if (q.Assessment.Explanation is { } explanation) page.Append("<p>").Append(E(explanation)).Append("</p>");
+                    foreach (var evidence in q.Assessment.Evidence) page.Append("<blockquote>").Append(E(evidence.Quote)).Append("</blockquote>");
+                    if (q.Assessment.FailureCode is { } failure) page.Append("<p>کد وضعیت ارزیابی: ").Append(E(failure)).Append("</p>");
+                    page.Append("</article>");
                 }
                 if (report.Questions.Count == 0) page.Append("<p>هنوز سؤالی پرسیده نشده است.</p>");
             } else if (section.Code == "signals") {
@@ -38,6 +43,6 @@ public static class SessionReportPage
             } else page.Append("<p class='pending'>").Append(E(section.Message)).Append("</p>");
             page.Append("</section>");
         }
-        return page.Append("<footer>این نسخه اطلاعات قطعی جلسه را نمایش می‌دهد. تحلیل‌ها هنوز ساخته نشده‌اند؛ تصمیم نهایی با کارشناس است.</footer></main></html>").ToString();
+        return page.Append("<footer>این نسخه اطلاعات قطعی جلسه را نمایش می‌دهد. ارزیابی هر پاسخ وضعیت مستقل دارد؛ تحلیل‌های کلی هنوز ساخته نشده‌اند. تصمیم نهایی با کارشناس است.</footer></main></html>").ToString();
     }
 }
