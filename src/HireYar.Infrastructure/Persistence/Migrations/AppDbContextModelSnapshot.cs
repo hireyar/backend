@@ -1405,82 +1405,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewEvaluationReport", b =>
-                {
-                    b.Property<Guid>("InterviewSessionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FailureCode")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("FailureStage")
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
-                    b.Property<DateTimeOffset?>("FinishedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("GenerationAttempts")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("GenerationSettingsJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("GenerationStage")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
-                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LeaseId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Model")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PromptVersion")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("Provider")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTimeOffset?>("RequestedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ResultJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTimeOffset?>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("InterviewSessionId");
-
-                    b.HasIndex("GenerationStage", "RequestedAtUtc");
-
-                    b.HasIndex("OrganizationId", "InterviewSessionId");
-
-                    b.ToTable("InterviewEvaluationReports", t =>
-                        {
-                            t.HasCheckConstraint("CK_Report_Generation", "\"GenerationStage\" IN ('Queued', 'Generating', 'Validating', 'Saving', 'Succeeded', 'Failed') AND \"GenerationAttempts\" >= 0");
-
-                            t.HasCheckConstraint("CK_Report_Lease", "(\"LeaseId\" IS NULL AND \"LeaseExpiresAtUtc\" IS NULL) OR (\"LeaseId\" IS NOT NULL AND \"LeaseExpiresAtUtc\" IS NOT NULL)");
-
-                            t.HasCheckConstraint("CK_Report_Result", "(\"ResultJson\" IS NULL AND \"Model\" IS NULL AND \"Provider\" IS NULL AND \"PromptVersion\" IS NULL AND \"CreatedAtUtc\" IS NULL) OR (\"ResultJson\" IS NOT NULL AND \"Model\" IS NOT NULL AND \"Provider\" IS NOT NULL AND \"PromptVersion\" IS NOT NULL AND \"CreatedAtUtc\" IS NOT NULL)");
-                        });
-                });
-
             modelBuilder.Entity("HireYar.Domain.Interviews.InterviewIntroduction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3003,16 +2927,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Interviews.InterviewSkill", null)
                         .WithMany()
                         .HasForeignKey("InterviewSessionId", "SkillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("HireYar.Domain.Interviews.InterviewEvaluationReport", b =>
-                {
-                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
-                        .WithMany()
-                        .HasForeignKey("OrganizationId", "InterviewSessionId")
-                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

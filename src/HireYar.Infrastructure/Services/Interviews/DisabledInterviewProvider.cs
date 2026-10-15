@@ -2,10 +2,8 @@ using HireYar.Application.Interviews;
 namespace HireYar.Infrastructure.Interviews;
 
 public sealed class DisabledInterviewProvider
-    : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IInterviewReportProvider
+    : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider
 {
-    public Task<InterviewDecisionResult> GenerateReportAsync(InterviewReportContext context, CancellationToken ct) =>
-        Task.FromException<InterviewDecisionResult>(Unavailable());
     public SpeechProfile Profile => new("disabled", "disabled", 1);
     public Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct) =>
         Task.FromException<SpeechTranscriptionResult>(Unavailable());

@@ -30,12 +30,10 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<InterviewSession> InterviewSessions => Set<InterviewSession>();
     public DbSet<InterviewAnswer> InterviewAnswers => Set<InterviewAnswer>();
     public DbSet<InterviewIntroduction> InterviewIntroductions => Set<InterviewIntroduction>();
-    public DbSet<InterviewEvaluationReport> InterviewEvaluationReports => Set<InterviewEvaluationReport>();
     public DbSet<InterviewReviewEntry> InterviewReviewEntries => Set<InterviewReviewEntry>();
     public DbSet<InterviewSessionRecording> InterviewSessionRecordings => Set<InterviewSessionRecording>();
     public DbSet<InterviewRecordingSegment> InterviewRecordingSegments => Set<InterviewRecordingSegment>();
     public Task ReloadIntroductionAsync(InterviewIntroduction introduction, CancellationToken ct) => Entry(introduction).ReloadAsync(ct);
-    public Task ReloadReportAsync(InterviewEvaluationReport report, CancellationToken ct) => Entry(report).ReloadAsync(ct);
     public Task ReloadInterviewAsync(InterviewSession session, CancellationToken ct) => Entry(session).ReloadAsync(ct);
     public void DetachEntity(object entity) => Entry(entity).State = EntityState.Detached;
     public DbSet<PricingPackage> PricingPackages => Set<PricingPackage>();

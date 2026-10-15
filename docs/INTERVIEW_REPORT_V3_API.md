@@ -1,3 +1,5 @@
+﻿> بازنشسته در 2026-10-15: موتور قبلی حذف شده است. مرجع جاری [گزارش جدید](SESSION_REPORT_API.md)؛ متن پایین فقط سابقه تاریخی است.
+
 # تکمیل بک‌اند گزارش مرجع HTML — 2026-10-10
 
 چرخه جاری 2026-10-13 در [INTERVIEW_REPORT_LIFECYCLE_API](INTERVIEW_REPORT_LIFECYCLE_API.md): completion صف خودکار، POST فقط retry پس از شکست با HTTP202، status مرحله/علت شکست/امکان retry؛ schema و فرمول report-v3 پایین محفوظ‌اند.

@@ -45,7 +45,6 @@ public sealed class InterviewProviderSelectionTests
         Assert.IsType(expected, services.GetRequiredService<IInterviewDecisionService>());
         Assert.IsType(expected, services.GetRequiredService<ITextToSpeechService>());
         Assert.IsType(expected, services.GetRequiredService<IQuestionSuggestionProvider>());
-        Assert.IsType(expected, services.GetRequiredService<IInterviewReportProvider>());
         Assert.NotNull(services.GetRequiredService<IOptions<InterviewOptions>>().Value);
     }
 

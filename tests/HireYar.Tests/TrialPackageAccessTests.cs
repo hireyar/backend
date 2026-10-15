@@ -73,8 +73,7 @@ public sealed class TrialPackageAccessTests
             Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync(route + "/complete", null)).StatusCode);
             f.Clock.Offset = TimeSpan.Zero;
             Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}")).StatusCode);
-            await f.ProcessReportAsync(invite.InterviewId);
-            Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}/evaluation-report")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}/report")).StatusCode);
             await f.Db(async db => {
                 var grant = await db.RegistrationTrials.SingleAsync();
                 var bill = await db.InterviewBillings.SingleAsync();

@@ -53,7 +53,6 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public bool UseFixedOtp { get; init; }
     public bool DisabledPayments { get; init; }
     public bool DiagnosticsEnabled { get; init; }
-    public bool ReportWorkerEnabled { get; init; }
     public int TrialDurationDays { get; init; } = 3;
     public decimal TrialCreditAmountUsd { get; init; } = 1m;
     public FakePaymentGateway PaymentGateway { get; } = new();
@@ -62,7 +61,6 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public FakeInvitationNotifier Invitations { get; } = new();
     public FakeQuestionSuggestionProvider QuestionAi { get; } = new();
     public FakeInterviewProvider InterviewAi { get; } = new();
-    public FakeInterviewReportProvider ReportAi { get; } = new();
     private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
     private string? connection;
     protected override void ConfigureWebHost(IWebHostBuilder b)
@@ -97,10 +95,6 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
-            if (!ReportWorkerEnabled) {
-                var reportWorker = s.Single(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(InterviewReportWorker));
-                s.Remove(reportWorker);
-            }
             s.RemoveAll<IAdminCaptcha>(); s.AddSingleton<IAdminCaptcha>(AdminCaptcha);
             if (UseS3VideoStorage) { s.RemoveAll<Amazon.S3.IAmazonS3>(); s.AddSingleton<Amazon.S3.IAmazonS3>(VideoS3); }
             if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }
@@ -110,7 +104,6 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
             s.RemoveAll<HireYar.Application.Interviews.IQuestionSuggestionProvider>(); s.AddSingleton<HireYar.Application.Interviews.IQuestionSuggestionProvider>(QuestionAi);
             s.RemoveAll<HireYar.Application.Interviews.ISpeechToTextService>(); s.AddSingleton<HireYar.Application.Interviews.ISpeechToTextService>(InterviewAi);
             s.RemoveAll<HireYar.Application.Interviews.IInterviewDecisionService>(); s.AddSingleton<HireYar.Application.Interviews.IInterviewDecisionService>(InterviewAi);
-            s.RemoveAll<HireYar.Application.Interviews.IInterviewReportProvider>(); s.AddSingleton<HireYar.Application.Interviews.IInterviewReportProvider>(ReportAi);
             s.RemoveAll<HireYar.Application.Interviews.ITextToSpeechService>(); s.AddSingleton<HireYar.Application.Interviews.ITextToSpeechService>(InterviewAi);
         });
     }
@@ -179,13 +172,6 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         await using var scope = Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var org = await db.Users.Where(x => x.Id == account.Id).Select(x => x.OrganizationId).SingleAsync();
         await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 100m, "Synthetic interview test credit"), default);
-    }
-    public async Task ProcessReportAsync(Guid id, CancellationToken ct = default)
-    {
-        await using var scope = Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var org = await db.InterviewSessions.Where(s => s.Id == id).Select(s => s.OrganizationId).SingleAsync(ct);
-        await scope.ServiceProvider.GetRequiredService<InterviewReportService>().ProcessQueuedAsync(org, id, ct);
     }
 }
 public sealed record PricingResponse(IReadOnlyList<HireYar.Application.Billing.PackageDto> Packages);
