@@ -66,7 +66,6 @@ public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser 
             new ReportSection("navigation","دسترسی‌ها و خروجی گزارش","Available","چاپ و رسانه خصوصی جلسه"),
             new ReportSection("identity","شناسنامه کارجو و مصاحبه","Available","اطلاعات ثبت‌شده جلسه"),
             new ReportSection("score","امتیاز کل",analytics.Score.State,"امتیاز مشاهده‌شده با فرمول و پوشش شواهد مشخص",shouldPoll),
-            new ReportSection("positionFit","تناسب با موقعیت",analytics.Fit.State,analytics.Fit.Message,shouldPoll),
             new ReportSection("statistics","آمار مصاحبه","Available","آمار سؤال‌های واقعی و توزیع نمرات"),
             new ReportSection("summary","جمع‌بندی مصاحبه",analytics.Summary.State,"جمع‌بندی محاسباتی از شواهد و پوشش موجود",shouldPoll),
             new ReportSection("strengthsAndImprovements","نقاط قوت و زمینه‌های بهبود",analytics.Coverage.ScoredQuestions>0?"Available":"InsufficientEvidence","با آستانه‌های مشخص و ارجاع به پاسخ؛ کمبود داده ضعف فرد نیست",shouldPoll),

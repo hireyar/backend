@@ -17,7 +17,7 @@ public static class SessionReportOutput
     {
         if (node is JsonObject obj)
         {
-            foreach (var name in new[] { "policy", "weight", "weights", "weightSource", "formula", "passingScore", "strongScore", "minimumCoverage" })
+            foreach (var name in new[] { "positionFit", "fit", "policy", "weight", "weights", "weightSource", "formula", "passingScore", "strongScore", "minimumCoverage" })
                 obj.Remove(name);
             foreach (var child in obj.ToArray()) Hide(child.Value);
         }

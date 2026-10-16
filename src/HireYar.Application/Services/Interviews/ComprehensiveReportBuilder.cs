@@ -81,7 +81,7 @@ public static class ComprehensiveReportBuilder
         var summary=$"{(completed?"مصاحبه پایان یافته است":"مصاحبه هنوز پایان نیافته است")}. از {questions.Count} سؤال پرسیده‌شده، {scored.Length} پاسخ نمره معتبر دارد؛ پوشش {coverage.Ratio*100:0.##} درصد است. "+
             (score.Value is null?"برای امتیاز کل شواهد کافی موجود نیست. ":$"امتیاز مشاهده‌شده {score.Value:0.##} از ۱۰۰ است{(coverage.IsProvisional?" و به دلیل پوشش ناقص، موقت محسوب می‌شود":"")}. ")+
             $"بر اساس آستانه‌های اعلام‌شده، {strong.Length} نقطه قوت و {improve.Length} زمینه بهبود از پاسخ‌های نمره‌دار استخراج شد. "+
-            (classification is "InsufficientCoverage" or "RequiredSkillsUnobserved"?"پوشش شواهد برای نتیجه‌گیری درباره تناسب نقش کافی نیست. ":"تناسب نقش بر مبنای مهارت‌ها و سطح هدف، جداگانه نمایش داده شده است. ")+"این جمع‌بندی محاسباتی است؛ تصمیم نهایی با کارشناس است.";
+            "این جمع‌بندی محاسباتی است؛ تصمیم نهایی با کارشناس است.";
         var fingerprint=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new {
             Version="comprehensive-report/1",session.Id,session.Status,session.PositionTitleSnapshot,session.PositionDescriptionSnapshot,
             Skills=session.Skills.OrderBy(s=>s.SkillId),Policy=policy with {CanEdit=false},Questions=questions
