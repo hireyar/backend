@@ -7,10 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Authorize(Roles = "Owner,Recruiter"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class SessionReportsController(SessionReportService reports, IApplicationDbContext db, ICurrentUser user, AnswerAssessmentService assessments, SessionReportPolicyService policies, SessionReportDecisionService decisions) : ControllerBase
+public sealed class SessionReportsController(SessionReportService reports, IApplicationDbContext db, ICurrentUser user, AnswerAssessmentService assessments, SessionReportDecisionService decisions) : ControllerBase
 {
     [HttpGet("api/interviews/{id:guid}/report")]
-    public Task<SessionReportDocument> Read(Guid id, CancellationToken ct) => reports.ReadAsync(id, ct);
+    public async Task<IActionResult> Read(Guid id, CancellationToken ct) => new JsonResult(SessionReportOutput.Public(await reports.ReadAsync(id, ct)));
 
     [HttpGet("api/interviews/{id:guid}/report/print")]
     public async Task<IActionResult> Print(Guid id, CancellationToken ct)
@@ -32,13 +32,17 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
     }
     [Authorize(Roles = "Owner")]
     [HttpPut("api/interviews/{id:guid}/report/policy")]
-    [ProducesResponseType(typeof(ReportPolicy), StatusCodes.Status200OK)]
-    public Task<ReportPolicy> UpdatePolicy(Guid id, ReportPolicyRequest request, CancellationToken ct) => policies.UpdateAsync(id, request, ct);
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdatePolicy(Guid id, ReportPolicyRequest request, CancellationToken ct)
+    {
+        await reports.ReadAsync(id, ct);
+        throw AppException.NotFound();
+    }
 
     [Authorize(Roles = "Owner")]
     [HttpPost("api/interviews/{id:guid}/report/review")]
-    [ProducesResponseType(typeof(ReportHumanReview), StatusCodes.Status200OK)]
-    public Task<ReportHumanReview> RecordDecision(Guid id, ReportDecisionRequest request, CancellationToken ct) => decisions.RecordAsync(id, request, ct);
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> RecordDecision(Guid id, ReportDecisionRequest request, CancellationToken ct) => new JsonResult(SessionReportOutput.Public(await decisions.RecordAsync(id, request, ct)));
 
     [HttpGet("api/interviews/{id:guid}/evaluation-report")]
     [HttpGet("api/interviews/{id:guid}/evaluation-report/status")]
