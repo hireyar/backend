@@ -86,7 +86,7 @@ public sealed partial class InterviewFlowTests
     {
         var x=await CompletedForAssessment(2);var index=0;f.AssessmentAi.Handler=(_,_)=>Task.FromResult(WithDimensions("specialized",Interlocked.Increment(ref index)==1?95:45));
         foreach(var answer in x.Answers)await Assess(f,x.Org,answer);
-        var report=await NewReport(x.Hr,x.Session);Assert.Equal(12,report.Sections.Count);Assert.DoesNotContain(report.Sections,s=>s.State is "NotImplemented" or "NotStarted");
+        var report=await NewReport(x.Hr,x.Session);Assert.Equal(11,report.Sections.Count);Assert.DoesNotContain(report.Sections,s=>s.State is "NotImplemented" or "NotStarted");
         Assert.False(report.Processing.HasUnimplementedSections);Assert.False(report.Processing.ShouldPoll);Assert.Equal(70,report.OverallScore.Value);
         Assert.Equal(3,report.SpecializedProfile.Axes.Count);Assert.Equal(4,report.SpecializedProfile.Metrics.Count);Assert.Contains(report.SpecializedProfile.Metrics,m=>m.Code=="communication" && m.Value==75);
         Assert.Single(report.Strengths.Findings!);Assert.Single(report.Improvements.Findings!);Assert.NotEmpty(report.Summary.Text!);
