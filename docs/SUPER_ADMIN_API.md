@@ -1,3 +1,13 @@
+## مدیریت سوپرادمین و جستجوی کاتالوگ — 2026-10-16
+
+GET /api/admin/users/super-admins با page/pageSize/search و Page<AdminUserDto> اضافه شد؛ جستجوی نام/موبایل، نمایش وضعیت فعال/تأیید موبایل/LockoutEnd، بدون رمز یا stamp. DELETE /api/admin/users/super-admins/{id} فقط امتیاز سوپرادمین را لغو و security stamp را rotate می‌کند؛ حساب Owner و سازمان حذف/غیرفعال نمی‌شوند. خودحذفی400 cannot_revoke_self، هدف ناموجود/غیرادمین404، موفق204؛ احراز مستقل SystemAdmin موجود و no-store محفوظ. قفل دو کاربر با ترتیب Id و recheck مدیر درخواست‌کننده مانع حذف متقابل همزمان هر دو مدیر است. افزودن با POST موجود؛ تغییر رمز/پروفایل/تعلیق حساب API تازه ندارد.
+
+دو GET مدیریتی admin/pricing/packages و admin/pricing/ai-credit-packages پارامتر search اختیاری با حداکثر256 دارند؛ Trim، case-insensitive substring، در پکیج Name/Code/Description و در اعتبار Name. شرط پیش از Count/Skip/Take در SQL اجرا می‌شود؛ total تعداد منطبق است؛ جستجوی خالی همه، % و _ متن عادی، ترتیب SortOrder/Id محفوظ. کاتالوگ عمومی تغییر ندارد؛ migration لازم نیست.
+
+رفرش سوپرادمین: طراحی جاری عمداً JWT پانزده‌دقیقه‌ای (قابل تنظیم1..30) بدون refresh/cookie و نگهداری فقط در حافظه فرانت دارد؛ بند4 قرارداد SUPER_ADMIN_API همین را الزام کرده است. رفرش حافظه را پاک می‌کند؛ API توکن موجود را بر اثر رفرش باطل نمی‌کند. GET me علاوه بر Bearer، X-Admin-Entry می‌خواهد؛ نبود آن404 است و نباید به‌اشتباه به انقضای JWT تعبیر شود. Angular در این ریپو نیست و رفتار مقصد بررسی نشده. حفظ نشست پس از رفرش نیازمند بازنگری نگهداری/بازیابی فرانت است؛ احراز و مدت نشست بک‌اند در این تغییر عوض نشده‌اند.
+
+فرانت: جدول از GET بالا، افزودن با POST موجود، دکمه لغو با DELETE و سپس fetch دوباره؛ برای ردیف حساب جاری دکمه حذف غیرفعال. فیلتر جستجو page را1 کند و total پاسخ را مصرف کند. توکن/رمز در لاگ یا analytics ثبت نشود. انتشار/فرانت/commit/push انجام نشده‌اند.
+
 # ورود سوپرادمین و مدیریت پکیج‌ها
 
 تکمیل2026-10-16: GET `/api/admin/pricing/packages` و `/api/admin/pricing/ai-credit-packages` اکنون `page/pageSize` و پاسخ `{items,total,pageNumber,pageSize}` دارند؛ دیگر آرایه نیستند. [PAGINATION_API](PAGINATION_API.md) قرارداد و پرامپت اتصال فرانت است. POST/PUT، جزئیات و فهرست عمومی تغییری ندارند.

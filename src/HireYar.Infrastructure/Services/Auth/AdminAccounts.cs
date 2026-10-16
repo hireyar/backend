@@ -19,6 +19,37 @@ public sealed class AdminAccounts(AppDbContext db, UserManager<ApplicationUser> 
     private static readonly PasswordHasher<ApplicationUser> Hasher = new();
     private static readonly string DummyHash = Hasher.HashPassword(Dummy, Guid.NewGuid().ToString("N"));
 
+    public async Task<Page<AdminUserDto>> ListAsync(PageQuery pagination, string? search, CancellationToken ct)
+    {
+        var query = db.Users.AsNoTracking().Where(x => x.IsSystemAdmin);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            query = query.Where(x => x.FullName.ToLower().Contains(term) || (x.PhoneNumber != null && x.PhoneNumber.Contains(term)));
+        }
+        var total = await query.CountAsync(ct);
+        var rows = await query.OrderBy(x => x.FullName).ThenBy(x => x.Id).Skip(pagination.Skip).Take(pagination.PageSize)
+            .Select(x => new AdminUserDto(x.Id, x.FullName, x.PhoneNumber, x.IsActive, x.PhoneNumberConfirmed, x.LockoutEnd)).ToListAsync(ct);
+        return new(rows, total, pagination.Page, pagination.PageSize);
+    }
+
+    public async Task RevokeAdminAsync(Guid actorId, Guid userId, CancellationToken ct)
+    {
+        if (actorId == userId) throw AppException.Invalid("cannot_revoke_self");
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        // Serialize administrative changes, including reciprocal concurrent revocations.
+        // Both accounts are revalidated under locks after authorization middleware ran.
+        var locked = await db.Users.FromSqlInterpolated($"SELECT * FROM \"AspNetUsers\" WHERE \"Id\" = {actorId} OR \"Id\" = {userId} ORDER BY \"Id\" FOR UPDATE").ToListAsync(ct);
+        var actor = locked.SingleOrDefault(x => x.Id == actorId);
+        if (actor is not { IsSystemAdmin: true, IsActive: true, PhoneNumberConfirmed: true, Role: OrganizationRole.Owner } || await users.IsLockedOutAsync(actor))
+            throw AppException.Unauthorized();
+        var target = locked.SingleOrDefault(x => x.Id == userId);
+        if (target is not { IsSystemAdmin: true }) throw AppException.NotFound();
+        target.IsSystemAdmin = false;
+        Check(await users.UpdateSecurityStampAsync(target));
+        await tx.CommitAsync(ct);
+    }
+
     public async Task<AdminSessionDto> LoginAsync(AdminLoginRequest r, CancellationToken ct)
     {
         if (!admin.Value.Enabled) throw AppException.NotFound();
