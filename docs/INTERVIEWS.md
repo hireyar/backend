@@ -60,7 +60,7 @@ Dockerfile پوشه `/app/storage/interviews` را پیش از `USER $APP_UID` �
 
 بانک جدید مستقل از سؤال‌های editable قالب است و mapping صریح به PositionSkill دارد. قالب‌های قدیمی و ترتیب سؤال‌های آن‌ها تغییر نکرده‌اند؛ سؤال‌های جریان AI از بانک موقعیت می‌آیند، نه Competency متنی قالب قدیمی. pool دعوت حداکثر ۳۰ سؤال فعال با ترتیب Id است؛ مهارت required بدون سؤال باعث خطای `interview_plan_incomplete` می‌شود. snapshot متن، موضوع، مهارت و difficulty هنگام **ساخت دعوت** تثبیت می‌شود و start همان plan را فعال می‌کند؛ ویرایش بعدی بانک/قالب، حتی پیش از start، دعوت صادرشده را تغییر نمی‌دهد. برای plan تازه دعوت تازه صادر کنید.
 
-`GET /api/job-positions/{positionId}/question-bank` حداکثر ۱۰۰ ردیف برمی‌گرداند. ویرایش با `PUT /api/job-positions/{positionId}/question-bank/{questionId}` و `{ "question": { ... }, "rowVersion": "BASE64" }` است؛ نسخه ۱۶بایتی و stale version برابر 409 است.
+`GET /api/job-positions/{positionId}/question-bank?page=1&pageSize=20` پاسخ `{items,total,pageNumber,pageSize}` دارد؛ اندازه۱تا۱۰۰ و دسترسی به تمام صفحات، مطابق [PAGINATION_API](PAGINATION_API.md). ویرایش با `PUT /api/job-positions/{positionId}/question-bank/{questionId}` و `{ "question": { ... }, "rowVersion": "BASE64" }` است؛ نسخه ۱۶بایتی و stale version برابر 409 است.
 
 ## درخواست‌های داوطلب
 

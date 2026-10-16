@@ -16,11 +16,11 @@ public sealed class BillingController(ICurrentUser user, BillingQueryService que
     [HttpGet("payments/{id:guid}/invoice")] public Task<InvoiceDto> Invoice(Guid id, CancellationToken ct) => panel.InvoiceAsync(user.OrganizationId, id, ct);
     [HttpGet("subscription")] public Task<SubscriptionOverviewDto> Subscription(CancellationToken ct) => query.SubscriptionsAsync(user.OrganizationId, ct);
     [HttpGet("ai-credit")] public Task<WalletDto> Credit(CancellationToken ct) => wallet.GetAsync(user.OrganizationId, ct);
-    [HttpGet("ai-credit/transactions")] public Task<Page<TransactionDto>> Transactions([FromQuery] PageQuery page, CancellationToken ct) => query.TransactionsAsync(user.OrganizationId, page, ct);
-    [HttpGet("ai-usage")] public Task<Page<UsageDto>> Usage([FromQuery] PageQuery page, CancellationToken ct) => query.UsageAsync(user.OrganizationId, page, ct);
-    [HttpGet("payments")] public Task<Page<PaymentDto>> Payments([FromQuery] PageQuery page, CancellationToken ct) => query.PaymentsAsync(user.OrganizationId, page, ct);
+    [HttpGet("ai-credit/transactions")] public Task<Page<TransactionDto>> Transactions([FromQuery] PageQuery pagination, CancellationToken ct) => query.TransactionsAsync(user.OrganizationId, pagination, ct);
+    [HttpGet("ai-usage")] public Task<Page<UsageDto>> Usage([FromQuery] PageQuery pagination, CancellationToken ct) => query.UsageAsync(user.OrganizationId, pagination, ct);
+    [HttpGet("payments")] public Task<Page<PaymentDto>> Payments([FromQuery] PageQuery pagination, CancellationToken ct) => query.PaymentsAsync(user.OrganizationId, pagination, ct);
     [HttpGet("payments/{id:guid}")] public Task<PaymentDto> Payment(Guid id, CancellationToken ct) => query.PaymentAsync(user.OrganizationId, id, ct);
-    [HttpGet("purchases")] public Task<Page<SubscriptionPurchaseDto>> Purchases([FromQuery] PageQuery page, CancellationToken ct) => query.PurchasesAsync(user.OrganizationId, page, ct);
+    [HttpGet("purchases")] public Task<Page<SubscriptionPurchaseDto>> Purchases([FromQuery] PageQuery pagination, CancellationToken ct) => query.PurchasesAsync(user.OrganizationId, pagination, ct);
     [HttpPost("subscription/purchases"), Authorize(Roles = "Owner")]
     public Task<PurchaseResult> BuySubscription(SubscriptionPurchaseRequest r, CancellationToken ct) => payments.PurchaseSubscriptionAsync(user.OrganizationId, r.PackagePeriodId, ct, r.TeamCapacity);
     [HttpGet("team-seats")] public Task<TeamSeatStateDto> TeamSeats(CancellationToken ct) => seats.StateAsync(user.OrganizationId, ct);
