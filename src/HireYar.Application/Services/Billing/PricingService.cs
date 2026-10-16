@@ -14,18 +14,28 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
         return (await query.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).Take(100).ToListAsync(ct)).Select(x => Map(x, publicOnly)).ToArray();
     }
     public async Task<PackageDto> GetAsync(Guid id, CancellationToken ct) => Map(await Packages.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound(), false);
-    public async Task<Page<PackageDto>> AdminPackagesAsync(PageQuery page, CancellationToken ct)
+    public async Task<Page<PackageDto>> AdminPackagesAsync(PageQuery page, CancellationToken ct, string? search = null)
     {
         var query = Packages.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            query = query.Where(x => x.Name.ToLower().Contains(term) || x.Code.ToLower().Contains(term) || x.Description.ToLower().Contains(term));
+        }
         var total = await query.CountAsync(ct);
         var rows = await query.OrderBy(x => x.SortOrder).ThenBy(x => x.Id)
             .Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
         return new(rows.Select(x => Map(x, false)).ToArray(), total, page.Page, page.PageSize);
     }
 
-    public async Task<Page<CreditPackageDto>> AdminCreditsAsync(PageQuery page, CancellationToken ct)
+    public async Task<Page<CreditPackageDto>> AdminCreditsAsync(PageQuery page, CancellationToken ct, string? search = null)
     {
         var query = db.AiCreditPackages.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            query = query.Where(x => x.Name.ToLower().Contains(term));
+        }
         var total = await query.CountAsync(ct);
         var rows = await query.OrderBy(x => x.SortOrder).ThenBy(x => x.Id)
             .Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);

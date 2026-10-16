@@ -6,6 +6,8 @@ public interface IAdminAccounts
     Task<AdminIdentityDto?> ValidateAsync(Guid userId, string securityStamp, CancellationToken ct);
     Task RevokeSessionsAsync(Guid userId, CancellationToken ct);
     Task<AdminGrantDto> GrantAsync(AdminGrantRequest request, CancellationToken ct);
+    Task<HireYar.Application.Common.Page<AdminUserDto>> ListAsync(HireYar.Application.Common.PageQuery pagination, string? search, CancellationToken ct);
+    Task RevokeAdminAsync(Guid actorId, Guid userId, CancellationToken ct);
 }
 
 public interface IAdminCaptcha

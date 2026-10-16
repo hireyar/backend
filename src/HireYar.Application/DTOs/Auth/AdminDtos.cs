@@ -11,3 +11,4 @@ public sealed record AdminSessionDto(string AccessToken, DateTimeOffset ExpiresA
 public sealed record AdminIdentityDto(Guid Id, string FullName);
 public sealed record AdminGrantRequest([Required, RegularExpression("^09[0-9]{9}$")] string Mobile);
 public sealed record AdminGrantDto(Guid Id, string FullName, string Mobile, string Password);
+public sealed record AdminUserDto(Guid Id, string FullName, string? Mobile, bool IsActive, bool PhoneNumberConfirmed, DateTimeOffset? LockoutEnd);
