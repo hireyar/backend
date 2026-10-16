@@ -7,7 +7,7 @@ namespace HireYar.Api.Controllers;
 [ApiController, Route("api/admin/pricing"), Authorize(Policy = "SystemAdmin")]
 public sealed class AdminPricingController(PricingService service, BillingQueryService query, WalletService wallet) : ControllerBase
 {
-    [HttpGet("packages")] public Task<IReadOnlyList<PackageDto>> Packages(CancellationToken ct) => service.ListAsync(false, ct);
+    [HttpGet("packages")] public Task<Page<PackageDto>> Packages([FromQuery] PageQuery pagination, CancellationToken ct) => service.AdminPackagesAsync(pagination, ct);
     [HttpGet("packages/{id:guid}")] public Task<PackageDto> Package(Guid id, CancellationToken ct) => service.GetAsync(id, ct);
     [HttpPost("packages")] public Task<PackageDto> CreatePackage(PackageRequest r, CancellationToken ct) => service.SaveAsync(null, r, null, ct);
     [HttpPut("packages/{id:guid}")] public Task<PackageDto> UpdatePackage(Guid id, PackageUpdateRequest r, CancellationToken ct) => service.SaveAsync(id, r.Package, r.RowVersion, ct);
@@ -17,7 +17,7 @@ public sealed class AdminPricingController(PricingService service, BillingQueryS
     [HttpPost("features")] public Task<FeatureDto> CreateFeature(FeatureRequest r, CancellationToken ct) => service.SaveFeatureDefinitionAsync(null, r, ct);
     [HttpPut("features/{id:guid}")] public Task<FeatureDto> UpdateFeature(Guid id, FeatureRequest r, CancellationToken ct) => service.SaveFeatureDefinitionAsync(id, r, ct);
     [HttpPut("packages/{id:guid}/features")] public Task<PackageDto> SetFeature(Guid id, FeatureWriteRequest r, CancellationToken ct) => service.SetFeatureAsync(id, r, ct);
-    [HttpGet("ai-credit-packages")] public Task<IReadOnlyList<CreditPackageDto>> Credits(CancellationToken ct) => service.CreditsAsync(false, ct);
+    [HttpGet("ai-credit-packages")] public Task<Page<CreditPackageDto>> Credits([FromQuery] PageQuery pagination, CancellationToken ct) => service.AdminCreditsAsync(pagination, ct);
     [HttpPost("ai-credit-packages")] public Task<CreditPackageDto> CreateCredit(CreditPackageRequest r, CancellationToken ct) => service.SaveCreditAsync(null, r, null, ct);
     [HttpPut("ai-credit-packages/{id:guid}")] public Task<CreditPackageDto> UpdateCredit(Guid id, CreditPackageUpdateRequest r, CancellationToken ct) => service.SaveCreditAsync(id, r.Package, r.RowVersion, ct);
     [HttpGet("organizations/{org:guid}/subscription")] public Task<SubscriptionOverviewDto> Subscriptions(Guid org, CancellationToken ct) => query.SubscriptionsAsync(org, ct);

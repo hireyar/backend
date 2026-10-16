@@ -8,9 +8,9 @@ namespace HireYar.Api.Controllers;
 public sealed class TeamMembersController(ITeamMembers team) : ControllerBase
 {
     [HttpGet("members")]
-    public Task<Page<TeamMemberDto>> Members([FromQuery] PageQuery page, CancellationToken ct) => team.ListAsync(page, ct);
+    public Task<Page<TeamMemberDto>> Members([FromQuery] PageQuery pagination, CancellationToken ct) => team.ListAsync(pagination, ct);
     [HttpGet("invitations")]
-    public Task<Page<TeamInvitationDto>> Invitations([FromQuery] PageQuery page, CancellationToken ct) => team.InvitationsAsync(page, ct);
+    public Task<Page<TeamInvitationDto>> Invitations([FromQuery] PageQuery pagination, CancellationToken ct) => team.InvitationsAsync(pagination, ct);
     [HttpPost("invitations")]
     public async Task<IActionResult> Invite(InviteTeamMemberRequest request, CancellationToken ct)
     {

@@ -53,12 +53,14 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         if (row.Text.Length == 0 || row.Topic.Length == 0) throw AppException.Invalid();
         await db.SaveChangesAsync(ct); return new(row.Id, row.SkillId, row.Text, row.Topic, row.Difficulty, row.IsActive, row.RowVersion);
     }
-    public async Task<IReadOnlyList<BankQuestionDto>> QuestionsAsync(Guid jobId, CancellationToken ct)
+    public async Task<Page<BankQuestionDto>> QuestionsAsync(Guid jobId, PageQuery page, CancellationToken ct)
     {
         await CheckJob(jobId, ct);
-        return await db.BankQuestions.AsNoTracking().Where(x => x.OrganizationId == user.OrganizationId && x.JobPositionId == jobId)
-            .OrderBy(x => x.CreatedAtUtc).ThenBy(x => x.Id).Take(100)
+        var query = db.BankQuestions.AsNoTracking().Where(x => x.OrganizationId == user.OrganizationId && x.JobPositionId == jobId);
+        var total = await query.CountAsync(ct);
+        var rows = await query.OrderBy(x => x.CreatedAtUtc).ThenBy(x => x.Id).Skip(page.Skip).Take(page.PageSize)
             .Select(x => new BankQuestionDto(x.Id, x.SkillId, x.Text, x.Topic, x.Difficulty, x.IsActive, x.RowVersion)).ToListAsync(ct);
+        return new(rows, total, page.Page, page.PageSize);
     }
     public async Task<InterviewInvitation> InviteAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct)
     {

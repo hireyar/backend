@@ -54,7 +54,7 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
     public async Task<IActionResult> SetSkill(Guid positionId, Guid skillId, PositionSkillRequest r, CancellationToken ct)
     { await service.SetPositionSkillAsync(positionId, skillId, r, ct); return NoContent(); }
     [HttpGet("api/job-positions/{positionId:guid}/question-bank")]
-    public Task<IReadOnlyList<BankQuestionDto>> Questions(Guid positionId, CancellationToken ct) => service.QuestionsAsync(positionId, ct);
+    public Task<Page<BankQuestionDto>> Questions(Guid positionId, [FromQuery] PageQuery pagination, CancellationToken ct) => service.QuestionsAsync(positionId, pagination, ct);
     [HttpPost("api/job-positions/{positionId:guid}/question-bank")]
     public Task<BankQuestionDto> CreateQuestion(Guid positionId, BankQuestionRequest r, CancellationToken ct) => service.SaveQuestionAsync(positionId, null, r, null, ct);
     [HttpPut("api/job-positions/{positionId:guid}/question-bank/{questionId:guid}")]
