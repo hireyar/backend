@@ -9,7 +9,7 @@ public sealed partial class AnswerAssessmentService
     private static bool IsRepairable(AnswerDimension d) => d.State != "Succeeded" &&
         d.FailureCode is "dimension_not_observed" or "dimension_not_returned" or "dimension_invalid_output" or "dimension_storage_invalid";
 
-    // Explicit Owner action; the successful primary score and its budget never change.
+    // Owner retry or future-completion worker; the successful primary score and its budget never change.
     public async Task RepairDimensionsAsync(Guid org, Guid sessionId, Guid answerId, CancellationToken ct)
     {
         var claim = await db.WithOrganizationBillingLockAsync<Claim?>(org, async () => {

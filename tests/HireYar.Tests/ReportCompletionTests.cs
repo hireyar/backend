@@ -145,12 +145,12 @@ public sealed partial class InterviewFlowTests
             await isolated.Db(async db=> {
                 var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var latest=migrations.Single(m=>m.EndsWith("_CompleteReportEvidenceAndNarrative"));var previous=migrations[Array.IndexOf(migrations,latest)-1];
                 await db.GetService<IMigrator>().MigrateAsync(previous);var script=db.GetService<IMigrator>().GenerateScript(previous,latest,MigrationsSqlGenerationOptions.Idempotent);
-                await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);Assert.False(db.Database.HasPendingModelChanges());
+                await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);await db.GetService<IMigrator>().MigrateAsync(migrations[^1]);Assert.False(db.Database.HasPendingModelChanges());
             });
             Assert.Equal(HttpStatusCode.OK,(await x.Hr.Client.Send(HttpMethod.Post,NarrativeUrl(x.Session),new GenerateReportNarrativeRequest(report.Fingerprint))).StatusCode);
             await isolated.Db(async db=> {
                 var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();
-                var error=await Assert.ThrowsAsync<PostgresException>(()=>db.GetService<IMigrator>().MigrateAsync(migrations[^2]));Assert.Equal("P0001",error.SqlState);
+                var error=await Assert.ThrowsAsync<PostgresException>(()=>db.GetService<IMigrator>().MigrateAsync(migrations[Array.FindIndex(migrations,m=>m.EndsWith("_CompleteReportEvidenceAndNarrative"))-1]));Assert.Equal("P0001",error.SqlState);
             });
         } finally {await ((IAsyncLifetime)isolated).DisposeAsync();}
     }

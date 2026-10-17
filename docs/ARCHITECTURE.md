@@ -1,3 +1,6 @@
+## ADR-062 — تکمیل خودکار گزارش برای پایان‌های جدید (2026-10-17)
+
+درخواست تازه، تولید خودکار روایت همراه گزارش را به محدوده می‌آورد. worker موجود پس از ارزیابی اولیه، شاخص قابل‌ترمیم را با بودجه مستقل بازیابی و سپس روایت مستند را با provider/model فعلی تولید می‌کند. مسیر دستی Owner و GET بدون write/AI محفوظ‌اند؛ worker با organization صریح و بدون جعل ICurrentUser کار می‌کند. marker AutomaticReportCompletionEnabled فقط هنگام Complete جدید فعال می‌شود؛ migration برای تاریخچه false است. بازبینی خودکار پردازش کل تاریخچه را به‌علت ارسال دوباره داده حساس رد کرد؛ دامنه به پایان‌های جدید محدود است. lease/cache/fingerprint مشترک، توقف سه‌تلاش و polling برای شاخص/روایت اعمال می‌شوند. [AUTOMATIC_REPORT_COMPLETION_API](AUTOMATIC_REPORT_COMPLETION_API.md) مرجع جایگزین بخش «صرفاً دستی» ADR-060 است.
 ## ADR-061 — فیلتر فهرست بر آخرین تصمیم انسان (2026-10-17)
 
 فهرست مصاحبه‌ها `humanDecisions` چندانتخابی و `items[].humanDecision` nullable دارد؛ منبع مشترک دو مسیر ثبت تصمیم، آخرین ردیف انسانی همان جلسه با ترتیب RecordedAtUtc/Id است. فیلتر مستقل از چرخه وضعیت و AI و پیش از total/صفحه‌بندی در SQL scoped سازمان اعمال می‌شود. تغییر نسخه گزارش تصمیم انسان را بازنویسی نمی‌کند؛ علامت بازبینی گزارش مستقل باقی است. schema/migration تازه لازم نیست. قرارداد و اتصال Angular جدا در [INTERVIEW_DECISION_FILTER_API](INTERVIEW_DECISION_FILTER_API.md) است.
