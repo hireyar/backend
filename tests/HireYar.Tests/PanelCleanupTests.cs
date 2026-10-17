@@ -58,7 +58,7 @@ public sealed class PanelCleanupTests(ApiFixture f)
     public async Task Removed_email_and_team_routes_are_absent_from_runtime_and_persian_openapi()
     {
         var owner = await f.RegisterOwner();
-        var routes = new[] { "/api/auth/register", "/api/auth/login", "/api/auth/confirm-email", "/api/auth/resend-confirmation",
+        var routes = new[] { "/api/auth/login", "/api/auth/confirm-email", "/api/auth/resend-confirmation",
             "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/change-password", "/api/auth/invitations/accept", "/api/members/invitations" };
         foreach (var route in routes) Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.Send(HttpMethod.Post, route, new { })).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.Send(HttpMethod.Get, "/api/members")).StatusCode);

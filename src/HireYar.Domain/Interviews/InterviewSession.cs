@@ -25,6 +25,7 @@ public sealed class InterviewSession
     }
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
+    public bool AutomaticReportCompletionEnabled { get; private set; }
     public Guid? CurrentQuestionId { get; private set; }
     public string? ProtectedAccessCode { get; private set; }
     public Guid? SupersededByInterviewId { get; private set; }
@@ -345,6 +346,7 @@ public sealed class InterviewSession
         if (reason == InterviewCompletionReason.DurationLimit)
             InterviewRules.Require(RemainingSeconds(now) == 0, "duration_limit_not_reached");
         CompletionReason = reason; CompletedAtUtc = now; CurrentQuestionId = null; Status = InterviewStatus.Completed;
+        AutomaticReportCompletionEnabled = true;
         Stage = CompanyIntroductionEnabled ? InterviewStage.CompanyIntroduction : InterviewStage.Goodbye;
         StageChangedAtUtc = now; NextRecoveryAtUtc = null;
     }

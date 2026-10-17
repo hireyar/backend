@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace HireYar.Application.Interviews;
 
-public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewBillingService billing,
+public sealed partial class AnswerAssessmentService(IApplicationDbContext db, InterviewBillingService billing,
     IAnswerAssessmentProvider provider, TimeProvider time, AnswerAssessmentOptions options,
     ILogger<AnswerAssessmentService> logger)
 {
@@ -90,6 +90,10 @@ public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewB
         catch (InterviewProviderException e) {
             (failure, retry) = e.Code switch {
                 "provider_not_configured" => ("assessment_not_configured", false),
+                "answer_assessment_http_402" => ("assessment_provider_payment_required", false),
+                "answer_assessment_http_401" => ("assessment_provider_unauthorized", false),
+                "answer_assessment_http_403" => ("assessment_provider_forbidden", false),
+                "answer_assessment_http_404" => ("assessment_provider_endpoint_or_model_not_found", false),
                 "answer_assessment_timeout" or "answer_assessment_unavailable" => ("assessment_provider_unavailable", true),
                 "answer_assessment_http_429" or "answer_assessment_http_408" => ("assessment_provider_busy", true),
                 _ when e.Code.StartsWith("answer_assessment_http_5", StringComparison.Ordinal) => ("assessment_provider_unavailable", true),
@@ -145,7 +149,7 @@ public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewB
             row.State = "Queued"; row.NextAttemptAtUtc = time.GetUtcNow(); return true;
         }, ct);
 
-    public static ReportAnswerAssessment View(InterviewAnswer? answer, bool completed, AnswerReportAssessment? row, DateTimeOffset now, string type = "specialized")
+    public static ReportAnswerAssessment View(InterviewAnswer? answer, bool completed, AnswerReportAssessment? row, DateTimeOffset now, string type = "specialized", string? positionDescription = null)
     {
         string state; string? failure = row?.FailureCode; AnswerAssessmentEvidence[] evidence = [];
         if (answer is null) state = "NotApplicable";
@@ -160,11 +164,18 @@ public sealed class AnswerAssessmentService(IApplicationDbContext db, InterviewB
             } catch (JsonException) { state = "Unavailable"; failure = "assessment_storage_invalid"; evidence = []; }
         }
         var available = state is "Succeeded" or "InsufficientEvidence";
+        var dimensions=available ? AnswerDimensionProtocol.Read(row!.DimensionsJson,type,answer!.Id,answer.Transcript!) : [];
+        var dimensionPending=row?.DimensionAttemptId is not null && row.DimensionLeaseExpiresAtUtc>now;
+        var dimensionExpired=row?.DimensionAttemptId is not null && row.DimensionLeaseExpiresAtUtc<=now;
         return new(state, state == "Succeeded" ? row!.Score : null, state == "Succeeded" ? row!.Confidence : null,
             state == "Succeeded" ? "answer-quality/100/v1" : null, available ? row!.Explanation : null, evidence,
             row?.Attempts ?? 0, state == "Failed" && row!.Attempts < AnswerAssessmentOptions.MaxAttempts, failure,
             row?.RequestedAtUtc, row?.StartedAtUtc, row?.FinishedAtUtc, row?.NextAttemptAtUtc,
             row?.EvaluatorVersion, row?.Provider, row?.Model,
-            available ? AnswerDimensionProtocol.Read(row!.DimensionsJson, type, answer!.Id, answer.Transcript!) : []);
+                        dimensions,
+            new(dimensionPending ? "Processing" : dimensionExpired || row?.DimensionFailureCode is not null ? "Failed" : row?.DimensionAttempts > 0 ? "Completed" : "NotRequested",
+                row?.DimensionAttempts ?? 0, state == "Succeeded" && row!.DimensionAttempts < AnswerAssessmentOptions.MaxAttempts &&
+                !dimensionPending &&
+                dimensions.Any(d=>IsRepairable(d) && (d.Code is not ("job_alignment" or "work_alignment") || !string.IsNullOrWhiteSpace(positionDescription))), dimensionExpired ? "dimensions_lease_expired" : row?.DimensionFailureCode));
     }
 }

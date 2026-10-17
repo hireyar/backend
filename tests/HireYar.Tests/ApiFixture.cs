@@ -63,6 +63,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public FakeInvitationNotifier Invitations { get; } = new();
     public FakeQuestionSuggestionProvider QuestionAi { get; } = new();
     public FakeInterviewProvider InterviewAi { get; } = new();
+    public FakeReportNarrativeProvider NarrativeAi { get; } = new();
     public FakeAnswerAssessmentProvider AssessmentAi { get; } = new();
     private readonly string database = "hireyar_tests_" + Guid.NewGuid().ToString("N");
     private string? connection;
@@ -103,6 +104,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
+            s.RemoveAll<IReportNarrativeProvider>(); s.AddSingleton<IReportNarrativeProvider>(NarrativeAi);
             s.RemoveAll<IAnswerAssessmentProvider>(); s.AddSingleton<IAnswerAssessmentProvider>(AssessmentAi);
             s.RemoveAll<IAdminCaptcha>(); s.AddSingleton<IAdminCaptcha>(AdminCaptcha);
             if (UseS3VideoStorage) { s.RemoveAll<Amazon.S3.IAmazonS3>(); s.AddSingleton<Amazon.S3.IAmazonS3>(VideoS3); }
@@ -141,6 +143,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         browser.AccessToken = (await response.Content.ReadFromJsonAsync<AccessResponse>())!.AccessToken;
         return response;
     }
+    public static RegisterRequest Registration(string mobile, string code) => new(mobile, code, mobile + "@example.test", "نام", "آزمایشی");
     public async Task<Account> RegisterOwner(bool signupTrial = false)
     {
         var browser = Browser(); var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
@@ -156,7 +159,14 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
                     FullName = "کاربر", OrganizationId = org.Id, Role = HireYar.Domain.Organizations.OrganizationRole.Owner, CreatedAtUtc = now, UpdatedAtUtc = now });
             Assert.True(result.Succeeded);
         }
-        await SignInAsync(browser, mobile);
+        if (signupTrial)
+        {
+            Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile))).StatusCode);
+            var response = await browser.Send(HttpMethod.Post, "/api/auth/register", Registration(mobile, UseFixedOtp ? "123456" : PhoneOtp.Codes[mobile]));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            browser.AccessToken = (await response.Content.ReadFromJsonAsync<AccessResponse>())!.AccessToken;
+        }
+        else await SignInAsync(browser, mobile);
         var me = (await (await browser.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
         return new(browser, mobile, me.Id);
     }

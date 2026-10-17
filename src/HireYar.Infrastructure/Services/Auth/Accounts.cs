@@ -51,9 +51,16 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
         }
         return new(challenge.ExpiresAtUtc);
     }
-    public Task<SessionResult> VerifyOtpAsync(VerifyOtpRequest r, CancellationToken ct) => VerifyAsync(r, null, ct);
-    public Task<SessionResult> AcceptTeamInvitationAsync(Guid id, VerifyOtpRequest r, CancellationToken ct) => VerifyAsync(r, id, ct);
-    private async Task<SessionResult> VerifyAsync(VerifyOtpRequest r, Guid? invitationId, CancellationToken ct)
+    public Task<SessionResult> RegisterAsync(RegisterRequest r, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(r.FirstName) || string.IsNullOrWhiteSpace(r.LastName) ||
+            r.FirstName.Trim().Length + r.LastName.Trim().Length + 1 > 200)
+            throw AppException.Invalid("invalid_registration_name");
+        return VerifyAsync(new(r.Mobile, r.Code), null, r, ct);
+    }
+    public Task<SessionResult> VerifyOtpAsync(VerifyOtpRequest r, CancellationToken ct) => VerifyAsync(r, null, null, ct);
+    public Task<SessionResult> AcceptTeamInvitationAsync(Guid id, VerifyOtpRequest r, CancellationToken ct) => VerifyAsync(r, id, null, ct);
+    private async Task<SessionResult> VerifyAsync(VerifyOtpRequest r, Guid? invitationId, RegisterRequest? registration, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await TeamMembershipLocks.LockMobileAsync(db, r.Mobile, ct);
@@ -102,14 +109,25 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 throw new AppException(409, "invitation_unavailable", "Invitation is no longer available.");
             invitation.AcceptedAtUtc = Now;
         }
-        else if (u is null)
+        else if (registration is not null || u is null)
         {
+            if (u is not null)
+                throw new AppException(409, "mobile_already_registered", "This mobile is already registered. Sign in instead.");
             if (await db.MobileTeamInvitations.AnyAsync(x => x.Mobile == r.Mobile && x.AcceptedAtUtc == null && x.CancelledAtUtc == null && x.ExpiresAtUtc > Now, ct))
                 throw new AppException(409, "team_invitation_pending", "Accept the team invitation before creating an organization.");
+            if (registration is null)
+                throw new AppException(409, "registration_required", "Complete registration before signing in.");
+            var email = registration.Email.Trim();
+            var normalizedEmail = users.NormalizeEmail(email);
+            if (await db.Users.AnyAsync(x => x.NormalizedEmail == normalizedEmail, ct))
+                throw new AppException(409, "email_unavailable", "This email is unavailable.");
             var org = new Organization { Name = "سازمان من", CreatedAtUtc = Now, UpdatedAtUtc = Now };
             db.Organizations.Add(org); await db.SaveChangesAsync(ct);
             u = new ApplicationUser { Id = Guid.NewGuid(), UserName = r.Mobile, PhoneNumber = r.Mobile,
-                PhoneNumberConfirmed = true, FullName = "کاربر", OrganizationId = org.Id, Role = OrganizationRole.Owner,
+                PhoneNumberConfirmed = true, Email = email, EmailConfirmed = false,
+                FullName = $"{registration.FirstName.Trim()} {registration.LastName.Trim()}",
+                ReferralCode = string.IsNullOrWhiteSpace(registration.ReferralCode) ? null : registration.ReferralCode.Trim(),
+                OrganizationId = org.Id, Role = OrganizationRole.Owner,
                 CreatedAtUtc = Now, UpdatedAtUtc = Now };
             Check(await users.CreateAsync(u));
             await trials.CreateForNewOrganizationAsync(org.Id, org.CreatedAtUtc, ct);

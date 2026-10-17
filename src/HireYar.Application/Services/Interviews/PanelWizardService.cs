@@ -161,7 +161,8 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
     public async Task<Page<PanelInterviewDto>> ListAsync(InterviewListQuery r, CancellationToken ct)
     {
         string[] valid = ["pending", "inProgress", "completed", "expired", "cancelled"];
-        if (r.Statuses?.Any(x => !valid.Contains(x)) == true ||
+        string[] decisions = ["advance", "review", "reject"];
+        if (r.HumanDecisions?.Any(x => !decisions.Contains(x)) == true || r.Statuses?.Any(x => !valid.Contains(x)) == true ||
             r.InvitedFromUtc > r.InvitedToUtc || r.CompletedFromUtc > r.CompletedToUtc) throw AppException.Invalid();
         var now = time.GetUtcNow();
         var query = from s in db.InterviewSessions.AsNoTracking().IgnoreAutoIncludes()
@@ -172,9 +173,15 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                     where a.OrganizationId == user.OrganizationId && j.OrganizationId == user.OrganizationId && t.OrganizationId == user.OrganizationId
                     let status = s.Status == InterviewStatus.Cancelled ? "cancelled" : s.Status == InterviewStatus.Completed ? "completed"
                         : s.ExpiresAtUtc <= now ? "expired" : s.Status == InterviewStatus.Created ? "pending" : "inProgress"
-                    select new { s, a, j, t, status };
+                    let humanDecision = db.InterviewReviewEntries
+                        .Where(e => e.OrganizationId == user.OrganizationId && e.InterviewSessionId == s.Id &&
+                            e.ActorUserId != null && decisions.Contains(e.Kind))
+                        .OrderByDescending(e => e.RecordedAtUtc).ThenByDescending(e => e.Id)
+                        .Select(e => e.Kind).FirstOrDefault()
+                    select new { s, a, j, t, status, humanDecision };
         if (r.JobPositionId.HasValue) query = query.Where(x => x.s.JobPositionId == r.JobPositionId);
         if (r.Statuses?.Length > 0) query = query.Where(x => r.Statuses.Contains(x.status));
+        if (r.HumanDecisions?.Length > 0) query = query.Where(x => x.humanDecision != null && r.HumanDecisions.Contains(x.humanDecision));
         if (!string.IsNullOrWhiteSpace(r.Search)) { var search = r.Search.Trim(); query = query.Where(x => (x.a.FirstName + " " + x.a.LastName).Contains(search) || x.a.Email.Contains(search) || (x.a.Phone != null && x.a.Phone.Contains(search))); }
         if (r.InvitedFromUtc.HasValue) query = query.Where(x => x.s.CreatedAtUtc >= r.InvitedFromUtc.Value);
         if (r.InvitedToUtc.HasValue) query = query.Where(x => x.s.CreatedAtUtc <= r.InvitedToUtc.Value);
@@ -184,7 +191,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         var rows = await query.OrderByDescending(x => x.s.CreatedAtUtc).ThenBy(x => x.s.Id).Skip(r.Skip).Take(r.PageSize)
             .Select(x => new { x.s.Id, x.a.FirstName, x.a.LastName, x.a.Email, x.a.Phone, x.s.JobPositionId,
                 PositionTitle = x.s.PositionTitleSnapshot ?? x.j.Title, TemplateId = x.s.InterviewTemplateId,
-                TemplateTitle = x.s.TemplateTitleSnapshot ?? x.t.Title, x.s.RequiredCapabilityCode, x.status,
+                TemplateTitle = x.s.TemplateTitleSnapshot ?? x.t.Title, x.s.RequiredCapabilityCode, x.status, x.humanDecision,
                 x.s.CreatedAtUtc, x.s.ExpiresAtUtc, x.s.StartedAtUtc, x.s.CompletedAtUtc, x.a.ResumeStorageKey,
                 x.s.AccessRevokedAtUtc, x.s.SupersededByInterviewId, x.s.ProtectedAccessCode, InterviewStatus = x.s.Status,
                 CanResend = x.s.SupersededByInterviewId == null && x.j.DeletedAtUtc == null && x.j.Status != HireYar.Domain.JobPositions.JobStatus.Archived && x.t.DeletedAtUtc == null && !x.t.IsArchived,
@@ -198,6 +205,6 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             x.CanResend,
             x.status is not ("completed" or "cancelled"), x.VideoAvailable, invitationSecurity.Link(x.Id),
             invitationSecurity.Unprotect(x.Id, x.ProtectedAccessCode),
-            InterviewInvitationStatus.Get(x.SupersededByInterviewId, x.AccessRevokedAtUtc, x.InterviewStatus, x.ExpiresAtUtc, now).Status)).ToArray(), total, r.Page, r.PageSize);
+            InterviewInvitationStatus.Get(x.SupersededByInterviewId, x.AccessRevokedAtUtc, x.InterviewStatus, x.ExpiresAtUtc, now).Status, x.humanDecision)).ToArray(), total, r.Page, r.PageSize);
     }
 }

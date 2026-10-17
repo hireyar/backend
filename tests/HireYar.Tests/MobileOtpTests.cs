@@ -25,9 +25,9 @@ public sealed class MobileOtpTests : IAsyncLifetime
             var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
             Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile))).StatusCode);
             Assert.False(test.PhoneOtp.Codes.ContainsKey(mobile));
-            Assert.Equal(HttpStatusCode.Unauthorized, (await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", new VerifyOtpRequest(mobile, "654321"))).StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", new VerifyOtpRequest(mobile, "123456"))).StatusCode);
-            Assert.Equal(HttpStatusCode.Unauthorized, (await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", new VerifyOtpRequest(mobile, "123456"))).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await browser.Send(HttpMethod.Post, "/api/auth/register", ApiFixture.Registration(mobile, "654321"))).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/register", ApiFixture.Registration(mobile, "123456"))).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await browser.Send(HttpMethod.Post, "/api/auth/register", ApiFixture.Registration(mobile, "123456"))).StatusCode);
         }
         finally { await ((IAsyncLifetime)test).DisposeAsync(); }
     }
@@ -42,7 +42,7 @@ public sealed class MobileOtpTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.TooManyRequests, (await browser.Send(HttpMethod.Post, "/api/auth/otp/request", request)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", new VerifyOtpRequest(mobile, "000000" == fixture.PhoneOtp.Codes[mobile] ? "000001" : "000000"))).StatusCode);
         var verify = new VerifyOtpRequest(mobile, fixture.PhoneOtp.Codes[mobile]);
-        var first = await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", verify);
+        var first = await browser.Send(HttpMethod.Post, "/api/auth/register", ApiFixture.Registration(mobile, verify.Code));
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         browser.AccessToken = (await first.Content.ReadFromJsonAsync<AccessResponse>())!.AccessToken;
         Assert.Equal(HttpStatusCode.Unauthorized, (await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", verify)).StatusCode);

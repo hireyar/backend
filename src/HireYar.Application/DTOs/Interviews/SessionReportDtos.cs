@@ -7,7 +7,7 @@ public sealed record SessionReportDocument(string SchemaVersion, Guid InterviewI
     IReadOnlyList<ReportSection> Sections, ReportProcessingStatus Processing,
     ReportCoverage Coverage, ReportPositionFit PositionFit, ReportProfile SpecializedProfile,
     ReportProfile GeneralProfile, ReportPolicy Policy, ReportHumanReview HumanReview,
-    IReadOnlyList<ReportGap> DataGaps, string Fingerprint);
+    IReadOnlyList<ReportGap> DataGaps, string Fingerprint, ReportExpectedLevel? ExpectedLevel = null, ReportNarrative? Narrative = null);
 public sealed record ReportIdentity(Guid CandidateId, string CandidateName, string PositionTitle,
     string InterviewType, string InterviewStatus, DateTimeOffset CreatedAtUtc,
     DateTimeOffset? StartedAtUtc, DateTimeOffset? CompletedAtUtc, int? ElapsedSeconds, string? CompletionReason);

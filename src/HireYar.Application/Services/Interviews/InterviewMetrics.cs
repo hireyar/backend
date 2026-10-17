@@ -11,6 +11,8 @@ public static class InterviewMetrics
     public static readonly Histogram<double> LlmDuration = Meter.CreateHistogram<double>("hireyar.interview.llm.duration", "ms");
     public static readonly Histogram<double> AnswerAssessmentDuration = Meter.CreateHistogram<double>("hireyar.interview.assessment.duration", "ms");
     public static readonly Counter<long> AnswerAssessmentFailure = Meter.CreateCounter<long>("hireyar.interview.assessment.failure");
+    public static readonly Histogram<double> NarrativeDuration = Meter.CreateHistogram<double>("hireyar.interview.narrative.duration", "ms");
+    public static readonly Counter<long> NarrativeFailure = Meter.CreateCounter<long>("hireyar.interview.narrative.failure");
     public static readonly Histogram<double> TtsDuration = Meter.CreateHistogram<double>("hireyar.interview.tts.duration", "ms");
     public static readonly Histogram<long> HistoryTotalTurns = Meter.CreateHistogram<long>("hireyar.interview.history.total_turns");
     public static readonly Histogram<long> HistorySelectedTurns = Meter.CreateHistogram<long>("hireyar.interview.history.selected_turns");

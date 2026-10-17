@@ -33,6 +33,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<InterviewSession> InterviewSessions => Set<InterviewSession>();
     public DbSet<InterviewAnswer> InterviewAnswers => Set<InterviewAnswer>();
     public DbSet<AnswerReportAssessment> AnswerAssessments => Set<AnswerReportAssessment>();
+    public DbSet<SessionReportNarrative> SessionReportNarratives => Set<SessionReportNarrative>();
     public DbSet<SessionReportPolicy> SessionReportPolicies => Set<SessionReportPolicy>();
     public Task ReloadAnswerAssessmentAsync(AnswerReportAssessment assessment, CancellationToken ct) => Entry(assessment).ReloadAsync(ct);
     public DbSet<InterviewIntroduction> InterviewIntroductions => Set<InterviewIntroduction>();

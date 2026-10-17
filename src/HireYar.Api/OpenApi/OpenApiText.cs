@@ -3,7 +3,7 @@ namespace HireYar.Api.OpenApi;
 internal static class OpenApiText
 {
     public const string Introduction = """
-        **ورود با موبایل:** `GET /api/auth/csrf` ← `POST /api/auth/otp/request` ← دریافت پیامک ← `POST /api/auth/otp/verify`. اگر موبایل حسابی نداشته باشد و دعوت تیم باز نداشته باشد، حساب Owner و سازمان اولیه ساخته می‌شود؛ موبایل دعوت‌شده باید مسیر پذیرش صریح دعوت را طی کند؛ نام سازمان را با `PUT /api/organization` تکمیل کنید. API key و نام قالب VerifyLookup کاوه‌نگار باید در تنظیمات محرمانه محیط باشند.
+        **ورود با موبایل:** `GET /api/auth/csrf` ← `POST /api/auth/otp/request` ← دریافت پیامک ← `POST /api/auth/otp/verify`. ورود فقط برای حساب موجود است؛ شماره تازه پس از OTP معتبر خطای registration_required می‌گیرد. برای ثبت‌نام، پس از دریافت OTP به `POST /api/auth/register` موبایل، کد، ایمیل، firstName، lastName و referralCode اختیاری بفرستید؛ حساب Owner و سازمان اولیه فقط در این مسیر ساخته می‌شود؛ موبایل دعوت‌شده باید مسیر پذیرش صریح دعوت را طی کند؛ نام سازمان را با `PUT /api/organization` تکمیل کنید. API key و نام قالب VerifyLookup کاوه‌نگار باید در تنظیمات محرمانه محیط باشند.
 
         **هر سازمان یک مالک دارد و می‌تواند زیرمجموعه Recruiter را با موبایل دعوت کند؛ ورود هر دو نقش با OTP است.** پذیرش دعوت با `POST /api/auth/team-invitations/{id}/accept` و OTP همان موبایل، بدون ساخت سازمان/هدیه جدید انجام می‌شود. مدیریت تیم، سازمان و امور مالی فقط مالک است؛ `docs/TEAM_MOBILE_API.md` قرارداد جاری دعوت است.
 
@@ -36,16 +36,20 @@ internal static class OpenApiText
         ("AdminAuth", "Login") => "ورود مستقل سوپرادمین با موبایل، رمز و کپچا",
         ("AdminAuth", "Me") => "مشاهده حساب سوپرادمین جاری",
         ("AdminAuth", "Logout") => "خروج و ابطال همه نشست‌های سوپرادمین حساب جاری",
+        ("AdminUsers", "List") => "فهرست و جستجوی سوپرادمین‌ها با صفحه‌بندی؛ فقط مدیر پلتفرم",
+        ("AdminUsers", "Revoke") => "لغو امتیاز سوپرادمین بدون حذف حساب سازمانی؛ خودحذفی ممنوع",
         ("AdminUsers", "Grant") => "اعطای دسترسی سوپرادمین به حساب موجود با شماره موبایل و صدور رمز",
         ("CandidateInterviews", "Event") => "ثبت رضایت یا رویداد دستگاه گزارش‌شده توسط داوطلب",
         ("CandidateInterviews", "Recording") => "آپلود خصوصی ویدیوی جلسه و زمان‌بندی پاسخ‌ها",
         ("CandidateInterviews", "RecordingProgress") => "بازیابی بخش‌های ضبط‌شده و شماره بخش بعدی پس از رفرش",
         ("CandidateInterviews", "RecordingSegment") => "آپلود بخش مستقل ویدیو با قابلیت ارسال مجدد",
+        ("SessionReports", "RepairDimensions") => "بازیابی محدود شاخص‌های مفقود یا نامعتبر با حفظ نمره موفق؛ فقط مالک",
+        ("SessionReports", "GenerateNarrative") => "تولید صریح روایت مستند و پیشنهاد مصاحبه تکمیلی؛ فقط مالک",
         ("SessionReports", "RetryAssessment") => "درخواست محدود ارزیابی مجدد یک پاسخ ناموفق؛ فقط مالک",
-        ("SessionReports", "UpdatePolicy") => "تنظیم آستانه‌ها و وزن‌های گزارش با کنترل نسخه؛ فقط مالک",
+        ("SessionReports", "UpdatePolicy") => "مسیر غیرفعال تنظیم سیاست گزارش؛ پاسخ404 برای سازمان جاری",
         ("SessionReports", "RecordDecision") => "ثبت تصمیم انسانی مستند به همین نسخه گزارش؛ فقط مالک",
-        ("SessionReports", "Read") => "گزارش پایه مستقل از AI؛ اطلاعات جلسه و پاسخ‌ها و وضعیت بخش‌های آینده",
-        ("SessionReports", "Print") => "نسخه چاپی گزارش پایه جدید",
+        ("SessionReports", "Read") => "خواندن گزارش و تحلیل‌های ذخیره‌شده؛ بدون فراخوانی AI یا تغییر داده در GET",
+        ("SessionReports", "Print") => "نسخه HTML چاپی گزارش عمومی یا تخصصی با داده و شواهد موجود",
         ("SessionReports", "RetiredCommand") => "عملیات تولید گزارش قبلی بازنشسته شده است",
         ("SessionReports", "Retired") => "قرارداد قبلی حذف شده؛ از report استفاده کنید",
         ("Interviews", "RecordingSegments") => "فهرست مرتب بخش‌های خصوصی ضبط جلسه",
@@ -57,7 +61,8 @@ internal static class OpenApiText
         ("CandidateInterviews", "Diagnostics") => "لاگ زنده موقت مراحل مصاحبه بدون محتوای پرامپت",
         ("Auth", "Csrf") => "۱. دریافت توکن CSRF",
         ("Auth", "RequestOtp") => "۲. ارسال کد ورود به موبایل",
-        ("Auth", "VerifyOtp") => "۳. تأیید کد و ورود یا ثبت‌نام",
+        ("Auth", "VerifyOtp") => "۳. تأیید کد و ورود حساب موجود",
+        ("Auth", "Register") => "ثبت‌نام مستقل با OTP، ایمیل، نام و نام خانوادگی و کد معرف اختیاری",
         ("Auth", "Me") => "۵. مشاهده حساب جاری",
         ("Auth", "Update") => "ویرایش نام حساب جاری",
         ("Auth", "Refresh") => "تمدید نشست با کوکی refresh",
