@@ -184,7 +184,10 @@ public sealed class TicketTests : IAsyncLifetime
             db.TicketMessages.Add(new() { OrganizationId = otherOrg, TicketId = ticket.Id, AuthorUserId = other.Id, Body = "invalid", CreatedAtUtc = f.Clock.GetUtcNow() });
             await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
             db.ChangeTracker.Clear();
-            var previous = db.Database.GetMigrations().SkipLast(1).Last();
+            var migrations=db.Database.GetMigrations().ToArray();
+            var ticketIndex=Array.FindIndex(migrations,m=>m.EndsWith("_AddSupportTickets",StringComparison.Ordinal));
+            Assert.True(ticketIndex>0);
+            var previous=migrations[ticketIndex-1];
             await Assert.ThrowsAnyAsync<Exception>(() => db.GetService<IMigrator>().MigrateAsync(previous));
             Assert.True(await db.SupportTickets.AnyAsync(x => x.Id == ticket.Id));
         });

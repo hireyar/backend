@@ -28,7 +28,7 @@ public sealed partial class InterviewFlowTests
         try {
             var report=await NewReport(hr,invite.InterviewId);
             Assert.Equal("session-report/1",report.SchemaVersion);Assert.Equal("BaseReady",report.State);
-            Assert.Equal(11,report.Sections.Count);Assert.Equal(3,report.Statistics.BankQuestions);
+            Assert.Equal(12,report.Sections.Count);Assert.Equal(3,report.Statistics.BankQuestions);
             Assert.Equal(2,report.Questions.Count);Assert.Equal(1,report.Statistics.SubmittedAnswers);
             Assert.Equal(1,report.Statistics.ProcessedAnswers);Assert.Equal(1,report.Statistics.UnansweredQuestions);
             Assert.Equal("InsufficientEvidence",report.OverallScore.State);Assert.Null(report.OverallScore.Value);Assert.NotNull(report.Summary.Text);

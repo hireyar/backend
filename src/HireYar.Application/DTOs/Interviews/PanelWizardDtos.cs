@@ -54,6 +54,7 @@ public sealed class InterviewListQuery
     [StringLength(256)] public string? Search { get; set; }
     public Guid? JobPositionId { get; set; }
     public string[]? Statuses { get; set; }
+    public string[]? HumanDecisions { get; set; }
     public DateTimeOffset? InvitedFromUtc { get; set; }
     public DateTimeOffset? InvitedToUtc { get; set; }
     public DateTimeOffset? CompletedFromUtc { get; set; }
@@ -64,4 +65,4 @@ public sealed record PanelInterviewDto(Guid Id, string FirstName, string LastNam
     string Status, DateTimeOffset InvitedAtUtc, DateTimeOffset ExpiresAtUtc, DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc, int DeadlineDays, decimal? EvaluationPercent,
     string ReportUrl, string? ResumeUrl, bool CanResend, bool CanCancel, bool VideoAvailable,
-    string? InterviewUrl = null, string? AccessCode = null, string? AccessStatus = null);
+    string? InterviewUrl = null, string? AccessCode = null, string? AccessStatus = null, string? HumanDecision = null);

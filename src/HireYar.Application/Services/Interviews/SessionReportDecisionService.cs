@@ -27,7 +27,7 @@ public sealed class SessionReportDecisionService(IApplicationDbContext db, ICurr
             var now=time.GetUtcNow();
             db.InterviewReviewEntries.Add(new(){OrganizationId=user.OrganizationId,InterviewSessionId=id,RequestId=request.RequestId,
                 ActorUserId=user.UserId,Kind=request.Decision,Note=request.Note,ReportFingerprint=report.Fingerprint,
-                ReportSnapshotJson=JsonSerializer.Serialize(new ReportReviewSnapshot("comprehensive-report/1",report.OverallScore,report.Coverage,report.PositionFit,report.Policy with {CanEdit=false})),
+                ReportSnapshotJson=JsonSerializer.Serialize(new ReportReviewSnapshot("comprehensive-report/1",report.OverallScore,report.Coverage,report.PositionFit,report.Policy with {CanEdit=false},report.Narrative)),
                 RecordedAtUtc=new DateTimeOffset(now.Ticks-now.Ticks%10,TimeSpan.Zero)});
             return true;
         },ct);

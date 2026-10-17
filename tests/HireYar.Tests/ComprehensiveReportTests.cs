@@ -28,6 +28,15 @@ public sealed class ComprehensiveReportCalculationTests
         return(session,questions,SessionReportPolicyService.Read(session.Skills,null,true));
     }
     [Fact]
+    public void Expected_level_compares_actual_scored_questions_against_the_roles_snapshot()
+    {
+        var d=Data();var result=ReportExpectedLevelBuilder.Build(d.Session,d.Questions);
+        Assert.Equal(1,result.BelowTargetAnswers);Assert.Equal(1,result.AtTargetAnswers);Assert.Equal(1,result.AboveTargetAnswers);
+        Assert.Equal(3,result.Answers.Count);
+        d.Questions[2]=d.Questions[2] with {Assessment=d.Questions[2].Assessment with {State="Failed",Value=null,Evidence=[]}};
+        var partial=ReportExpectedLevelBuilder.Build(d.Session,d.Questions);Assert.Equal(0,partial.AboveTargetAnswers);Assert.Equal("Partial",partial.State);
+    }
+    [Fact]
     public void Specialized_mean_does_not_overweight_adaptive_questions_and_fit_uses_target_level()
     {
         var d=Data();var report=ComprehensiveReportBuilder.Build(d.Session,d.Questions,d.Policy,[],true);
@@ -86,7 +95,7 @@ public sealed partial class InterviewFlowTests
     {
         var x=await CompletedForAssessment(2);var index=0;f.AssessmentAi.Handler=(_,_)=>Task.FromResult(WithDimensions("specialized",Interlocked.Increment(ref index)==1?95:45));
         foreach(var answer in x.Answers)await Assess(f,x.Org,answer);
-        var report=await NewReport(x.Hr,x.Session);Assert.Equal(11,report.Sections.Count);Assert.DoesNotContain(report.Sections,s=>s.State is "NotImplemented" or "NotStarted");
+        var report=await NewReport(x.Hr,x.Session);Assert.Equal(12,report.Sections.Count);Assert.DoesNotContain(report.Sections,s=>s.State is "NotImplemented" or "NotStarted");
         Assert.False(report.Processing.HasUnimplementedSections);Assert.False(report.Processing.ShouldPoll);Assert.Equal(70,report.OverallScore.Value);
         Assert.Equal(3,report.SpecializedProfile.Axes.Count);Assert.Equal(4,report.SpecializedProfile.Metrics.Count);Assert.Contains(report.SpecializedProfile.Metrics,m=>m.Code=="communication" && m.Value==75);
         Assert.Single(report.Strengths.Findings!);Assert.Single(report.Improvements.Findings!);Assert.NotEmpty(report.Summary.Text!);
@@ -95,10 +104,11 @@ public sealed partial class InterviewFlowTests
         var response=await x.Hr.Client.Send(HttpMethod.Post,$"/api/interviews/{x.Session}/report/review",request);Assert.Equal(HttpStatusCode.OK,response.StatusCode);
         var review=(await response.Content.ReadFromJsonAsync<ReportHumanReview>())!;Assert.Equal("Reviewed",review.State);Assert.Single(review.History);Assert.NotNull(review.Latest!.Snapshot);Assert.Equal(70,review.Latest.Snapshot!.Score.Value);
         Assert.Equal(HttpStatusCode.OK,(await x.Hr.Client.Send(HttpMethod.Post,$"/api/interviews/{x.Session}/report/review",request)).StatusCode);
-        var update=new ReportPolicyRequest(report.Policy.Revision,90,95,0.8m,report.Policy.Weights);
-        var policyResponse=await x.Hr.Client.Send(HttpMethod.Put,$"/api/interviews/{x.Session}/report/policy",update);Assert.Equal(HttpStatusCode.OK,policyResponse.StatusCode);
+        var update=new ReportPolicyRequest(Guid.Empty,90,95,0.8m,[]);
+        var policyResponse=await x.Hr.Client.Send(HttpMethod.Put,$"/api/interviews/{x.Session}/report/policy",update);Assert.Equal(HttpStatusCode.NotFound,policyResponse.StatusCode);
+        await f.Db(async db=>{var row=await db.AnswerAssessments.SingleAsync(a=>a.AnswerId==x.Answers[0]);row.Score=90;await db.SaveChangesAsync();});
         var changed=await NewReport(x.Hr,x.Session);Assert.NotEqual(report.Fingerprint,changed.Fingerprint);Assert.Equal("ReviewOutdated",changed.HumanReview.State);
-        Assert.Equal(HttpStatusCode.Conflict,(await x.Hr.Client.Send(HttpMethod.Put,$"/api/interviews/{x.Session}/report/policy",update)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,(await x.Hr.Client.Send(HttpMethod.Put,$"/api/interviews/{x.Session}/report/policy",update)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict,(await x.Hr.Client.Send(HttpMethod.Post,$"/api/interviews/{x.Session}/report/review",request with {RequestId=Guid.NewGuid()})).StatusCode);
         var html=await(await x.Hr.Client.Send(HttpMethod.Get,$"/api/interviews/{x.Session}/report/print")).Content.ReadAsStringAsync();
         foreach(var section in changed.Sections.Where(s=>s.State!="NotApplicable"))Assert.Contains($"data-section='{section.Code}'",html);
@@ -113,19 +123,20 @@ public sealed partial class InterviewFlowTests
         var report=await NewReport(hr,invite.InterviewId);Guid org=default;await f.Db(async db=>org=await db.InterviewSessions.Where(s=>s.Id==invite.InterviewId).Select(s=>s.OrganizationId).SingleAsync());
         f.AssessmentAi.Handler=(_,_)=>Task.FromResult(WithDimensions("general"));await Assess(f,org,report.Questions[0].Answer!.AnswerId);report=await NewReport(hr,invite.InterviewId);
         Assert.Equal("NotApplicable",report.SpecializedProfile.State);Assert.Equal(7,report.GeneralProfile.Metrics.Count);Assert.All(report.GeneralProfile.Metrics,m=>Assert.Equal(75,m.Value));
-        var policy=report.Policy;Assert.Equal(HttpStatusCode.OK,(await hr.Client.Send(HttpMethod.Put,$"/api/interviews/{invite.InterviewId}/report/policy",new ReportPolicyRequest(policy.Revision,60,80,0.6m,policy.Weights))).StatusCode);
+        Assert.Null(report.Policy);
+        await f.Db(async db=> {db.SessionReportPolicies.Add(new(){OrganizationId=org,InterviewSessionId=invite.InterviewId,Revision=Guid.NewGuid(),PassingScore=60,StrongScore=80,MinimumCoverage=0.6m,UpdatedAtUtc=f.Clock.GetUtcNow(),UpdatedByUserId=hr.Id});await db.SaveChangesAsync();});
         await f.Db(async db=> {var row=await db.SessionReportPolicies.SingleAsync(p=>p.InterviewSessionId==invite.InterviewId);row.WeightsJson="[{}]";var answer=await db.AnswerAssessments.SingleAsync(a=>a.InterviewSessionId==invite.InterviewId);answer.DimensionsJson="{}";await db.SaveChangesAsync();});
-        report=await NewReport(hr,invite.InterviewId);Assert.Equal("BaseReady",report.State);Assert.Equal("Defaulted",report.Policy.State);Assert.Equal(80,report.OverallScore.Value);
+        report=await NewReport(hr,invite.InterviewId);Assert.Equal("BaseReady",report.State);Assert.Contains(report.DataGaps,g=>g.Code=="report_policy_invalid");Assert.Equal(80,report.OverallScore.Value);
         Assert.All(report.GeneralProfile.Metrics,m=>Assert.Null(m.Value));Assert.False(report.Processing.ShouldPoll);Assert.DoesNotContain(report.Sections,s=>s.State=="NotImplemented");f.AssessmentAi.Reset();
     }
     [PostgresFact]
-    public async Task Report_policy_and_review_are_scoped_and_validate_revisions_weights_and_decisions()
+    public async Task Retired_report_policy_and_active_review_are_scoped_and_validate_decisions()
     {
         var x=await CompletedForAssessment();var report=await NewReport(x.Hr,x.Session);var other=await f.RegisterOwner();var url=$"/api/interviews/{x.Session}/report/policy";
-        var valid=new ReportPolicyRequest(Guid.Empty,60,80,0.6m,report.Policy.Weights);
+        var valid=new ReportPolicyRequest(Guid.Empty,60,80,0.6m,[]);
         Assert.Equal(HttpStatusCode.NotFound,(await other.Client.Send(HttpMethod.Put,url,valid)).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest,(await x.Hr.Client.Send(HttpMethod.Put,url,valid with {StrongScore=50})).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest,(await x.Hr.Client.Send(HttpMethod.Put,url,valid with {Weights=[]})).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,(await x.Hr.Client.Send(HttpMethod.Put,url,valid with {StrongScore=50})).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,(await x.Hr.Client.Send(HttpMethod.Put,url,valid with {Weights=[]})).StatusCode);
         var decision=new ReportDecisionRequest(Guid.NewGuid(),"review",report.Fingerprint);
         Assert.Equal(HttpStatusCode.NotFound,(await other.Client.Send(HttpMethod.Post,$"/api/interviews/{x.Session}/report/review",decision)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,(await x.Hr.Client.Send(HttpMethod.Post,$"/api/interviews/{x.Session}/report/review",decision with {Decision="hire_automatically"})).StatusCode);

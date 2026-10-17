@@ -41,6 +41,7 @@ public interface IApplicationDbContext
     DbSet<InterviewSession> InterviewSessions { get; }
     DbSet<InterviewAnswer> InterviewAnswers { get; }
     DbSet<AnswerReportAssessment> AnswerAssessments { get; }
+    DbSet<SessionReportNarrative> SessionReportNarratives { get; }
     DbSet<SessionReportPolicy> SessionReportPolicies { get; }
     Task ReloadAnswerAssessmentAsync(AnswerReportAssessment assessment, CancellationToken ct);
     DbSet<InterviewIntroduction> InterviewIntroductions { get; }
