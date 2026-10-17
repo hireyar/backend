@@ -494,3 +494,4 @@ GET /api/admin/users/super-admins با page/pageSize/search و Page<AdminUserDto
 تغییر 2026-10-17: API عمومی /api/pricing/ai-display-rate از بازار USDTTMN والکس با cache5ثانیه، no-store و503 هنگام نبود نرخ معتبر اضافه شد؛ حسابداری/پرداخت ثابت. قرارداد و پرامپت Angular: AI_TOMAN_DISPLAY_API.md. فرانت جدا و تماس واقعی فعلاً به علت DNS تأیید نشده است.
 
 نرخ lastPrice با کنترل TMN/USDT و decimal مثبت؛ singleton refresh gate و timeout5ثانیه و backoff5ثانیه. API فقط نرخ نمایش را می‌دهد؛ تبدیل همه اعداد نمایش در فرانت مشترک و حسابداریUSD بدون تغییر. هیچ network داخل قفل سازمان یا تغییری در snapshot پرداخت ندارد.
+اصلاح واحد تبدیل AI — 2026-10-17: خروجی ai-display-rate اکنون currency=IRR و rialPerUsdt است؛ lastPrice بازار USDTTMN والکس در۱۰ ضرب می‌شود. cache و refresh پنج‌ثانیه‌ای محفوظ؛ تبدیل اختیاری ریال به تومان فقط در فرانت با تقسیم بر۱۰. مبالغ قبلی پرداخت IRT و حسابداری USD تغییر نمی‌کنند. قرارداد AI_TOMAN_DISPLAY_API.md به‌روز شد.

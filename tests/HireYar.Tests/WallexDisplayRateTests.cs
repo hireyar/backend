@@ -8,9 +8,9 @@ namespace HireYar.Tests;
 public sealed class WallexDisplayRateTests
 {
     [Theory]
-    [InlineData("\"65000.5\"", "65000.5")]
-    [InlineData("65000.5", "65000.5")]
-    public void ReadsTomanWithoutRialConversion(string price, string expected)
+    [InlineData("\"65000.5\"", "650005")]
+    [InlineData("65000.5", "650005")]
+    public void ConvertsWallexTomanToRial(string price, string expected)
     {
         using var json = JsonDocument.Parse(Payload(price));
         Assert.Equal(decimal.Parse(expected, System.Globalization.CultureInfo.InvariantCulture), WallexAiDisplayRateProvider.ParseRate(json.RootElement));
@@ -32,6 +32,9 @@ public sealed class WallexDisplayRateTests
         var handler = new Handler(); var clock = new Clock();
         var provider = new WallexAiDisplayRateProvider(new Factory(handler), clock);
         var first = await provider.GetAsync(default);
+        Assert.Equal("IRR", first.Currency);
+        Assert.Equal(650005m, first.RialPerUsdt);
+        Assert.Equal(65000.5m, 0.1m * first.RialPerUsdt);
         Assert.Equal(5, first.RefreshAfterSeconds);
         Assert.Equal(TimeSpan.FromSeconds(5), first.ExpiresAtUtc - first.FetchedAtUtc);
         clock.Now = clock.Now.AddSeconds(4);
