@@ -1809,6 +1809,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<bool>("AskOneQuestionPerTopic")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("AutomaticReportCompletionEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("CandidateApplicationId")
                         .HasColumnType("uuid");
 

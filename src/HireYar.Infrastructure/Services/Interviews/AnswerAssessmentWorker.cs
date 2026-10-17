@@ -11,6 +11,8 @@ namespace HireYar.Infrastructure.Interviews;
 public sealed class AnswerAssessmentWorker(IServiceScopeFactory scopes, AnswerAssessmentOptions options,
     TimeProvider time, ILogger<AnswerAssessmentWorker> logger) : BackgroundService
 {
+    private int completionOffset;
+
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         if (!options.WorkerEnabled) return;
@@ -42,5 +44,29 @@ public sealed class AnswerAssessmentWorker(IServiceScopeFactory scopes, AnswerAs
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception e) { logger.LogWarning("Answer assessment poll deferred exceptionType={ExceptionType}", e.GetType().Name); }
+        try {await CompleteReportsAsync(ct);}
+        catch(OperationCanceledException) when(ct.IsCancellationRequested) {throw;}
+        catch(Exception e) {logger.LogWarning("Report completion poll deferred exceptionType={ExceptionType}",e.GetType().Name);}
+    }
+
+    private async Task CompleteReportsAsync(CancellationToken ct)
+    {
+        await using var scope=scopes.CreateAsyncScope();
+        var db=scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+        // Only future completions opt in. A rotating bounded scan avoids starving later sessions.
+        var batch=await db.InterviewSessions.IgnoreAutoIncludes().AsNoTracking()
+            .Where(s=>s.AutomaticReportCompletionEnabled && s.Status==InterviewStatus.Completed && s.DeletedAtUtc==null &&
+                s.Answers.Any(a=>!a.IsInteraction && a.Transcript!=null && a.Transcript.Trim()!=""))
+            .OrderBy(s=>s.CompletedAtUtc).ThenBy(s=>s.Id).Skip(completionOffset).Take(3)
+            .Select(s=>new{s.OrganizationId,s.Id}).ToArrayAsync(ct);
+        completionOffset=batch.Length<3?0:completionOffset+batch.Length;
+        foreach(var item in batch) {
+            try {
+                await using var job=scopes.CreateAsyncScope();
+                await job.ServiceProvider.GetRequiredService<ReportCompletionService>().ProcessAsync(item.OrganizationId,item.Id,ct);
+            }
+            catch(OperationCanceledException) when(ct.IsCancellationRequested) {throw;}
+            catch(Exception e) {logger.LogWarning("Report completion deferred interviewId={InterviewId} exceptionType={ExceptionType}",item.Id,e.GetType().Name);}
+        }
     }
 }

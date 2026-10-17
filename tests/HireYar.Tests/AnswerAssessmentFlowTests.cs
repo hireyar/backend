@@ -170,6 +170,9 @@ public sealed partial class InterviewFlowTests
                 var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var index=Array.FindIndex(migrations,m=>m.EndsWith("_AddAnswerReportAssessments",StringComparison.Ordinal));var latest=migrations[index];Assert.EndsWith("_AddAnswerReportAssessments",latest);
                 var migrator=db.GetService<IMigrator>();await migrator.MigrateAsync(migrations[index-1]);var script=migrator.GenerateScript(migrations[index-1],latest,MigrationsSqlGenerationOptions.Idempotent);
                 await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);await migrator.MigrateAsync(migrations[^1]);Assert.False(db.Database.HasPendingModelChanges());
+                Assert.False(await db.InterviewSessions.Where(s=>s.Id==x.Session).Select(s=>s.AutomaticReportCompletionEnabled).SingleAsync());
+                var futureScript=migrator.GenerateScript(migrations[^2],migrations[^1],MigrationsSqlGenerationOptions.Idempotent);
+                await db.Database.ExecuteSqlRawAsync(futureScript);await db.Database.ExecuteSqlRawAsync(futureScript);
             });
             var worker=new AnswerAssessmentWorker(isolated.Services.GetRequiredService<IServiceScopeFactory>(),new(),isolated.Clock,Microsoft.Extensions.Logging.Abstractions.NullLogger<AnswerAssessmentWorker>.Instance);
             await worker.RunOnceAsync(default);Assert.Equal(1,isolated.AssessmentAi.Calls);

@@ -65,7 +65,7 @@ public sealed partial class InterviewFlowTests
         Assert.DoesNotContain(report.Sections,s=>s.State=="NotImplemented");
         Assert.DoesNotContain(report.Sections,s=>s.State=="NotStarted");
         await Assess(f,x.Org,x.Answers[0]);report=await NewReport(x.Hr,x.Session);
-        Assert.Equal("Idle",report.Processing.State);Assert.False(report.Processing.ShouldPoll);Assert.Equal(1,report.Processing.CompletedAssessments);
+        Assert.Equal("Paused",report.Processing.State);Assert.False(report.Processing.ShouldPoll);Assert.Equal(1,report.Processing.CompletedAssessments);
         Assert.Equal(0,report.Processing.PendingAssessments);Assert.False(report.Processing.HasUnimplementedSections);
         Assert.Equal(80,report.OverallScore.Value);Assert.Equal("Partial",report.OverallScore.State);
     }
@@ -93,7 +93,7 @@ public sealed partial class InterviewFlowTests
             SessionReportDocument report;
             do {report=await NewReport(x.Hr,x.Session);if(!report.Processing.ShouldPoll) break;await Task.Delay(100,deadline.Token);}while(true);
             Assert.Equal("Idle",report.Processing.State);Assert.Equal(0,report.Processing.PendingAssessments);
-            Assert.Equal("Succeeded",report.Questions[0].Assessment.State);Assert.Equal(1,isolated.AssessmentAi.Calls);
+            Assert.Equal("Succeeded",report.Questions[0].Assessment.State);Assert.Equal(4,isolated.AssessmentAi.Calls);Assert.Equal(1,isolated.NarrativeAi.Calls);Assert.Equal("Available",report.Narrative!.State);
             Assert.False(report.Processing.HasUnimplementedSections);Assert.Equal("Partial",report.OverallScore.State);
             Assert.All(report.Sections.Where(s=>s.State=="NotImplemented"),s=>Assert.False(s.ShouldPoll));
         } finally {

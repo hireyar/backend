@@ -64,6 +64,7 @@ public static class InterviewDependencyInjection
         services.AddSingleton(s => s.GetRequiredService<IOptions<AnswerAssessmentOptions>>().Value);
         services.AddScoped<AnswerAssessmentService>();
         services.AddScoped<ReportNarrativeService>();
+        services.AddScoped<ReportCompletionService>();
         services.AddHostedService<AnswerAssessmentWorker>();
         services.AddScoped<InterviewReviewService>();
         services.AddScoped<InterviewAccessStatusService>();
