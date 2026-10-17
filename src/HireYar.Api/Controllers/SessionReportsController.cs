@@ -16,7 +16,7 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
     public async Task<IActionResult> Print(Guid id, CancellationToken ct)
     {
         var report = await reports.ReadAsync(id, ct);
-        Response.Headers.ContentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'";
+        Response.Headers.ContentSecurityPolicy = SessionReportPage.ContentSecurityPolicy;
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return Content(SessionReportPage.Render(report), "text/html; charset=utf-8");
     }
