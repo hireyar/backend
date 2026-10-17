@@ -28,7 +28,7 @@ public sealed class WallexAiDisplayRateProvider(IHttpClientFactory clients, Time
                 using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
                 var rate = ParseRate(json.RootElement);
                 var fetched = time.GetUtcNow();
-                return cached = new("Wallex", "USDTTMN", "IRR", rate, fetched, fetched.AddSeconds(5), 5);
+                return cached = new("IRR", rate, fetched, fetched.AddSeconds(5), 5);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception e) when (e is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)

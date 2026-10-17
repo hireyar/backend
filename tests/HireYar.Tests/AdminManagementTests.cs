@@ -74,7 +74,7 @@ public sealed class AdminManagementTests(ApiFixture f)
             for (var i = 0; i < 3; i++) {
                 db.PricingPackages.Add(new PricingPackage { Code = "search_" + Guid.NewGuid().ToString("N"), Name = i == 0 ? marker : "سازمانی",
                     Description = i == 0 ? "" : marker, AiPricePerMinuteUsd = .03m, InterviewRetentionDays = 30, CreatedAtUtc = now, UpdatedAtUtc = now });
-                db.AiCreditPackages.Add(new AiCreditPackage { Name = marker + " اعتبار " + i, CreditAmountUsd = 1,
+                db.AiCreditPackages.Add(new AiCreditPackage { Name = marker + " اعتبار " + i, CreditAmountRial = 1,
                     SellPriceAmount = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
             }
             await db.SaveChangesAsync();

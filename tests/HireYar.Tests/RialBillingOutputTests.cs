@@ -11,22 +11,22 @@ namespace HireYar.Tests;
 public sealed class RialBillingOutputTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-10-17T10:00:00Z");
-    private static AiDisplayRateDto Rate(decimal value = 650005m) => new("Wallex", "USDTTMN", "IRR", value, Now, Now.AddSeconds(5), 5);
+    private static AiDisplayRateDto Rate(decimal value = 650005m) => new("IRR", value, Now, Now.AddSeconds(5), 5);
 
     [Fact]
-    public void Wallet_revalues_with_market_rate_and_does_not_change_accounting_balance()
+    public void Wallet_stays_rial_when_market_rate_changes()
     {
-        var source = new WalletDto("USD", 20, 3, 17);
+        var source = new WalletDto("IRR", 20, 3, 17);
         var first = RialBillingOutput.Map(source, Rate());
         var second = RialBillingOutput.Map(source, Rate(700000));
         Assert.Equal("IRR", first.Currency);
-        Assert.Equal(13000100m, first.Balance);
-        Assert.Equal(1950015m, first.ReservedCredit);
-        Assert.Equal(11050085m, first.AvailableCredit);
+        Assert.Equal(20m, first.Balance);
+        Assert.Equal(3m, first.ReservedCredit);
+        Assert.Equal(17m, first.AvailableCredit);
         Assert.Equal(first.Balance - first.ReservedCredit, first.AvailableCredit);
-        Assert.Equal(14000000m, second.Balance);
+        Assert.Equal(20m, second.Balance);
         Assert.Equal(20, source.Balance);
-        Assert.Equal("USD", source.Currency);
+        Assert.Equal("IRR", source.Currency);
         var json = JsonSerializer.SerializeToElement(first, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.Equal(650005m, json.GetProperty("displayRate").GetProperty("rialPerUsdt").GetDecimal());
     }
@@ -37,12 +37,12 @@ public sealed class RialBillingOutputTests
         var id = Guid.NewGuid();
         var usage = RialBillingOutput.Map(new UsageDto(id, .1m, 60, .1m, InterviewBillingStatus.Settled, Now), Rate());
         var tx = RialBillingOutput.Map(new TransactionDto(Guid.NewGuid(), CreditTransactionType.InterviewUsage, -.1m, 1, .9m, "interview", id, "usage", Now), Rate());
-        Assert.Equal(65000.5m, usage.RatePerMinuteRial);
-        Assert.Equal(65000.5m, usage.BilledAmountRial);
+        Assert.Equal(.1m, usage.RatePerMinuteRial);
+        Assert.Equal(.1m, usage.BilledAmountRial);
         Assert.Equal(60, usage.BillableSeconds);
         Assert.Equal(-usage.BilledAmountRial, tx.Amount);
-        Assert.Equal(650005m, tx.BalanceBefore);
-        Assert.Equal(585004.5m, tx.BalanceAfter);
+        Assert.Equal(1m, tx.BalanceBefore);
+        Assert.Equal(.9m, tx.BalanceAfter);
         Assert.Equal(id, tx.ReferenceId);
         Assert.Equal("IRR", tx.Currency);
     }
@@ -60,17 +60,17 @@ public sealed class RialBillingOutputTests
         Assert.Equal(5, period.DiscountPercent);
         Assert.Equal("IRR", period.Currency);
         var credit = RialBillingOutput.Map(new CreditPackageDto(Guid.NewGuid(), "credit", 50, 5000000, "IRT", true, true, 0, []), Rate());
-        Assert.Equal(32500250, credit.CreditAmountRial);
+        Assert.Equal(50, credit.CreditAmountRial);
         Assert.Equal(50000000, credit.SellPriceAmount);
         Assert.Equal("IRR", credit.SellPriceCurrency);
-        Assert.Equal(50, credit.CreditAmountUsd);
+        Assert.Equal(50, credit.CreditAmountRial);
     }
 
     [Fact]
     public void Panel_and_scheduled_subscriptions_share_one_rate_and_preserve_minutes()
     {
         var sub = Sample<SubscriptionDto>();
-        var source = new BillingPanelDto(Now, "active", sub, sub, [sub], 3, new("USD", 20, 3, 17), .1m, 170, true, true);
+        var source = new BillingPanelDto(Now, "active", sub, sub, [sub], 3, new("IRR", 20, 3, 17), .1m, 170, true, true);
         var rate = Rate();
         var result = RialBillingOutput.Map(source, rate);
         Assert.Same(rate, result.DisplayRate);
@@ -87,17 +87,17 @@ public sealed class RialBillingOutputTests
     [Fact]
     public void History_handles_mixed_units_totals_and_pagination_without_rounding()
     {
-        var usd = new FinancialHistoryItemDto(Guid.NewGuid(), Now, "usage", "aiCredit", "usage", -.1m, "USD", null, 60, Guid.NewGuid(), "candidate", "tx1", null);
+        var usd = new FinancialHistoryItemDto(Guid.NewGuid(), Now, "usage", "aiCredit", "usage", -.1m, "IRR", null, 60, Guid.NewGuid(), "candidate", "tx1", null);
         var cash = usd with { Id = Guid.NewGuid(), Amount = -100000, Currency = "IRT", CashPaidIrt = 100000, TransactionType = "payment" };
         var source = new FinancialHistoryDto(Now, new([usd, cash], 12, 2, 2), new(100000, 50, .1m, 60, 5000000, 200000));
         var result = RialBillingOutput.Map(source, Rate());
-        Assert.Equal(-65000.5m, result.Transactions.Items[0].Amount);
+        Assert.Equal(-.1m, result.Transactions.Items[0].Amount);
         Assert.Null(result.Transactions.Items[0].CashPaidRial);
         Assert.Equal(-1000000, result.Transactions.Items[1].Amount);
         Assert.Equal(1000000, result.Transactions.Items[1].CashPaidRial);
         Assert.Equal(1000000, result.Totals.SubscriptionPaidRial);
-        Assert.Equal(32500250, result.Totals.CreditPurchasedRial);
-        Assert.Equal(65000.5m, result.Totals.CreditConsumedRial);
+        Assert.Equal(50, result.Totals.CreditPurchasedRial);
+        Assert.Equal(.1m, result.Totals.CreditConsumedRial);
         Assert.Equal(50000000, result.Totals.CreditPaidRial);
         Assert.Equal(2000000, result.Totals.TeamSeatsPaidRial);
         Assert.Equal(60, result.Totals.BillableSeconds);
@@ -106,15 +106,15 @@ public sealed class RialBillingOutputTests
     }
 
     [Fact]
-    public void Invoice_paid_cash_stays_fixed_while_credit_equivalent_revalues()
+    public void Invoice_paid_cash_and_rial_credit_stay_fixed()
     {
         var source = new InvoiceDto(Guid.NewGuid(), "invoice", "tx", Now, "AiCredit", "credit", "IRT", 5000000, 0, 0, 0, 5000000, 50, null);
         var first = RialBillingOutput.Map(source, Rate());
         var second = RialBillingOutput.Map(source, Rate(700000));
         Assert.Equal(50000000, first.TotalAmount);
         Assert.Equal(first.TotalAmount, second.TotalAmount);
-        Assert.Equal(32500250, first.CreditAmountRial);
-        Assert.Equal(35000000, second.CreditAmountRial);
+        Assert.Equal(50, first.CreditAmountRial);
+        Assert.Equal(50, second.CreditAmountRial);
         Assert.Equal(5000000, source.TotalAmount);
         Assert.Equal("IRT", source.Currency);
     }
@@ -136,7 +136,7 @@ public sealed class RialBillingOutputTests
         Assert.Equal(20, mapped.SubtotalAmount); Assert.Equal(20, mapped.ProratedCreditAmount);
         Assert.Equal(20, mapped.TaxAmount); Assert.Equal(20, mapped.TotalAmount);
         Assert.Equal(2, mapped.TaxPercent);
-        Assert.Equal(1300010, mapped.CreditAmountRial);
+        Assert.Equal(2, mapped.CreditAmountRial);
         Assert.Equal(result, mapped.Subscription);
         var purchase = RialBillingOutput.Map(Sample<SubscriptionPurchaseDto>() with { Currency = "IRT" }, Rate());
         Assert.Equal(20, purchase.PriceAmount); Assert.Equal(1300010, purchase.AiRatePerMinuteRial);
@@ -158,14 +158,30 @@ public sealed class RialBillingOutputTests
     }
 
     [Fact]
-    public async Task Rate_failure_happens_before_financial_mutation_and_cash_reads_work_without_wallex()
+    public async Task Rial_writes_and_cash_reads_work_without_a_live_exchange_quote()
     {
         var responses = new RialBillingResponses(new FailedRate());
         var mutated = false;
-        await Assert.ThrowsAsync<AppException>(() => responses.ConvertAsync(() => { mutated = true; return Task.FromResult(Sample<WalletDto>()); }, default));
-        Assert.False(mutated);
+        var adjusted = await responses.ConvertAsync(() => { mutated = true; return Task.FromResult(new WalletDto("IRR", 2, 0, 2)); }, default);
+        Assert.True(mutated); Assert.Equal(2m, adjusted.Balance);
         var pay = await responses.ConvertAsync(() => Task.FromResult(Sample<PaymentDto>() with { Currency = "IRT" }), default);
         Assert.Equal(20, pay.Amount);
+    }
+
+    [Fact]
+    public async Task Admin_package_writes_need_no_live_quote_but_landing_catalog_does()
+    {
+        var responses = new RialBillingResponses(new FailedRate());
+        var edited = await responses.ConvertAsync(() => Task.FromResult(Sample<PackageDto>()), default);
+        Assert.Null(edited.AiPricePerMinuteRial);
+        Assert.Null(edited.DisplayRate);
+        Assert.Equal(2m, edited.AiPricePerMinuteUsd);
+        var readCatalog = false;
+        await Assert.ThrowsAsync<AppException>(() => responses.ConvertAsync(() => {
+            readCatalog = true;
+            return Task.FromResult<IReadOnlyList<PackageDto>>([Sample<PackageDto>()]);
+        }, default));
+        Assert.False(readCatalog);
     }
 
     [Fact]
@@ -174,9 +190,9 @@ public sealed class RialBillingOutputTests
         var provider = new FixedRate(); var responses = new RialBillingResponses(provider);
         var source = new Page<TransactionDto>([Sample<TransactionDto>(), Sample<TransactionDto>()], 20, 2, 2);
         var result = await responses.ConvertAsync(() => Task.FromResult(source), default);
-        Assert.Equal(1, provider.Calls);
+        Assert.Equal(0, provider.Calls);
         Assert.Equal(20, result.Total); Assert.Equal(2, result.PageNumber); Assert.Equal(2, result.PageSize);
-        Assert.All(result.Items, x => { Assert.Equal(1300010, x.Amount); Assert.Same(result.Items[0].DisplayRate, x.DisplayRate); });
+        Assert.All(result.Items, x => { Assert.Equal(2, x.Amount); Assert.Same(result.Items[0].DisplayRate, x.DisplayRate); });
     }
 
     [Fact]

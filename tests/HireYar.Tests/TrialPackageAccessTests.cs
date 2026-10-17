@@ -24,7 +24,7 @@ public sealed class TrialPackageAccessTests
 
     private static async Task VerifyAsync(string type, bool advanced)
     {
-        var f = new ApiFixture { TrialCreditAmountUsd = 0.5m, TrialDurationDays = 2 };
+        var f = new ApiFixture { TrialCreditAmountRial = 0.5m, TrialDurationDays = 2 };
         await f.InitializeAsync();
         try
         {
@@ -46,7 +46,7 @@ public sealed class TrialPackageAccessTests
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 return (await response.Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!;
             }
-            async Task<InterviewInvitation> Invite(TemplateDto template)
+            async Task<HttpResponseMessage> Invite(TemplateDto template)
             {
                 using var client = f.CreateClient(); client.DefaultRequestHeaders.Authorization = new("Bearer", owner.Client.AccessToken);
                 using var form = new MultipartFormDataContent();
@@ -56,10 +56,11 @@ public sealed class TrialPackageAccessTests
                 form.Add(new StringContent("Synthetic SQL work history"), "resumeText");
                 form.Add(new ByteArrayContent("%PDF-1.7 synthetic"u8.ToArray()), "resume", "resume.pdf");
                 var response = await client.PostAsync("/api/panel-wizard/invitations", form);
-                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-                return (await response.Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
+                return response;
             }
-            var invite = await Invite(await Save(request));
+            var invited = await Invite(await Save(request));
+            Assert.Equal(HttpStatusCode.OK, invited.StatusCode);
+            var invite = (await invited.Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
             using var candidate = f.CreateClient(); candidate.DefaultRequestHeaders.Authorization = new("Bearer", invite.Token);
             var route = $"/api/candidate/interviews/{invite.InterviewId}";
             Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync(route + "/start", null)).StatusCode);
@@ -79,16 +80,14 @@ public sealed class TrialPackageAccessTests
                 var grant = await db.RegistrationTrials.SingleAsync();
                 var bill = await db.InterviewBillings.SingleAsync();
                 Assert.Equal(grant.Id, bill.SubscriptionId);
-                Assert.True(bill.BilledAmountUsd > 0);
-                Assert.Equal(BillingMath.Cost(bill.BillableSeconds, bill.RatePerMinuteUsd), bill.BilledAmountUsd);
-                Assert.Equal(0.5m - bill.BilledAmountUsd, (await db.OrganizationAiWallets.SingleAsync()).Balance);
+                Assert.True(bill.BilledAmountRial > 0);
+                Assert.Equal(BillingMath.Cost(bill.BillableSeconds, bill.RatePerMinuteUsd), bill.BilledAmountRial);
+                Assert.Equal(0.5m - bill.BilledAmountRial, (await db.OrganizationAiWallets.SingleAsync()).Balance);
                 Assert.False(await db.Payments.AnyAsync());
                 Assert.False(await db.SubscriptionPurchases.AnyAsync());
             });
-            // A longer session still has its features; only the wallet prevents its start.
-            var tooLong = await Invite(await Save(request with { Title = "Synthetic trial long template", DurationMinutes = 60 }));
-            using var otherCandidate = f.CreateClient(); otherCandidate.DefaultRequestHeaders.Authorization = new("Bearer", tooLong.Token);
-            var rejected = await otherCandidate.PostAsync($"/api/candidate/interviews/{tooLong.InterviewId}/start", null);
+            // A longer invitation is rejected before a candidate link or second reservation exists.
+            var rejected = await Invite(await Save(request with { Title = "Synthetic trial long template", DurationMinutes = 60 }));
             Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
             Assert.Contains("insufficient_ai_credit", await rejected.Content.ReadAsStringAsync());
         }

@@ -50,8 +50,8 @@ public static class DependencyInjection
         services.AddScoped<HireYar.Application.Organizations.ITeamMembers, HireYar.Infrastructure.Organizations.TeamMembers>();
         services.AddOptions<RegistrationTrialOptions>().Bind(config.GetSection("RegistrationTrial"))
             .Validate(x => x.DurationDays is >= 1 and <= 3650, "RegistrationTrial:DurationDays must be between 1 and 3650.")
-            .Validate(x => x.CreditAmountUsd > 0 && x.CreditAmountUsd < 1_000_000_000_000m && BillingMath.HasPrecision(x.CreditAmountUsd, 6),
-                "RegistrationTrial:CreditAmountUsd must be positive, below 1000000000000 and have at most six decimals.")
+            .Validate(x => x.CreditAmountRial > 0 && x.CreditAmountRial < 1_000_000_000_000m && BillingMath.HasPrecision(x.CreditAmountRial, 6),
+                "RegistrationTrial:CreditAmountRial must be positive, below 1000000000000 and have at most six decimals.")
             .ValidateOnStart();
         services.AddScoped<RegistrationTrialService>();
         services.AddHttpClient("WallexDisplayRate", h => { h.BaseAddress = new Uri("https://api.wallex.ir/"); h.Timeout = TimeSpan.FromSeconds(5); });
@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddOptions<BillingPanelOptions>().Bind(config.GetSection("BillingPanel"))
             .Validate(x => x.SubscriptionTaxPercent is >= 0 and <= 100 && BillingMath.HasPrecision(x.SubscriptionTaxPercent, 2), "BillingPanel tax percent must be between 0 and 100 with at most two decimals.").ValidateOnStart();
         services.AddScoped<BillingPanelService>();
+        services.AddScoped<InvitationPricingService>();
         services.AddScoped<TeamSeatService>();
         services.AddScoped<ITeamSeatUsage, HireYar.Infrastructure.Organizations.TeamSeatUsage>();
         services.AddScoped<ISubscriptionEntitlementService, SubscriptionEntitlementService>(); services.AddScoped<InterviewBillingService>(); services.AddScoped<BillingQueryService>();

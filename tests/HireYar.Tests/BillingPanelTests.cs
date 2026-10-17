@@ -50,7 +50,7 @@ public sealed class BillingPanelTests(ApiFixture f)
         await Verify(a, checkout.Checkout.Payment.Id);
         var invoice = await (await a.Client.Send(HttpMethod.Get, $"/api/billing/payments/{checkout.Checkout.Payment.Id}/invoice")).Content.ReadFromJsonAsync<RialInvoiceDto>(BillingJson.Options);
         Assert.Equal(9405000m * 10m, invoice!.TotalAmount); Assert.Equal(855000m * 10m, invoice.TaxAmount); Assert.StartsWith("HY-", invoice.InvoiceNumber);
-        var overview = await Overview(a); Assert.Equal("active", overview.SubscriptionState); Assert.Equal(0.03m, overview.AiRatePerMinuteRial); Assert.Equal(0m, overview.EstimatedAvailableMinutes);
+        var overview = await Overview(a); Assert.Equal("active", overview.SubscriptionState); Assert.Null(overview.AiRatePerMinuteRial); Assert.Null(overview.EstimatedAvailableMinutes);
         var renewal = await Checkout(a, period.Id, "renewal"); await Verify(a, renewal.Checkout.Payment.Id);
         var after = await Overview(a); Assert.Equal(overview.Current!.ExpiresAtUtc, Assert.Single(after.Scheduled).StartedAtUtc);
         var history = await History(a, "?creditType=subscription&transactionType=payment&pageSize=1");
@@ -79,7 +79,7 @@ public sealed class BillingPanelTests(ApiFixture f)
             Assert.Equal((taxable + decimal.Round(taxable * 0.1m, 0, MidpointRounding.AwayFromZero)) * 10m, upgrade.Checkout.Payment.Amount);
             Assert.Equal(HttpStatusCode.Conflict, (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(basic.Periods[0].Id))).StatusCode);
             await Task.WhenAll(Verify(a, upgrade.Checkout.Payment.Id), Verify(a, upgrade.Checkout.Payment.Id));
-            var after = await Overview(a); Assert.Equal("advanced", after.Current!.PackageCode); Assert.Equal(0.05m, after.AiRatePerMinuteRial);
+            var after = await Overview(a); Assert.Equal("advanced", after.Current!.PackageCode); Assert.Null(after.AiRatePerMinuteRial);
             Assert.Empty(after.Scheduled); Assert.True(after.Current.StartedAtUtc < original.ExpiresAtUtc);
             await f.Db(async db =>
             {
@@ -138,7 +138,7 @@ public sealed class BillingPanelTests(ApiFixture f)
         var invitation = (await (await hr.PostAsync("/api/panel-wizard/invitations", form)).Content.ReadFromJsonAsync<PanelInvitationResult>(BillingJson.Options))!;
         using var candidate = f.CreateClient(); candidate.DefaultRequestHeaders.Authorization = new("Bearer", invitation.Invitation.Token);
         var current = (await (await candidate.PostAsync($"/api/candidate/interviews/{invitation.Invitation.InterviewId}/start", null)).Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
-        var reserved = await Overview(a); Assert.Equal(3m, reserved.Wallet.ReservedCredit); Assert.Equal(1940m, reserved.EstimatedAvailableMinutes);
+        var reserved = await Overview(a); Assert.Equal(3m, reserved.Wallet.ReservedCredit); Assert.Null(reserved.EstimatedAvailableMinutes);
         f.Clock.Offset = TimeSpan.FromSeconds(20);
         try
         {

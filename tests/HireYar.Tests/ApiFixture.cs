@@ -57,7 +57,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public bool DiagnosticsEnabled { get; init; }
     public bool AssessmentWorkerEnabled { get; init; }
     public int TrialDurationDays { get; init; } = 3;
-    public decimal TrialCreditAmountUsd { get; init; } = 1m;
+    public decimal TrialCreditAmountRial { get; init; } = 1m;
     public FakePaymentGateway PaymentGateway { get; } = new();
     public TestClock Clock { get; } = new();
     public TestAiDisplayRates DisplayRates { get; } = new();
@@ -81,7 +81,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("SuperAdmin:RandomKey", AdminEntry);
         b.UseSetting("SuperAdmin:AuthRequestsPerMinute", AdminRateLimit.ToString());
         b.UseSetting("RegistrationTrial:DurationDays", TrialDurationDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        b.UseSetting("RegistrationTrial:CreditAmountUsd", TrialCreditAmountUsd.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        b.UseSetting("RegistrationTrial:CreditAmountRial", TrialCreditAmountRial.ToString(System.Globalization.CultureInfo.InvariantCulture));
         b.UseSetting("InterviewDiagnostics:Enabled", DiagnosticsEnabled.ToString());
         b.UseSetting("InterviewDiagnostics:CapturePrompts", "true");
         b.UseSetting("ConnectionStrings:Default", connection!);
@@ -106,6 +106,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
+            DisplayRates.Clock = Clock;
             s.RemoveAll<HireYar.Application.Billing.IAiDisplayRateProvider>();
             s.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(DisplayRates);
             s.RemoveAll<IReportNarrativeProvider>(); s.AddSingleton<IReportNarrativeProvider>(NarrativeAi);
@@ -192,9 +193,10 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         var pricing = await (await account.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options);
         var package = pricing!.Packages.Single(x => x.Code == "advanced");
         var pending = await (await account.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(package.Periods.Single(x => x.Months == 1).Id))).Content.ReadFromJsonAsync<HireYar.Api.Billing.RialPurchaseResult>(BillingJson.Options);
-        Assert.Equal(HttpStatusCode.OK, (await account.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending!.Payment.Id}/verify")).StatusCode);
+
         await using var scope = Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var org = await db.Users.Where(x => x.Id == account.Id).Select(x => x.OrganizationId).SingleAsync();
+        await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.PaymentService>().VerifyAsync(org, pending!.Payment.Id, default);
         await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 100m, "Synthetic interview test credit"), default);
     }
 }

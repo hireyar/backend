@@ -19,9 +19,9 @@ public sealed class Payment
     public DateTimeOffset? FailedAtUtc { get; set; }
     public Guid? CreditPackageId { get; set; }
     public string? CreditPackageNameSnapshot { get; set; }
-    public decimal? CreditAmountUsdSnapshot { get; set; }
-    // Fixed-price credit products: this is the effective contracted IRT/USD ratio, not a live forex quote.
-    public decimal? EffectiveUsdToIrtSnapshot { get; set; }
+    public decimal? CreditAmountRialSnapshot { get; set; }
+    // Fixed credit product ratio: cash IRT per granted IRR; independent of foreign exchange.
+    public decimal? EffectiveCreditRialToIrtSnapshot { get; set; }
     public decimal? SubtotalAmountSnapshot { get; set; }
     public decimal? TaxPercentSnapshot { get; set; }
     public decimal? TaxAmountSnapshot { get; set; }
@@ -91,7 +91,7 @@ public sealed class OrganizationAiWallet
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid OrganizationId { get; set; }
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "IRR";
     public decimal Balance { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
@@ -104,6 +104,8 @@ public sealed class AiCreditTransaction
     public Guid WalletId { get; set; }
     public CreditTransactionType Type { get; set; }
     public decimal Amount { get; set; }
+    // USD usage audit only; never returned by financial HTTP contracts.
+    public decimal? AmountUsd { get; set; }
     public decimal BalanceBefore { get; set; }
     public decimal BalanceAfter { get; set; }
     public string ReferenceType { get; set; } = "";
@@ -118,8 +120,8 @@ public sealed class AiCreditReservation
     public Guid OrganizationId { get; set; }
     public Guid WalletId { get; set; }
     public Guid InterviewSessionId { get; set; }
-    public decimal ReservedAmountUsd { get; set; }
-    public decimal ConsumedAmountUsd { get; set; }
+    public decimal ReservedAmountRial { get; set; }
+    public decimal ConsumedAmountRial { get; set; }
     public ReservationStatus Status { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset ExpiresAtUtc { get; set; }
@@ -132,8 +134,12 @@ public sealed class InterviewBilling
     public Guid InterviewSessionId { get; set; }
     public Guid SubscriptionId { get; set; }
     public decimal RatePerMinuteUsd { get; set; }
+    public decimal RatePerMinuteRial { get; set; }
+    public decimal RialPerUsdt { get; set; }
+    public DateTimeOffset RateQuotedAtUtc { get; set; }
     public int RetentionDays { get; set; }
     public int BillableSeconds { get; set; }
+    public decimal BilledAmountRial { get; set; }
     public decimal BilledAmountUsd { get; set; }
     public InterviewBillingStatus Status { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }

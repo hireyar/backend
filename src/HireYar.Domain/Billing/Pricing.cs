@@ -54,7 +54,7 @@ public sealed class AiCreditPackage
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
-    public decimal CreditAmountUsd { get; set; }
+    public decimal CreditAmountRial { get; set; }
     public decimal SellPriceAmount { get; set; }
     public string SellPriceCurrency { get; set; } = "IRT";
     public bool IsActive { get; set; }

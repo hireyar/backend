@@ -234,33 +234,23 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
     }
 
     [PostgresFact]
-    public async Task Migration_preserves_legacy_team_capacity_and_cash_without_retroactive_charge()
+    public async Task Currency_cutover_blocks_unsafe_downgrade_without_mutating_team_contract_or_cash()
     {
         var owner = await f.RegisterOwner(); var sub = await Buy(owner, "advanced");
         await f.Db(async db => {
             var before = await db.SubscriptionPurchases.SingleAsync();
             var amount = (await db.Payments.SingleAsync()).Amount;
-            await db.GetService<IMigrator>().MigrateAsync("20261014052638_AddMobileTeamInvitationNames");
-            var org = await db.Users.Where(x => x.Id == owner.Id).Select(x => x.OrganizationId).SingleAsync();
-            // Populate the historical schema explicitly: the current EF user model may
-            // contain columns added after the migration under test (e.g. ReferralCode).
-            for (var i = 0; i < 6; i++)
-                await db.Database.ExecuteSqlInterpolatedAsync($"""
-                    INSERT INTO "AspNetUsers" ("Id", "UserName", "PhoneNumber", "PhoneNumberConfirmed", "OrganizationId", "Role", "FullName",
-                        "EmailConfirmed", "TwoFactorEnabled", "LockoutEnabled", "AccessFailedCount", "IsActive", "IsSystemAdmin", "CreatedAtUtc", "UpdatedAtUtc")
-                    VALUES ({Guid.NewGuid()}, {Guid.NewGuid().ToString()}, {Mobile()}, true, {org}, 'Recruiter', 'Legacy synthetic member',
-                        false, false, false, 0, true, false, {f.Clock.GetUtcNow()}, {f.Clock.GetUtcNow()})
-                    """);
+            var blocked = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261014052638_AddMobileTeamInvitationNames"));
+            Assert.Contains("currency cutover cannot be downgraded", blocked.MessageText);
             db.ChangeTracker.Clear();
-            await db.Database.MigrateAsync();
             var after = await db.SubscriptionPurchases.SingleAsync();
             Assert.Equal(before.Id, after.Id); Assert.Equal(before.PriceAmountSnapshot, after.PriceAmountSnapshot);
             Assert.Equal(amount, (await db.Payments.SingleAsync()).Amount);
-            Assert.Equal(5, after.IncludedTeamUsersSnapshot); Assert.Equal(7, after.TeamCapacitySnapshot); Assert.Equal(0m, after.TeamSeatAmountIrtSnapshot);
+            Assert.Equal(before.IncludedTeamUsersSnapshot, after.IncludedTeamUsersSnapshot);
+            Assert.Equal(before.TeamCapacitySnapshot, after.TeamCapacitySnapshot);
             Assert.False(db.Database.HasPendingModelChanges());
         });
-        var state = await State(owner); Assert.Equal(sub.Id, state.SubscriptionId); Assert.Equal(7, state.Capacity);
-        Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(Mobile(), "نام", "آزمایشی"))).StatusCode);
+        var state = await State(owner); Assert.Equal(sub.Id, state.SubscriptionId);
     }
 }
 

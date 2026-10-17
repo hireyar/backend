@@ -51,7 +51,7 @@ public sealed class BillingTests(ApiFixture f)
     }
     private async Task<RialPurchaseResult> BuyCredit(Account a, Guid product) => (await (await a.Client.Send(HttpMethod.Post, "/api/billing/ai-credit/purchases", new CreditPurchaseRequest(product))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options))!;
     private async Task<RialWalletDto> Wallet(Account a) => (await (await a.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<RialWalletDto>(BillingJson.Options))!;
-    private async Task<InterviewInvitation> Invite(Account a, string capability = "technical_interview")
+    private async Task<InterviewInvitation> Invite(Account a, string capability = "technical_interview", bool insufficient = false)
     {
         var suffix = Guid.NewGuid().ToString("N");
         var job = await (await a.Client.Send(HttpMethod.Post, "/api/job-positions", new { title = "Synthetic role " + suffix, description = "Synthetic job", seniority = "Senior", status = "Active" })).Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options);
@@ -65,6 +65,7 @@ public sealed class BillingTests(ApiFixture f)
         var application = await (await a.Client.Send(HttpMethod.Post, $"/api/job-positions/{jobId}/applications", new { firstName = "Synthetic", lastName = "Candidate", email = "candidate@example.test" })).Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options);
         var result = await a.Client.Send(HttpMethod.Post, $"/api/job-positions/{jobId}/applications/{application.GetProperty("id").GetGuid()}/interviews",
             new CreateInterviewRequest(template.GetProperty("id").GetGuid(), 1, 72, capability));
+        if (insufficient) { Assert.Equal(HttpStatusCode.Conflict, result.StatusCode); Assert.Contains("insufficient_ai_credit", await result.Content.ReadAsStringAsync()); return null!; }
         Assert.Equal(HttpStatusCode.OK, result.StatusCode); return (await result.Content.ReadFromJsonAsync<InterviewInvitation>(BillingJson.Options))!;
     }
     private HttpClient Candidate(InterviewInvitation i)
@@ -186,11 +187,10 @@ public sealed class BillingTests(ApiFixture f)
     {
         var a = await f.RegisterOwner(); var package = await SeedPackage("advanced"); var purchase = await Buy(a, package.Periods[0].Id); await Verify(a, purchase.Payment.Id);
         var org = await Org(a); await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 5m, "Synthetic credit"), default);
-        var i1 = await Invite(a); var i2 = await Invite(a); using var c1 = Candidate(i1); using var c2 = Candidate(i2);
-        var results = await Task.WhenAll(c1.PostAsync($"/api/candidate/interviews/{i1.InterviewId}/start", null), c2.PostAsync($"/api/candidate/interviews/{i2.InterviewId}/start", null));
-        Assert.Single(results, x => x.StatusCode == HttpStatusCode.OK); Assert.Single(results, x => x.StatusCode == HttpStatusCode.Conflict);
+        var winning = await Invite(a); await Invite(a, insufficient: true);
+        using var candidate = Candidate(winning);
+        Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{winning.InterviewId}/start", null)).StatusCode);
         var balance = await Wallet(a); Assert.Equal(3m, balance.ReservedCredit); Assert.Equal(2m, balance.AvailableCredit); Assert.Equal(5m, balance.Balance);
-        var winning = results[0].StatusCode == HttpStatusCode.OK ? i1 : i2;
         Assert.Equal(HttpStatusCode.NoContent, (await a.Client.Send(HttpMethod.Post, $"/api/interviews/{winning.InterviewId}/revoke")).StatusCode);
         balance = await Wallet(a); Assert.Equal(0m, balance.ReservedCredit); Assert.Equal(5m, balance.AvailableCredit);
     }
@@ -209,7 +209,7 @@ public sealed class BillingTests(ApiFixture f)
             Assert.Equal(HttpStatusCode.Gone, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
             Assert.Equal(HttpStatusCode.Gone, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
             await f.Db(async db => { var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId);
-                Assert.InRange(bill.BillableSeconds, 42, 45); Assert.Equal(BillingMath.Cost(bill.BillableSeconds, 0.05m), bill.BilledAmountUsd);
+                Assert.InRange(bill.BillableSeconds, 42, 45); Assert.Equal(BillingMath.Cost(bill.BillableSeconds, 0.05m), bill.BilledAmountRial);
                 Assert.Equal(1, await db.AiCreditTransactions.CountAsync(x => x.ReferenceId == invite.InterviewId)); });
             Assert.Equal(0m, (await Wallet(a)).ReservedCredit);
         }
@@ -227,7 +227,7 @@ public sealed class BillingTests(ApiFixture f)
             var failed = (await (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/answers", form)).Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
             f.InterviewAi.FailStt = false; f.Clock.Offset = TimeSpan.FromSeconds(250);
             Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/answers/{failed.Answer!.Id}/retry", null)).StatusCode);
-            await f.Db(async db => { var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId); Assert.Equal(120, bill.BillableSeconds); Assert.Equal(0.1m, bill.BilledAmountUsd); });
+            await f.Db(async db => { var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId); Assert.Equal(120, bill.BillableSeconds); Assert.Equal(0.1m, bill.BilledAmountRial); });
             Assert.Equal(99.9m, (await Wallet(a)).Balance);
         }
         finally { f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
@@ -267,12 +267,13 @@ public sealed class BillingTests(ApiFixture f)
             var e = scope.ServiceProvider.GetRequiredService<ISubscriptionEntitlementService>(); var org = await Org(a);
             await e.RequireAsync(org, ["hr_interview"], default); var error = await Assert.ThrowsAsync<AppException>(() => e.RequireAsync(org, ["technical_interview"], default)); Assert.Equal("subscription_feature_required", error.Code);
         }
+        await Invite(a, "hr_interview", insufficient: true);
+        await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(await Org(a), new(Guid.NewGuid(), 3m, "Synthetic credit"), default);
         var invite = await Invite(a, "hr_interview"); using var c = Candidate(invite);
         foreach (var route in new[] { "/api/billing/ai-credit", "/api/billing/subscription", "/api/billing/payments", "/api/admin/pricing/packages" }) Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(route)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.PostAsJsonAsync("/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(p.Periods[0].Id))).StatusCode);
-        var start = await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null); Assert.Equal(HttpStatusCode.Conflict, start.StatusCode);
-        Assert.Contains("insufficient_ai_credit", await start.Content.ReadAsStringAsync());
-        await f.Db(async db => Assert.False(await db.AiCreditReservations.AnyAsync(x => x.InterviewSessionId == invite.InterviewId)));
+        var start = await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null); Assert.Equal(HttpStatusCode.OK, start.StatusCode);
+        await f.Db(async db => Assert.Single(await db.AiCreditReservations.Where(x => x.InterviewSessionId == invite.InterviewId).ToListAsync()));
     }
     [PostgresFact]
     public async Task Disabled_gateway_keeps_payment_pending_without_fake_credit()
@@ -308,7 +309,7 @@ public sealed class BillingTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/ai-credit-packages/{product.Id}",
             new CreditPackageUpdateRequest(new("Changed synthetic product", 100m, 987654m, "IRT", false, false, 0), product.RowVersion))).StatusCode);
         await Verify(a, pending.Payment.Id); Assert.Equal(10m, (await Wallet(a)).Balance);
-        await f.Db(async db => { var pay = await db.Payments.SingleAsync(x => x.Id == pending.Payment.Id); Assert.Equal(123456m, pay.Amount); Assert.Equal(12345.6m, pay.EffectiveUsdToIrtSnapshot); });
+        await f.Db(async db => { var pay = await db.Payments.SingleAsync(x => x.Id == pending.Payment.Id); Assert.Equal(123456m, pay.Amount); Assert.Equal(12345.6m, pay.EffectiveCreditRialToIrtSnapshot); });
     }
     [PostgresFact]
     public async Task Concurrent_start_of_same_interview_reserves_only_once()

@@ -33,7 +33,7 @@ public sealed class BillingQueryService(IApplicationDbContext db, ISubscriptionE
     {
         var q = db.InterviewBillings.AsNoTracking().Where(x => x.OrganizationId == org); var total = await q.CountAsync(ct);
         var rows = await q.OrderByDescending(x => x.CreatedAtUtc).ThenBy(x => x.Id).Skip(page.Skip).Take(page.PageSize)
-            .Select(x => new UsageDto(x.InterviewSessionId, x.RatePerMinuteUsd, x.BillableSeconds, x.BilledAmountUsd, x.Status, x.SettledAtUtc)).ToListAsync(ct);
+            .Select(x => new UsageDto(x.InterviewSessionId, x.RatePerMinuteRial, x.BillableSeconds, x.BilledAmountRial, x.Status, x.SettledAtUtc)).ToListAsync(ct);
         return new(rows, total, page.Page, page.PageSize);
     }
     public async Task<PaymentDto> PaymentAsync(Guid org, Guid id, CancellationToken ct) => PaymentService.Map(await db.Payments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.OrganizationId == org, ct) ?? throw AppException.NotFound());

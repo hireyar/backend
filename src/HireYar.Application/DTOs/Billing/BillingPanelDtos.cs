@@ -34,10 +34,10 @@ public sealed class FinancialHistoryQuery
 public sealed record FinancialHistoryItemDto(Guid Id, DateTimeOffset OccurredAtUtc, string Description,
     string CreditType, string TransactionType, decimal Amount, string Currency, decimal? CashPaidIrt,
     int? BillableSeconds, Guid? InterviewId, string? CandidateName, string TrackingNumber, string? InvoiceUrl);
-public sealed record FinancialTotalsDto(decimal SubscriptionPaidIrt, decimal CreditPurchasedUsd,
-    decimal CreditConsumedUsd, long BillableSeconds, decimal CreditPaidIrt, decimal TeamSeatsPaidIrt = 0);
+public sealed record FinancialTotalsDto(decimal SubscriptionPaidIrt, decimal CreditPurchasedRial,
+    decimal CreditConsumedRial, long BillableSeconds, decimal CreditPaidIrt, decimal TeamSeatsPaidIrt = 0);
 public sealed record FinancialHistoryDto(DateTimeOffset UpdatedAtUtc, Page<FinancialHistoryItemDto> Transactions, FinancialTotalsDto Totals);
 public sealed record InvoiceDto(Guid PaymentId, string InvoiceNumber, string TrackingNumber, DateTimeOffset PaidAtUtc,
     string Type, string Name, string Currency, decimal SubtotalAmount, decimal ProratedCreditAmount,
-    decimal TaxPercent, decimal TaxAmount, decimal TotalAmount, decimal? CreditAmountUsd, CheckoutSummaryDto? Subscription,
+    decimal TaxPercent, decimal TaxAmount, decimal TotalAmount, decimal? CreditAmountRial, CheckoutSummaryDto? Subscription,
     TeamSeatQuoteDto? TeamSeats = null);

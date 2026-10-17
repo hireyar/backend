@@ -3,24 +3,24 @@ using HireYar.Application.Common;
 
 namespace HireYar.Api.Billing;
 
-// Resolve exchange quotes before mutations and outside organization database locks.
+// Only the public landing catalog needs a live display rate; rial balances and admin writes are fixed.
 public sealed class RialBillingResponses(IAiDisplayRateProvider rates)
 {
     public async Task<RialPackageDto> ConvertAsync(Func<Task<PackageDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
     public async Task<RialCreditPackageDto> ConvertAsync(Func<Task<CreditPackageDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
     public async Task<RialWalletDto> ConvertAsync(Func<Task<WalletDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
@@ -38,43 +38,43 @@ public sealed class RialBillingResponses(IAiDisplayRateProvider rates)
 
     public async Task<RialSubscriptionOverviewDto> ConvertAsync(Func<Task<SubscriptionOverviewDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
     public async Task<RialSubscriptionPurchaseDto> ConvertAsync(Func<Task<SubscriptionPurchaseDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
     public async Task<RialBillingPanelDto> ConvertAsync(Func<Task<BillingPanelDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
     public async Task<RialCheckoutSummaryDto> ConvertAsync(Func<Task<CheckoutSummaryDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
     public async Task<RialPanelCheckoutResult> ConvertAsync(Func<Task<PanelCheckoutResult>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
     public async Task<RialFinancialHistoryDto> ConvertAsync(Func<Task<FinancialHistoryDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
     public async Task<RialInvoiceDto> ConvertAsync(Func<Task<InvoiceDto>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return RialBillingOutput.Map(await action(), rate);
     }
 
@@ -98,28 +98,28 @@ public sealed class RialBillingResponses(IAiDisplayRateProvider rates)
 
     public async Task<Page<RialPackageDto>> ConvertAsync(Func<Task<Page<PackageDto>>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         var page = await action();
         return new(page.Items.Select(x => RialBillingOutput.Map(x, rate)).ToArray(), page.Total, page.PageNumber, page.PageSize);
     }
 
     public async Task<Page<RialCreditPackageDto>> ConvertAsync(Func<Task<Page<CreditPackageDto>>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         var page = await action();
         return new(page.Items.Select(x => RialBillingOutput.Map(x, rate)).ToArray(), page.Total, page.PageNumber, page.PageSize);
     }
 
     public async Task<Page<RialTransactionDto>> ConvertAsync(Func<Task<Page<TransactionDto>>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         var page = await action();
         return new(page.Items.Select(x => RialBillingOutput.Map(x, rate)).ToArray(), page.Total, page.PageNumber, page.PageSize);
     }
 
     public async Task<Page<RialUsageDto>> ConvertAsync(Func<Task<Page<UsageDto>>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         var page = await action();
         return new(page.Items.Select(x => RialBillingOutput.Map(x, rate)).ToArray(), page.Total, page.PageNumber, page.PageSize);
     }
@@ -133,7 +133,7 @@ public sealed class RialBillingResponses(IAiDisplayRateProvider rates)
 
     public async Task<Page<RialSubscriptionPurchaseDto>> ConvertAsync(Func<Task<Page<SubscriptionPurchaseDto>>> action, CancellationToken ct)
     {
-        AiDisplayRateDto? rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         var page = await action();
         return new(page.Items.Select(x => RialBillingOutput.Map(x, rate)).ToArray(), page.Total, page.PageNumber, page.PageSize);
     }
@@ -146,7 +146,7 @@ public sealed class RialBillingResponses(IAiDisplayRateProvider rates)
 
     public async Task<IReadOnlyList<RialCreditPackageDto>> ConvertAsync(Func<Task<IReadOnlyList<CreditPackageDto>>> action, CancellationToken ct)
     {
-        var rate = await rates.GetAsync(ct);
+        AiDisplayRateDto? rate = null;
         return (await action()).Select(x => RialBillingOutput.Map(x, rate)).ToArray();
     }
 

@@ -9,5 +9,5 @@ internal static class BillingMetrics
     public static readonly Counter<long> VerificationFailures = Meter.CreateCounter<long>("payment.verification.failed");
     public static readonly Counter<long> Reservations = Meter.CreateCounter<long>("ai_credit.reservation.created");
     public static readonly Counter<long> ReservationFailures = Meter.CreateCounter<long>("ai_credit.reservation.failed");
-    public static readonly Counter<decimal> Consumed = Meter.CreateCounter<decimal>("ai_credit.consumed", "USD");
+    public static readonly Counter<decimal> Consumed = Meter.CreateCounter<decimal>("ai_credit.consumed", "IRR");
 }
