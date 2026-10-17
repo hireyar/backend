@@ -105,7 +105,15 @@ public sealed class SecurityTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, openApiResponse.StatusCode);
         var openApi = await openApiResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Contains("ورود با موبایل", openApi.GetProperty("info").GetProperty("description").GetString());
-        Assert.Contains("ثبت‌نام", openApi.GetProperty("paths").GetProperty("/api/auth/otp/verify").GetProperty("post").GetProperty("summary").GetString());
+        Assert.Contains("ورود", openApi.GetProperty("paths").GetProperty("/api/auth/otp/verify").GetProperty("post").GetProperty("summary").GetString());
+        var registerOperation = openApi.GetProperty("paths").GetProperty("/api/auth/register").GetProperty("post");
+        Assert.Contains("ثبت‌نام", registerOperation.GetProperty("summary").GetString());
+        var registrationSchema = registerOperation.GetProperty("requestBody").GetProperty("content").GetProperty("application/json").GetProperty("schema");
+        if (registrationSchema.TryGetProperty("$ref", out var registrationReference))
+            registrationSchema = openApi.GetProperty("components").GetProperty("schemas").GetProperty(registrationReference.GetString()!.Split('/').Last());
+        var requiredRegistrationFields = registrationSchema.GetProperty("required").EnumerateArray().Select(x => x.GetString()).ToArray();
+        foreach (var field in new[] { "mobile", "code", "email", "firstName", "lastName" }) Assert.Contains(field, requiredRegistrationFields);
+        Assert.DoesNotContain("referralCode", requiredRegistrationFields);
         var adminLogin = openApi.GetProperty("paths").GetProperty("/api/admin/auth/login").GetProperty("post");
         Assert.Contains(adminLogin.GetProperty("parameters").EnumerateArray(), x => x.GetProperty("name").GetString() == "X-Admin-Entry" && x.GetProperty("required").GetBoolean());
         var adminPricing = openApi.GetProperty("paths").GetProperty("/api/admin/pricing/packages").GetProperty("get");

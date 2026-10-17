@@ -16,6 +16,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<ApplicationUser
     public void Configure(EntityTypeBuilder<ApplicationUser> b)
     {
         b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
+        b.Property(x => x.ReferralCode).HasMaxLength(64);
         b.Property(x => x.Email).HasMaxLength(256); b.Property(x => x.NormalizedEmail).HasMaxLength(256);
         b.Property(x => x.PhoneNumber).HasMaxLength(11);
         b.HasIndex(x => x.PhoneNumber).IsUnique().HasFilter("\"PhoneNumber\" IS NOT NULL");

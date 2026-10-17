@@ -11,4 +11,11 @@ public sealed record AccessResponse(string AccessToken, DateTimeOffset ExpiresAt
 public sealed record RequestOtpRequest([Required, RegularExpression(@"^09\d{9}$")] string Mobile);
 public sealed record VerifyOtpRequest([Required, RegularExpression(@"^09\d{9}$")] string Mobile,
     [Required, RegularExpression(@"^\d{6}$")] string Code);
+public sealed record RegisterRequest(
+    [Required, RegularExpression(@"^09[0-9]{9}$")] string Mobile,
+    [Required, RegularExpression(@"^[0-9]{6}$")] string Code,
+    [Required, EmailAddress, StringLength(256)] string Email,
+    [Required, StringLength(100)] string FirstName,
+    [Required, StringLength(100)] string LastName,
+    [StringLength(64)] string? ReferralCode = null);
 public sealed record OtpRequestResult(DateTimeOffset ExpiresAtUtc);

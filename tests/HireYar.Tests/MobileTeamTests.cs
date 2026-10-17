@@ -194,7 +194,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         var owner = await f.RegisterOwner(); var mobile = Mobile(); var browser = f.Browser();
         await browser.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile));
         var results = await Task.WhenAll(owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی")),
-            browser.Send(HttpMethod.Post, "/api/auth/otp/verify", new VerifyOtpRequest(mobile, f.PhoneOtp.Codes[mobile])));
+            browser.Send(HttpMethod.Post, "/api/auth/register", ApiFixture.Registration(mobile, f.PhoneOtp.Codes[mobile])));
         Assert.Equal(1, results.Count(r => r.StatusCode == HttpStatusCode.Conflict));
         Assert.Equal(1, results.Count(r => r.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK));
         await f.Db(async db => {

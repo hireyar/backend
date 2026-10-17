@@ -169,8 +169,8 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
         var first = f.Browser(); var second = f.Browser();
         var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
         Assert.Equal(HttpStatusCode.OK, (await first.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile))).StatusCode);
-        var verify = new VerifyOtpRequest(mobile, f.PhoneOtp.Codes[mobile]);
-        var responses = await Task.WhenAll(first.Send(HttpMethod.Post, "/api/auth/otp/verify", verify), second.Send(HttpMethod.Post, "/api/auth/otp/verify", verify));
+        var verify = ApiFixture.Registration(mobile, f.PhoneOtp.Codes[mobile]);
+        var responses = await Task.WhenAll(first.Send(HttpMethod.Post, "/api/auth/register", verify), second.Send(HttpMethod.Post, "/api/auth/register", verify));
         Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK); Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Unauthorized);
         await f.Db(async db => {
             var org = (await db.Users.SingleAsync(x => x.PhoneNumber == mobile)).OrganizationId;
@@ -229,15 +229,15 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
             await test.Db(db => db.PricingPackages.ExecuteUpdateAsync(s => s.SetProperty(x => x.IsActive, false)));
             var browser = test.Browser(); var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
             Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile))).StatusCode);
-            var verify = new VerifyOtpRequest(mobile, test.PhoneOtp.Codes[mobile]);
-            Assert.Equal(HttpStatusCode.ServiceUnavailable, (await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", verify)).StatusCode);
+            var verify = ApiFixture.Registration(mobile, test.PhoneOtp.Codes[mobile]);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, (await browser.Send(HttpMethod.Post, "/api/auth/register", verify)).StatusCode);
             await test.Db(async db => {
                 Assert.False(await db.Users.AnyAsync()); Assert.False(await db.Organizations.AnyAsync());
                 Assert.False(await db.RegistrationTrials.AnyAsync()); Assert.False(await db.AiCreditTransactions.AnyAsync());
                 Assert.Null((await db.OtpChallenges.SingleAsync(x => x.Mobile == mobile)).ConsumedAtUtc);
                 await db.PricingPackages.ExecuteUpdateAsync(s => s.SetProperty(x => x.IsActive, true));
             });
-            Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/otp/verify", verify)).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/register", verify)).StatusCode);
             await test.Db(async db => { Assert.Single(await db.RegistrationTrials.ToListAsync()); Assert.Single(await db.AiCreditTransactions.ToListAsync()); });
         }
         finally { await ((IAsyncLifetime)test).DisposeAsync(); }
