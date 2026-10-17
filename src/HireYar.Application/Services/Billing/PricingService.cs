@@ -95,12 +95,12 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
     }
     public async Task<CreditPackageDto> SaveCreditAsync(Guid? id, CreditPackageRequest r, byte[]? version, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(r.Name) || r.CreditAmountUsd is <= 0 or > 1000000 || r.SellPriceAmount is <= 0 or > 1000000000000m ||
-            r.SellPriceCurrency != "IRT" || !BillingMath.HasPrecision(r.CreditAmountUsd, 6) || !BillingMath.HasPrecision(r.SellPriceAmount, 0) ||
-            r.SellPriceAmount / r.CreditAmountUsd > 999999999999999999m) throw AppException.Invalid();
+        if (string.IsNullOrWhiteSpace(r.Name) || r.CreditAmountRial is <= 0 or > 999999999999m || r.SellPriceAmount is <= 0 or > 1000000000000m ||
+            r.SellPriceCurrency != "IRT" || !BillingMath.HasPrecision(r.CreditAmountRial, 6) || !BillingMath.HasPrecision(r.SellPriceAmount, 0) ||
+            r.SellPriceAmount / r.CreditAmountRial > 999999999999999999m) throw AppException.Invalid();
         var p = id is { } key ? await db.AiCreditPackages.SingleOrDefaultAsync(x => x.Id == key, ct) ?? throw AppException.NotFound() : new AiCreditPackage { CreatedAtUtc = time.GetUtcNow() };
         if (id is null) db.AiCreditPackages.Add(p); else db.SetOriginalVersion(p, version!);
-        p.Name = r.Name.Trim(); p.CreditAmountUsd = r.CreditAmountUsd; p.SellPriceAmount = r.SellPriceAmount; p.SellPriceCurrency = r.SellPriceCurrency;
+        p.Name = r.Name.Trim(); p.CreditAmountRial = r.CreditAmountRial; p.SellPriceAmount = r.SellPriceAmount; p.SellPriceCurrency = r.SellPriceCurrency;
         p.IsActive = r.IsActive; p.IsPublic = r.IsPublic; p.SortOrder = r.SortOrder; p.UpdatedAtUtc = time.GetUtcNow(); await db.SaveChangesAsync(ct); return MapCredit(p);
     }
     private static void ValidatePackage(PackageRequest r)
@@ -115,5 +115,5 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
         p.Features.Where(x => !publicOnly || x.IsEnabled).OrderBy(x => x.Feature.Code).Select(x => new FeatureDto(x.FeatureId, x.Feature.Code, x.Feature.Name, x.Feature.Description, x.Feature.DataType, x.IsEnabled, x.Value)).ToArray(),
         p.Periods.Where(x => !publicOnly || x.IsActive).OrderBy(x => x.SortOrder).ThenBy(x => x.Months).Select(x => new PeriodDto(x.Id, x.Months, x.PriceAmount, x.Currency, x.DiscountPercent, x.IsActive, x.SortOrder)).ToArray(),
         p.IncludedTeamUsers, p.PaidTeamUserLimit, p.TeamUserMonthlyPriceIrt);
-    private static CreditPackageDto MapCredit(AiCreditPackage p) => new(p.Id, p.Name, p.CreditAmountUsd, p.SellPriceAmount, p.SellPriceCurrency, p.IsActive, p.IsPublic, p.SortOrder, p.RowVersion);
+    private static CreditPackageDto MapCredit(AiCreditPackage p) => new(p.Id, p.Name, p.CreditAmountRial, p.SellPriceAmount, p.SellPriceCurrency, p.IsActive, p.IsPublic, p.SortOrder, p.RowVersion);
 }

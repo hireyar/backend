@@ -183,7 +183,7 @@ public sealed class PanelCleanupTests(ApiFixture f)
             await f.Db(async db =>
             {
                 var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == id);
-                Assert.Equal(BillingMath.Cost(bill.BillableSeconds, bill.RatePerMinuteUsd), bill.BilledAmountUsd);
+                Assert.Equal(BillingMath.Cost(bill.BillableSeconds, bill.RatePerMinuteUsd), bill.BilledAmountRial);
                 Assert.Equal(InterviewBillingStatus.Settled, bill.Status);
                 Assert.Equal(1, await db.AiCreditTransactions.CountAsync(x => x.ReferenceType == "Interview" && x.ReferenceId == id));
                 Assert.True(await db.InterviewAnswers.AnyAsync(x => x.InterviewSessionId == id));

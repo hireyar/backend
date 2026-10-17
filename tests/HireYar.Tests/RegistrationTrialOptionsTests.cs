@@ -14,7 +14,7 @@ public sealed class RegistrationTrialOptionsTests
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["RegistrationTrial:DurationDays"] = days.ToString(CultureInfo.InvariantCulture),
-            ["RegistrationTrial:CreditAmountUsd"] = credit,
+            ["RegistrationTrial:CreditAmountRial"] = credit,
             ["AI:Provider"] = "Disabled"
         }).Build();
         return new ServiceCollection().AddInfrastructure(config).BuildServiceProvider();
@@ -29,7 +29,7 @@ public sealed class RegistrationTrialOptionsTests
         using var provider = Provider(days, credit);
         var options = provider.GetRequiredService<IOptions<RegistrationTrialOptions>>().Value;
         Assert.Equal(days, options.DurationDays);
-        Assert.Equal(decimal.Parse(credit, CultureInfo.InvariantCulture), options.CreditAmountUsd);
+        Assert.Equal(decimal.Parse(credit, CultureInfo.InvariantCulture), options.CreditAmountRial);
     }
 
     [Theory]

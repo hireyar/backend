@@ -24,14 +24,14 @@ public sealed class RegistrationTrialService(IApplicationDbContext db, IOptions<
         var trial = new RegistrationTrial { Id = subscription.Id, OrganizationId = org, CreatedAtUtc = registeredAtUtc,
             IncludedTeamUsers = packages.Max(x => x.IncludedTeamUsers), PaidTeamUserLimit = packages.Max(x => x.PaidTeamUserLimit),
             TeamUserMonthlyPriceIrt = anchor.TeamUserMonthlyPriceIrt,
-            CreditAmountUsd = settings.CreditAmountUsd,
+            CreditAmountRial = settings.CreditAmountRial,
             AiPricePerMinuteUsd = anchor.AiPricePerMinuteUsd, RetentionDays = packages.Max(x => x.InterviewRetentionDays),
             Entitlements = features.Select(x => new RegistrationTrialEntitlement { TrialId = subscription.Id, Code = x.Feature.Code,
                 Name = x.Feature.Name, DataType = x.Feature.DataType, Value = x.Value }).ToList() };
-        var wallet = new OrganizationAiWallet { OrganizationId = org, Balance = settings.CreditAmountUsd, CreatedAtUtc = registeredAtUtc, UpdatedAtUtc = registeredAtUtc };
+        var wallet = new OrganizationAiWallet { OrganizationId = org, Balance = settings.CreditAmountRial, CreatedAtUtc = registeredAtUtc, UpdatedAtUtc = registeredAtUtc };
         db.OrganizationSubscriptions.Add(subscription); db.RegistrationTrials.Add(trial); db.OrganizationAiWallets.Add(wallet);
         db.AiCreditTransactions.Add(new() { OrganizationId = org, WalletId = wallet.Id, Type = CreditTransactionType.PromotionalCredit,
-            Amount = settings.CreditAmountUsd, BalanceBefore = 0, BalanceAfter = settings.CreditAmountUsd, ReferenceType = "RegistrationTrial", ReferenceId = trial.Id,
+            Amount = settings.CreditAmountRial, BalanceBefore = 0, BalanceAfter = settings.CreditAmountRial, ReferenceType = "RegistrationTrial", ReferenceId = trial.Id,
             Description = "Registration trial credit", CreatedAtUtc = registeredAtUtc });
     }
 }

@@ -7,7 +7,7 @@ namespace HireYar.Api.Billing;
 public sealed record RialPackageCatalogDto(IReadOnlyList<RialPackageDto> Packages);
 public sealed record RialCreditPackageCatalogDto(IReadOnlyList<RialCreditPackageDto> Packages);
 
-// HTTP-only contracts. Accounting DTOs and persisted payment amounts keep their original units.
+// HTTP contracts: AI accounting is IRR; legacy cash payment IRT amounts are normalized to IRR.
 public sealed record RialPeriodDto(
     Guid Id,
     int Months,
@@ -26,7 +26,7 @@ public sealed record RialPackageDto(
     bool IsActive,
     bool IsPublic,
     int SortOrder,
-    decimal AiPricePerMinuteRial,
+    decimal? AiPricePerMinuteRial,
     int RetentionDays,
     byte[] RowVersion,
     IReadOnlyList<FeatureDto> Features,
@@ -48,7 +48,6 @@ public sealed record RialCreditPackageDto(
     bool IsPublic,
     int SortOrder,
     byte[] RowVersion,
-    decimal CreditAmountUsd,
     string Currency,
     AiDisplayRateDto? DisplayRate);
 
@@ -59,7 +58,7 @@ public sealed record RialSubscriptionDto(
     string Status,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset ExpiresAtUtc,
-    decimal AiRatePerMinuteRial,
+    decimal? AiRatePerMinuteRial,
     int RetentionDays,
     IReadOnlyList<EntitlementDto> Features,
     bool IsTrial,
@@ -124,7 +123,7 @@ public sealed record RialSubscriptionPurchaseDto(
     decimal PriceAmount,
     string Currency,
     decimal DiscountPercent,
-    decimal AiRatePerMinuteRial,
+    decimal? AiRatePerMinuteRial,
     int RetentionDays,
     DateTimeOffset QuotedAtUtc,
     AiDisplayRateDto? DisplayRate);
@@ -171,7 +170,7 @@ public sealed record RialCheckoutSummaryDto(
     DateTimeOffset EstimatedStartsAtUtc,
     DateTimeOffset EstimatedExpiresAtUtc,
     Guid? ReplacesSubscriptionId,
-    decimal AiRatePerMinuteRial,
+    decimal? AiRatePerMinuteRial,
     int RetentionDays,
     IReadOnlyList<EntitlementDto> Features,
     string? QuoteFingerprint,

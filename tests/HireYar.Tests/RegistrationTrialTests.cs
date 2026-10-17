@@ -23,9 +23,9 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
     public Task InitializeAsync() => f.InitializeAsync();
     public Task DisposeAsync() => ((IAsyncLifetime)f).DisposeAsync();
     [PostgresFact]
-    public async Task Configured_half_dollar_and_two_days_are_persisted_and_not_repeated()
+    public async Task Configured_fractional_rial_and_two_days_are_persisted_and_not_repeated()
     {
-        var test = new ApiFixture { TrialDurationDays = 2, TrialCreditAmountUsd = 0.5m };
+        var test = new ApiFixture { TrialDurationDays = 2, TrialCreditAmountRial = 0.5m };
         await test.InitializeAsync();
         try
         {
@@ -35,14 +35,14 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
                 var grant = await db.RegistrationTrials.SingleAsync();
                 var sub = await db.OrganizationSubscriptions.SingleAsync(x => x.Id == grant.Id);
                 Assert.Equal(TimeSpan.FromDays(2), sub.ExpiresAtUtc - sub.StartedAtUtc);
-                Assert.Equal(0.5m, grant.CreditAmountUsd);
+                Assert.Equal(0.5m, grant.CreditAmountRial);
                 Assert.Equal(0.5m, (await db.OrganizationAiWallets.SingleAsync()).Balance);
                 var entry = await db.AiCreditTransactions.SingleAsync();
                 Assert.Equal(0.5m, entry.Amount); Assert.Equal(0m, entry.BalanceBefore); Assert.Equal(0.5m, entry.BalanceAfter);
                 var error = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261010132215_AddRegistrationTrial"));
-                Assert.Equal("23514", error.SqlState);
-                // The newer team snapshot guard now prevents reaching the older trial downgrade.
-                Assert.Contains("Cannot remove registration trial history", error.MessageText);
+                Assert.Equal("P0001", error.SqlState);
+                // The currency cutover guard prevents restoring a historical USD schema.
+                Assert.Contains("currency cutover cannot be downgraded", error.MessageText);
                 Assert.False(db.Database.HasPendingModelChanges());
             });
             var wallet = await (await owner.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<RialWalletDto>(BillingJson.Options);
@@ -66,7 +66,7 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
             await test.Db(async db => {
                 var org = (await db.Users.SingleAsync(x => x.Id == owner.Id)).OrganizationId;
                 await using var transaction = await db.Database.BeginTransactionAsync();
-                var service = new RegistrationTrialService(db, Microsoft.Extensions.Options.Options.Create(new RegistrationTrialOptions { DurationDays = 2, CreditAmountUsd = 0.5m }));
+                var service = new RegistrationTrialService(db, Microsoft.Extensions.Options.Options.Create(new RegistrationTrialOptions { DurationDays = 2, CreditAmountRial = 0.5m }));
                 await service.CreateForNewOrganizationAsync(org, test.Clock.GetUtcNow(), default);
                 var ledger = db.AiCreditTransactions.Local.Single();
                 ledger.Amount = 0.25m; ledger.BalanceAfter = 0.25m;
@@ -100,7 +100,7 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
             var codes = await db.PackageFeatures.Where(x => x.IsEnabled && db.PricingPackages.Any(p => p.Id == x.PackageId && p.IsActive && p.IsPublic)).Select(x => x.Feature.Code).Distinct().ToListAsync();
             Assert.Equal(codes.Order(), grant.Entitlements.Select(x => x.Code).Order());
             Assert.Contains("hr_interview", codes); Assert.Contains("technical_interview", codes); Assert.Contains("advanced_ai_workflow", codes);
-            Assert.Equal(1m, grant.CreditAmountUsd); Assert.Equal(trial.Id, grant.Id);
+            Assert.Equal(1m, grant.CreditAmountRial); Assert.Equal(trial.Id, grant.Id);
             var entry = await db.AiCreditTransactions.SingleAsync(x => x.OrganizationId == org);
             Assert.Equal(CreditTransactionType.PromotionalCredit, entry.Type); Assert.Equal("RegistrationTrial", entry.ReferenceType);
             Assert.Equal(grant.Id, entry.ReferenceId); Assert.Equal(0m, entry.BalanceBefore); Assert.Equal(1m, entry.BalanceAfter);
@@ -206,7 +206,7 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
                 Assert.True((await db.OrganizationSubscriptions.SingleAsync(x => x.Id == bill.SubscriptionId)).IsTrial);
                 Assert.Equal(0.05m, bill.RatePerMinuteUsd);
                 var reserve = await db.AiCreditReservations.SingleAsync(x => x.InterviewSessionId == invite.InterviewId);
-                Assert.Equal(0.25m, reserve.ReservedAmountUsd);
+                Assert.Equal(0.25m, reserve.ReservedAmountRial);
                 Assert.Equal(1m, (await db.OrganizationAiWallets.SingleAsync(x => x.OrganizationId == bill.OrganizationId)).Balance);
                 await db.PackageFeatures.ExecuteUpdateAsync(s => s.SetProperty(x => x.IsEnabled, false));
             });
@@ -251,8 +251,9 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
         try
         {
             await test.Db(async db => {
-                await db.GetService<IMigrator>().MigrateAsync("20261010085424_AddMediumFirstTopicQuestions");
-                await db.Database.MigrateAsync(); Assert.False(db.Database.HasPendingModelChanges());
+                var blocked = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261010085424_AddMediumFirstTopicQuestions"));
+                Assert.Contains("currency cutover cannot be downgraded", blocked.MessageText);
+                Assert.False(db.Database.HasPendingModelChanges());
             });
             var a = await test.RegisterOwner(signupTrial: true); var b = await test.RegisterOwner();
             await test.Db(async db => {
@@ -261,13 +262,13 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
                 var sub = await db.OrganizationSubscriptions.SingleAsync(x => x.Id == grant.Id);
                 async Task Reject(FormattableString sql, string state)
                 { Assert.Equal(state, (await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(sql))).SqlState); }
-                await Reject($"UPDATE \"RegistrationTrials\" SET \"CreditAmountUsd\" = 2 WHERE \"Id\" = {grant.Id}", "23514");
+                await Reject($"UPDATE \"RegistrationTrials\" SET \"CreditAmountRial\" = 2 WHERE \"Id\" = {grant.Id}", "23514");
                 await Reject($"DELETE FROM \"RegistrationTrialEntitlement\" WHERE \"TrialId\" = {grant.Id}", "23514");
-                await Reject($"INSERT INTO \"RegistrationTrials\" (\"Id\",\"OrganizationId\",\"CreatedAtUtc\",\"CreditAmountUsd\",\"AiPricePerMinuteUsd\",\"RetentionDays\") VALUES ({grant.Id},{other},{grant.CreatedAtUtc},1,0.05,60)", "23514");
+                await Reject($"INSERT INTO \"RegistrationTrials\" (\"Id\",\"OrganizationId\",\"CreatedAtUtc\",\"CreditAmountRial\",\"AiPricePerMinuteUsd\",\"RetentionDays\") VALUES ({grant.Id},{other},{grant.CreatedAtUtc},1,0.05,60)", "23514");
                 var fresh = Guid.NewGuid();
                 await Reject($"INSERT INTO \"OrganizationSubscriptions\" (\"Id\",\"OrganizationId\",\"PaymentId\",\"IsTrial\",\"PackageId\",\"PackagePeriodId\",\"Status\",\"StartedAtUtc\",\"ExpiresAtUtc\",\"CreatedAtUtc\") VALUES ({fresh},{other},NULL,true,{sub.PackageId},{sub.PackagePeriodId},'Active',{sub.StartedAtUtc},{sub.ExpiresAtUtc},{sub.CreatedAtUtc})", "23514");
                 var error = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261010085424_AddMediumFirstTopicQuestions"));
-                Assert.Equal("23514", error.SqlState); Assert.Contains("Cannot remove registration trial history", error.MessageText);
+                Assert.Equal("P0001", error.SqlState); Assert.Contains("currency cutover cannot be downgraded", error.MessageText);
                 Assert.Single(await db.RegistrationTrials.ToListAsync()); Assert.False(db.Database.HasPendingModelChanges());
             });
         }

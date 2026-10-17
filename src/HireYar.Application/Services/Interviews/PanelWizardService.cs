@@ -65,6 +65,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         try
         {
             application.ResumeStorageKey = saved.Key;
+            var quote = await billing.CurrentRateAsync(ct);
             await db.WithOrganizationBillingLockAsync(user.OrganizationId, async () =>
             {
                 // Serialize invitation persistence with position/template removal. File upload stays outside the lock.
@@ -72,6 +73,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                     !await db.InterviewTemplates.AnyAsync(x => x.Id == sourceTemplateId && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && !x.IsArchived, ct))
                     throw AppException.NotFound();
                 db.CandidateApplications.Add(application); db.InterviewSessions.Add(session);
+                await billing.ReserveInvitationLockedAsync(session, quote, ct);
                 return true;
             }, ct);
         }
@@ -111,6 +113,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         var session = await db.InterviewSessions.SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)
             ?? throw AppException.NotFound();
         if (r.DeadlineDays is < 1 or > 14) throw AppException.Invalid();
+        var quote = await billing.CurrentRateAsync(ct);
         var result = await billing.FinishAsync(session, false, async () => {
             await db.ReloadInterviewAsync(session, ct);
             if (session.DeletedAtUtc is not null) throw AppException.NotFound();
@@ -134,7 +137,10 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                 session.ResumeTextSnapshot, session.Language, session.CandidateIntroductionEnabled, session.CandidateIntroductionMessage ?? "",
                 session.CompanyIntroductionEnabled, session.CompanyIntroductionMessage ?? "");
             var code = IssueCode(fresh, invitationSecurity.Unprotect(session.Id, session.ProtectedAccessCode));
+            // Release/settle the old hold before checking available credit for its replacement.
+            await billing.SettleReplacementLockedAsync(session, ct);
             db.InterviewSessions.Add(fresh);
+            await billing.ReserveInvitationLockedAsync(fresh, quote, ct);
             // Persist the new principal before the self-reference; this is still the same organization transaction.
             await db.SaveChangesAsync(ct);
             if (session.Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled)) session.Cancel(now);

@@ -25,10 +25,10 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
                 expired = await entitlements.MapAsync(previous, "Expired", ct);
             }
         }
-        var current = subscriptions.Current; decimal? minutes = current is null ? null : decimal.Floor((w.Balance - reserved) / current.AiRatePerMinuteUsd * 60m) / 60m;
+        var current = subscriptions.Current; decimal? minutes = null;
         return new BillingPanelDto(now, current is not null ? "active" : subscriptions.Scheduled.Count > 0 ? "scheduled" : expired is not null ? "expired" : "none", current, expired, subscriptions.Scheduled,
             current is null ? expired is not null ? 0 : null : (int)Math.Ceiling((current.ExpiresAtUtc - now).TotalDays),
-            new("USD", w.Balance, reserved, w.Balance - reserved), current?.AiRatePerMinuteUsd, minutes, owner && gateway.IsEnabled, gateway.IsEnabled);
+            new("IRR", w.Balance, reserved, w.Balance - reserved), current?.AiRatePerMinuteUsd, minutes, owner && gateway.IsEnabled, gateway.IsEnabled);
     }, ct);
 
     public Task<CheckoutSummaryDto> QuoteAsync(Guid org, SubscriptionQuoteRequest r, CancellationToken ct) =>
@@ -115,7 +115,7 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
         }
         return new(id, $"HY-{id:N}", pay.ProviderTransactionId!, pay.PaidAtUtc!.Value, pay.Type.ToString(), subscription?.PackageName ?? (team is not null ? "ظرفیت کاربران تیم" : pay.CreditPackageNameSnapshot!),
             pay.Currency, subscription?.SubtotalAmount ?? pay.SubtotalAmountSnapshot ?? pay.Amount, subscription?.ProratedCreditAmount ?? 0,
-            pay.TaxPercentSnapshot ?? 0, pay.TaxAmountSnapshot ?? 0, pay.Amount, pay.CreditAmountUsdSnapshot, subscription, team);
+            pay.TaxPercentSnapshot ?? 0, pay.TaxAmountSnapshot ?? 0, pay.Amount, pay.CreditAmountRialSnapshot, subscription, team);
     }
 
     public Task<FinancialHistoryDto> HistoryAsync(Guid org, FinancialHistoryQuery r, CancellationToken ct) => db.WithOrganizationBillingLockAsync(org, async () =>
@@ -127,8 +127,8 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
                           from purchase in purchases.DefaultIfEmpty()
                           select new FinancialRow { Id = p.Id, Date = p.PaidAtUtc!.Value, Category = p.Type == PaymentType.Subscription ? "subscription" : p.Type == PaymentType.TeamSeats ? "teamSeats" : "aiCredit", Kind = "payment",
                               Name = p.Type == PaymentType.Subscription ? purchase.PackageNameSnapshot : p.Type == PaymentType.TeamSeats ? "ظرفیت کاربران تیم" : p.CreditPackageNameSnapshot!,
-                              Amount = p.Type != PaymentType.AiCredit ? -p.Amount : p.CreditAmountUsdSnapshot!.Value,
-                              Currency = p.Type != PaymentType.AiCredit ? "IRT" : "USD", Cash = p.Amount,
+                              Amount = p.Type != PaymentType.AiCredit ? -p.Amount : p.CreditAmountRialSnapshot!.Value,
+                              Currency = p.Type != PaymentType.AiCredit ? "IRT" : "IRR", Cash = p.Amount,
                               Seconds = null, InterviewId = null, Candidate = null, Tracking = p.ProviderTransactionId!, PaymentId = p.Id };
         var ledgerRows = from t in db.AiCreditTransactions.AsNoTracking()
                          where t.OrganizationId == org && t.Type != CreditTransactionType.CreditPurchase
@@ -139,7 +139,7 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
                          join candidate in db.CandidateApplications.Where(x => x.OrganizationId == org) on session.CandidateApplicationId equals candidate.Id into candidates
                          from candidate in candidates.DefaultIfEmpty()
                          select new FinancialRow { Id = t.Id, Date = t.CreatedAtUtc, Category = "aiCredit", Kind = t.Type == CreditTransactionType.InterviewUsage ? "usage" : "adjustment",
-                             Name = t.Type == CreditTransactionType.Refund ? "بازگشت اعتبار" : t.Type == CreditTransactionType.PromotionalCredit ? "اعتبار هدیه" : "اصلاح اعتبار", Amount = t.Amount, Currency = "USD", Cash = null,
+                             Name = t.Type == CreditTransactionType.Refund ? "بازگشت اعتبار" : t.Type == CreditTransactionType.PromotionalCredit ? "اعتبار هدیه" : "اصلاح اعتبار", Amount = t.Amount, Currency = "IRR", Cash = null,
                              Seconds = t.Type == CreditTransactionType.InterviewUsage && bill != null ? bill.BillableSeconds : null,
                              InterviewId = t.Type == CreditTransactionType.InterviewUsage ? (Guid?)t.ReferenceId : null,
                              Candidate = candidate == null ? null : candidate.FirstName + " " + candidate.LastName, Tracking = "CR-" + t.Id.ToString(), PaymentId = null };

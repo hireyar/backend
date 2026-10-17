@@ -35,7 +35,7 @@ public sealed class PaginationTests
                     db.PricingPackages.Add(new PricingPackage { Code = $"page_{i}", Name = $"Synthetic {i}",
                         AiPricePerMinuteUsd = .03m, InterviewRetentionDays = 30, CreatedAtUtc = now, UpdatedAtUtc = now,
                         SortOrder = 7, IsActive = i % 2 == 0, IsPublic = false });
-                    db.AiCreditPackages.Add(new AiCreditPackage { Name = $"Synthetic {i}", CreditAmountUsd = 1,
+                    db.AiCreditPackages.Add(new AiCreditPackage { Name = $"Synthetic {i}", CreditAmountRial = 1,
                         SellPriceAmount = 100, SortOrder = 7, IsActive = i % 2 == 0, IsPublic = false,
                         CreatedAtUtc = now, UpdatedAtUtc = now });
                 }

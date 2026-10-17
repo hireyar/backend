@@ -64,14 +64,15 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
     }
     public async Task<InterviewInvitation> InviteAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct)
     {
-        var invitation = await db.WithOrganizationBillingLockAsync(user.OrganizationId, () => InviteLockedAsync(jobId, applicationId, r, ct), ct);
+        var quote = await billing.CurrentRateAsync(ct);
+        var invitation = await db.WithOrganizationBillingLockAsync(user.OrganizationId, () => InviteLockedAsync(jobId, applicationId, r, quote, ct), ct);
         var candidate = await db.CandidateApplications.AsNoTracking().SingleAsync(x => x.Id == applicationId && x.OrganizationId == user.OrganizationId, ct);
         var session = await db.InterviewSessions.AsNoTracking().SingleAsync(x => x.Id == invitation.InterviewId && x.OrganizationId == user.OrganizationId, ct);
         var delivery = await notifier.SendAsync(new(candidate.Email, candidate.Phone, $"{candidate.FirstName} {candidate.LastName}",
             session.PositionTitleSnapshot ?? "", invitation), r.SendEmail, r.SendSms, ct);
         return invitation with { EmailDelivery = delivery.EmailDelivery, SmsDelivery = delivery.SmsDelivery };
     }
-    private async Task<InterviewInvitation> InviteLockedAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct)
+    private async Task<InterviewInvitation> InviteLockedAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, AiDisplayRateDto quote, CancellationToken ct)
     {
         await CheckJob(jobId, ct);
         if (!await db.CandidateApplications.AnyAsync(x => x.Id == applicationId && x.OrganizationId == user.OrganizationId && x.JobPositionId == jobId, ct))
@@ -104,6 +105,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
             template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
         var encrypted = invitationSecurity.Protect(session.Id, token);
         session.SetProtectedAccessCode(encrypted, InterviewTokens.Hash(encrypted)); db.InterviewSessions.Add(session);
+        await billing.ReserveInvitationLockedAsync(session, quote, ct);
         await db.SaveChangesAsync(ct);
         return new(session.Id, token, session.ExpiresAtUtc, $"/api/candidate/interviews/{session.Id}", token, invitationSecurity.Link(session.Id));
     }

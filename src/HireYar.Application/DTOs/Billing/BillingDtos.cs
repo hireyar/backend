@@ -19,7 +19,7 @@ public sealed record FeatureRequest([Required, RegularExpression("^[a-z][a-z0-9_
 public sealed record FeatureWriteRequest(Guid FeatureId, bool IsEnabled, [StringLength(1000)] string? Value,
     [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
 public sealed record CreditPackageRequest([Required, StringLength(200, MinimumLength = 1)] string Name,
-    [Range(typeof(decimal), "0.000001", "1000000")] decimal CreditAmountUsd,
+    [Range(typeof(decimal), "0.000001", "999999999999")] decimal CreditAmountRial,
     [Range(typeof(decimal), "1", "1000000000000")] decimal SellPriceAmount,
     [Required, RegularExpression("^IRT$")] string SellPriceCurrency, bool IsActive, bool IsPublic, [Range(0, 10000)] int SortOrder);
 public sealed record CreditPackageUpdateRequest(CreditPackageRequest Package, [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
@@ -31,7 +31,7 @@ public sealed record PeriodDto(Guid Id, int Months, decimal Price, string Curren
 public sealed record PackageDto(Guid Id, string Code, string Name, string Description, bool IsActive, bool IsPublic, int SortOrder,
     decimal AiPricePerMinuteUsd, int RetentionDays, byte[] RowVersion, IReadOnlyList<FeatureDto> Features, IReadOnlyList<PeriodDto> Periods,
     int IncludedTeamUsers = 3, int PaidTeamUserLimit = 30, decimal TeamUserMonthlyPriceIrt = 200_000m);
-public sealed record CreditPackageDto(Guid Id, string Name, decimal CreditAmountUsd, decimal SellPriceAmount, string SellPriceCurrency,
+public sealed record CreditPackageDto(Guid Id, string Name, decimal CreditAmountRial, decimal SellPriceAmount, string SellPriceCurrency,
     bool IsActive, bool IsPublic, int SortOrder, byte[] RowVersion);
 public sealed record EntitlementDto(string Code, string Name, FeatureDataType DataType, string? Value);
 public sealed record SubscriptionDto(Guid Id, string PackageCode, string PackageName, string Status, DateTimeOffset StartedAtUtc,
@@ -46,5 +46,5 @@ public sealed record PurchaseResult(PaymentDto Payment, string? RedirectUrl, boo
 public sealed record SubscriptionOverviewDto(SubscriptionDto? Current, IReadOnlyList<SubscriptionDto> Scheduled);
 public sealed record SubscriptionPurchaseDto(Guid Id, Guid PaymentId, string PackageCode, string PackageName, int PeriodMonths,
     decimal PriceAmount, string Currency, decimal DiscountPercent, decimal AiRatePerMinuteUsd, int RetentionDays, DateTimeOffset QuotedAtUtc);
-public sealed record UsageDto(Guid InterviewSessionId, decimal RatePerMinuteUsd, int BillableSeconds, decimal BilledAmountUsd,
+public sealed record UsageDto(Guid InterviewSessionId, decimal RatePerMinuteRial, int BillableSeconds, decimal BilledAmountRial,
     InterviewBillingStatus Status, DateTimeOffset? SettledAtUtc);

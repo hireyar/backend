@@ -89,8 +89,8 @@ public sealed class PaymentService(IApplicationDbContext db, IPaymentGateway gat
     {
         var product = await db.AiCreditPackages.AsNoTracking().SingleOrDefaultAsync(x => x.Id == creditId && x.IsActive && x.IsPublic, ct) ?? throw AppException.NotFound();
         var payment = NewPayment(org, PaymentType.AiCredit, product.SellPriceAmount, product.SellPriceCurrency, time.GetUtcNow());
-        payment.CreditPackageId = product.Id; payment.CreditPackageNameSnapshot = product.Name; payment.CreditAmountUsdSnapshot = product.CreditAmountUsd;
-        payment.EffectiveUsdToIrtSnapshot = decimal.Round(product.SellPriceAmount / product.CreditAmountUsd, 6, MidpointRounding.ToEven);
+        payment.CreditPackageId = product.Id; payment.CreditPackageNameSnapshot = product.Name; payment.CreditAmountRialSnapshot = product.CreditAmountRial;
+        payment.EffectiveCreditRialToIrtSnapshot = decimal.Round(product.SellPriceAmount / product.CreditAmountRial, 12, MidpointRounding.ToEven);
         db.Payments.Add(payment); await db.SaveChangesAsync(ct); return await InitiateAsync(payment, ct);
     }
     private Payment NewPayment(Guid org, PaymentType type, decimal amount, string currency, DateTimeOffset now)
@@ -148,7 +148,7 @@ public sealed class PaymentService(IApplicationDbContext db, IPaymentGateway gat
                     Status = start > now ? SubscriptionStatus.Scheduled : SubscriptionStatus.Active, CreatedAtUtc = now });
             }
             else if (payment.Type == PaymentType.AiCredit)
-                await wallet.AddEntryLockedAsync(org, payment.CreditAmountUsdSnapshot!.Value, CreditTransactionType.CreditPurchase, "Payment", id, null, ct);
+                await wallet.AddEntryLockedAsync(org, payment.CreditAmountRialSnapshot!.Value, CreditTransactionType.CreditPurchase, "Payment", id, null, ct);
             else if (payment.Type == PaymentType.TeamSeats)
                 _ = await db.TeamSeatPurchases.SingleAsync(x => x.OrganizationId == org && x.PaymentId == id, ct);
             else throw AppException.Invalid("unknown_payment_type");

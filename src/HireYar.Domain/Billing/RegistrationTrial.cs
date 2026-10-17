@@ -6,7 +6,7 @@ public sealed class RegistrationTrial
     public Guid Id { get; set; }
     public Guid OrganizationId { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
-    public decimal CreditAmountUsd { get; set; }
+    public decimal CreditAmountRial { get; set; }
     public decimal AiPricePerMinuteUsd { get; set; }
     public int RetentionDays { get; set; }
     public int IncludedTeamUsers { get; set; } = 5;
