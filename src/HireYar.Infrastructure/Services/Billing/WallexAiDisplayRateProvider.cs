@@ -28,7 +28,7 @@ public sealed class WallexAiDisplayRateProvider(IHttpClientFactory clients, Time
                 using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
                 var rate = ParseRate(json.RootElement);
                 var fetched = time.GetUtcNow();
-                return cached = new("Wallex", "USDTTMN", "IRT", rate, fetched, fetched.AddSeconds(5), 5);
+                return cached = new("Wallex", "USDTTMN", "IRR", rate, fetched, fetched.AddSeconds(5), 5);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception e) when (e is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
@@ -50,7 +50,8 @@ public sealed class WallexAiDisplayRateProvider(IHttpClientFactory clients, Time
         var value = price.ValueKind == JsonValueKind.String
             ? decimal.Parse(price.GetString()!, NumberStyles.Float, CultureInfo.InvariantCulture) : price.GetDecimal();
         if (value <= 0 || value > 1_000_000_000m) throw new FormatException("Invalid market price.");
-        return value;
+        // Wallex TMN prices are toman; the public conversion contract uses rial.
+        return value * 10m;
     }
 
     private static AppException Unavailable() => new(503, "ai_display_rate_unavailable", "The live AI display rate is temporarily unavailable.");
