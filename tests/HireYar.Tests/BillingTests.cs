@@ -1,3 +1,4 @@
+using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -39,17 +40,17 @@ public sealed class BillingTests(ApiFixture f)
     {
         return await f.RegisterAdmin();
     }
-    private async Task<PackageDto> SeedPackage(string code) => (await (await f.Browser().Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!.Packages.Single(x => x.Code == code);
-    private static PackageRequest Request(PackageDto p, decimal? rate = null, bool? active = null) => new(p.Code, p.Name, p.Description, active ?? p.IsActive, p.IsPublic, p.SortOrder, rate ?? p.AiPricePerMinuteUsd, p.RetentionDays);
-    private async Task<PurchaseResult> Buy(Account a, Guid period) => (await (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(period))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options))!;
+    private async Task<RialPackageDto> SeedPackage(string code) => (await (await f.Browser().Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!.Packages.Single(x => x.Code == code);
+    private static PackageRequest Request(RialPackageDto p, decimal? rate = null, bool? active = null) => new(p.Code, p.Name, p.Description, active ?? p.IsActive, p.IsPublic, p.SortOrder, rate ?? p.AiPricePerMinuteUsd, p.RetentionDays);
+    private async Task<RialPurchaseResult> Buy(Account a, Guid period) => (await (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(period))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options))!;
     private async Task Verify(Account a, Guid payment) => Assert.Equal(HttpStatusCode.OK, (await a.Client.Send(HttpMethod.Post, $"/api/billing/payments/{payment}/verify")).StatusCode);
-    private async Task<CreditPackageDto> CreditProduct(Account admin)
+    private async Task<RialCreditPackageDto> CreditProduct(Account admin)
     {
         var response = await admin.Client.Send(HttpMethod.Post, "/api/admin/pricing/ai-credit-packages", new CreditPackageRequest("Synthetic credit", 10m, 123456m, "IRT", true, true, 0));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode); return (await response.Content.ReadFromJsonAsync<CreditPackageDto>(BillingJson.Options))!;
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode); return (await response.Content.ReadFromJsonAsync<RialCreditPackageDto>(BillingJson.Options))!;
     }
-    private async Task<PurchaseResult> BuyCredit(Account a, Guid product) => (await (await a.Client.Send(HttpMethod.Post, "/api/billing/ai-credit/purchases", new CreditPurchaseRequest(product))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options))!;
-    private async Task<WalletDto> Wallet(Account a) => (await (await a.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<WalletDto>(BillingJson.Options))!;
+    private async Task<RialPurchaseResult> BuyCredit(Account a, Guid product) => (await (await a.Client.Send(HttpMethod.Post, "/api/billing/ai-credit/purchases", new CreditPurchaseRequest(product))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options))!;
+    private async Task<RialWalletDto> Wallet(Account a) => (await (await a.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<RialWalletDto>(BillingJson.Options))!;
     private async Task<InterviewInvitation> Invite(Account a, string capability = "technical_interview")
     {
         var suffix = Guid.NewGuid().ToString("N");
@@ -73,8 +74,8 @@ public sealed class BillingTests(ApiFixture f)
     public async Task Catalog_seed_prices_and_features_are_exact()
     {
         var basic = await SeedPackage("basic"); var advanced = await SeedPackage("advanced");
-        Assert.Equal(new decimal[] { 3000000, 8550000, 16200000, 28800000 }, basic.Periods.Select(x => x.Price));
-        Assert.Equal(new decimal[] { 4500000, 12825000, 24300000, 43200000 }, advanced.Periods.Select(x => x.Price));
+        Assert.Equal(new decimal[] { 3000000, 8550000, 16200000, 28800000 }, basic.Periods.Select(x => x.Price / 10m));
+        Assert.Equal(new decimal[] { 4500000, 12825000, 24300000, 43200000 }, advanced.Periods.Select(x => x.Price / 10m));
         Assert.Equal(0.03m, basic.AiPricePerMinuteUsd); Assert.Equal(0.05m, advanced.AiPricePerMinuteUsd);
         Assert.Equal(30, basic.RetentionDays); Assert.Equal(60, advanced.RetentionDays);
         Assert.DoesNotContain(basic.Features, x => x.Code == "technical_interview"); Assert.Contains(advanced.Features, x => x.Code == "technical_interview");
@@ -83,9 +84,9 @@ public sealed class BillingTests(ApiFixture f)
     public async Task Admin_can_create_dynamic_periods_archive_and_enforce_stale_versions()
     {
         var admin = await Admin(); var response = await admin.Client.Send(HttpMethod.Post, "/api/admin/pricing/packages", new PackageRequest("test_" + Guid.NewGuid().ToString("N"), "Custom", "Synthetic", true, true, 0, 0.07m, 90));
-        var p = (await response.Content.ReadFromJsonAsync<PackageDto>(BillingJson.Options))!; Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var p = (await response.Content.ReadFromJsonAsync<RialPackageDto>(BillingJson.Options))!; Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var change = await admin.Client.Send(HttpMethod.Post, $"/api/admin/pricing/packages/{p.Id}/periods", new PeriodWriteRequest(new(9, 123456m, "IRT", 7m, true, 0), p.RowVersion));
-        Assert.Equal(HttpStatusCode.OK, change.StatusCode); var latest = (await change.Content.ReadFromJsonAsync<PackageDto>(BillingJson.Options))!;
+        Assert.Equal(HttpStatusCode.OK, change.StatusCode); var latest = (await change.Content.ReadFromJsonAsync<RialPackageDto>(BillingJson.Options))!;
         Assert.Contains((await (await f.Browser().Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!.Packages, x => x.Id == p.Id && x.Periods.Any(y => y.Months == 9));
         Assert.Equal(HttpStatusCode.Conflict, (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}", new PackageUpdateRequest(Request(p), p.RowVersion))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}", new PackageUpdateRequest(Request(latest, active: false), latest.RowVersion))).StatusCode);
@@ -103,7 +104,7 @@ public sealed class BillingTests(ApiFixture f)
     public async Task Duplicate_callbacks_and_concurrent_credit_verifications_fulfill_once()
     {
         var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterOwner(); var pending = await BuyCredit(a, product.Id);
-        Assert.Equal(PaymentStatus.Pending, pending.Payment.Status); Assert.Equal(123456m, pending.Payment.Amount);
+        Assert.Equal(PaymentStatus.Pending, pending.Payment.Status); Assert.Equal(1234560m, pending.Payment.Amount);
         using var c = f.CreateClient(); var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => c.PostAsync($"/api/payment-callbacks/{pending.Payment.Id}", null)));
         Assert.All(responses, x => Assert.Equal(HttpStatusCode.NoContent, x.StatusCode)); await Verify(a, pending.Payment.Id);
         Assert.Equal(10m, (await Wallet(a)).Balance);
@@ -114,7 +115,7 @@ public sealed class BillingTests(ApiFixture f)
     {
         var admin = await Admin(); var product = await CreditProduct(admin); var a = await f.RegisterOwner(); var b = await f.RegisterOwner();
         var first = await BuyCredit(a, product.Id); var second = await BuyCredit(b, product.Id); var txn = "shared-test-" + Guid.NewGuid();
-        f.PaymentGateway.Results[first.Payment.Id] = new(true, txn, first.Payment.Amount, "IRT"); f.PaymentGateway.Results[second.Payment.Id] = new(true, txn, second.Payment.Amount, "IRT");
+        f.PaymentGateway.Results[first.Payment.Id] = new(true, txn, first.Payment.Amount / 10m, "IRT"); f.PaymentGateway.Results[second.Payment.Id] = new(true, txn, second.Payment.Amount / 10m, "IRT");
         await Verify(a, first.Payment.Id); Assert.Equal(HttpStatusCode.Conflict, (await b.Client.Send(HttpMethod.Post, $"/api/billing/payments/{second.Payment.Id}/verify")).StatusCode);
         Assert.Equal(0m, (await Wallet(b)).Balance);
         await f.Db(async db => Assert.Equal(PaymentStatus.Pending, (await db.Payments.SingleAsync(x => x.Id == second.Payment.Id)).Status));
@@ -157,14 +158,14 @@ public sealed class BillingTests(ApiFixture f)
     {
         var admin = await Admin(); var a = await f.RegisterOwner();
         var create = await admin.Client.Send(HttpMethod.Post, "/api/admin/pricing/packages", new PackageRequest("contract_" + Guid.NewGuid().ToString("N"), "Original", "", true, true, 0, 0.123456m, 75));
-        var p = (await create.Content.ReadFromJsonAsync<PackageDto>(BillingJson.Options))!;
+        var p = (await create.Content.ReadFromJsonAsync<RialPackageDto>(BillingJson.Options))!;
         var period = await admin.Client.Send(HttpMethod.Post, $"/api/admin/pricing/packages/{p.Id}/periods", new PeriodWriteRequest(new(2, 123m, "IRT", 12m, true, 0), p.RowVersion));
-        p = (await period.Content.ReadFromJsonAsync<PackageDto>(BillingJson.Options))!;
+        p = (await period.Content.ReadFromJsonAsync<RialPackageDto>(BillingJson.Options))!;
         var features = (await (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/features")).Content.ReadFromJsonAsync<List<FeatureDto>>(BillingJson.Options))!;
         var feature = features.Single(x => x.Code == "hr_interview");
-        p = (await (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}/features", new FeatureWriteRequest(feature.Id, true, null, p.RowVersion))).Content.ReadFromJsonAsync<PackageDto>(BillingJson.Options))!;
+        p = (await (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}/features", new FeatureWriteRequest(feature.Id, true, null, p.RowVersion))).Content.ReadFromJsonAsync<RialPackageDto>(BillingJson.Options))!;
         var pending = await Buy(a, p.Periods[0].Id);
-        p = (await (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}", new PackageUpdateRequest(Request(p, rate: 0.9m), p.RowVersion))).Content.ReadFromJsonAsync<PackageDto>(BillingJson.Options))!;
+        p = (await (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}", new PackageUpdateRequest(Request(p, rate: 0.9m), p.RowVersion))).Content.ReadFromJsonAsync<RialPackageDto>(BillingJson.Options))!;
         Assert.Equal(HttpStatusCode.OK, (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}/features", new FeatureWriteRequest(feature.Id, false, null, p.RowVersion))).StatusCode);
         await Verify(a, pending.Payment.Id); await using var scope = f.Services.CreateAsyncScope();
         var e = scope.ServiceProvider.GetRequiredService<ISubscriptionEntitlementService>(); var snapshot = await e.RequireAsync(await Org(a), ["hr_interview"], default);
@@ -280,7 +281,7 @@ public sealed class BillingTests(ApiFixture f)
         try
         {
             var a = await disabled.RegisterOwner(); var pricing = (await (await a.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
-            var pending = (await (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(pricing.Packages[0].Periods[0].Id))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options))!;
+            var pending = (await (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(pricing.Packages[0].Periods[0].Id))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options))!;
             Assert.False(pending.GatewayEnabled); Assert.Null(pending.RedirectUrl); Assert.Equal(PaymentStatus.Pending, pending.Payment.Status);
             Assert.Equal(HttpStatusCode.ServiceUnavailable, (await a.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Payment.Id}/verify")).StatusCode);
             await disabled.Db(async db => { Assert.Equal(0, await db.OrganizationSubscriptions.CountAsync()); Assert.Equal(0, await db.AiCreditTransactions.CountAsync()); });
@@ -326,7 +327,7 @@ public sealed class BillingTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null)).StatusCode);
         var admin = await Admin(); var package = await SeedPackage("advanced");
         // Edit and restore the catalog without changing any existing purchase snapshot.
-        var changed = (await (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{package.Id}", new PackageUpdateRequest(Request(package, 0.9m), package.RowVersion))).Content.ReadFromJsonAsync<PackageDto>(BillingJson.Options))!;
+        var changed = (await (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{package.Id}", new PackageUpdateRequest(Request(package, 0.9m), package.RowVersion))).Content.ReadFromJsonAsync<RialPackageDto>(BillingJson.Options))!;
         try
         {
             await f.Db(async db => Assert.Equal(0.05m, (await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId)).RatePerMinuteUsd));

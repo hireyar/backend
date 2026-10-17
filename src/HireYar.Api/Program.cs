@@ -41,6 +41,7 @@ builder.Services.AddScoped<ICurrentInterviewAccess, CurrentInterviewAccess>();
 builder.Services.AddScoped<PanelWizardService>();
 builder.Services.AddScoped<HireYar.Application.Support.TicketService>();
 builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
+builder.Services.AddScoped<HireYar.Api.Billing.RialBillingResponses>();
 builder.Services.AddControllers().AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
 builder.Services.Configure<ApiBehaviorOptions>(o => o.InvalidModelStateResponseFactory = c =>
 {

@@ -1,3 +1,4 @@
+using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Json;
 using HireYar.Application.Billing;
@@ -28,7 +29,7 @@ public sealed class TrialPackageAccessTests
         try
         {
             var owner = await f.RegisterOwner(signupTrial: true);
-            var subscription = (await (await owner.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<SubscriptionOverviewDto>(BillingJson.Options))!.Current!;
+            var subscription = (await (await owner.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<RialSubscriptionOverviewDto>(BillingJson.Options))!.Current!;
             Assert.True(subscription.IsTrial);
             var catalog = (await (await owner.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
             var expected = catalog.Packages.SelectMany(p => p.Features).Where(x => x.IsEnabled).Select(x => x.Code).Distinct().Order();

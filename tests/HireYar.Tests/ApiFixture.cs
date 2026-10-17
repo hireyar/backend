@@ -1,3 +1,4 @@
+using HireYar.Api.Billing;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
@@ -59,6 +60,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public decimal TrialCreditAmountUsd { get; init; } = 1m;
     public FakePaymentGateway PaymentGateway { get; } = new();
     public TestClock Clock { get; } = new();
+    public TestAiDisplayRates DisplayRates { get; } = new();
     public TestPhoneOtp PhoneOtp { get; } = new();
     public FakeInvitationNotifier Invitations { get; } = new();
     public FakeQuestionSuggestionProvider QuestionAi { get; } = new();
@@ -104,6 +106,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
+            s.RemoveAll<HireYar.Application.Billing.IAiDisplayRateProvider>();
+            s.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(DisplayRates);
             s.RemoveAll<IReportNarrativeProvider>(); s.AddSingleton<IReportNarrativeProvider>(NarrativeAi);
             s.RemoveAll<IAnswerAssessmentProvider>(); s.AddSingleton<IAnswerAssessmentProvider>(AssessmentAi);
             s.RemoveAll<IAdminCaptcha>(); s.AddSingleton<IAdminCaptcha>(AdminCaptcha);
@@ -187,14 +191,14 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     {
         var pricing = await (await account.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options);
         var package = pricing!.Packages.Single(x => x.Code == "advanced");
-        var pending = await (await account.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(package.Periods.Single(x => x.Months == 1).Id))).Content.ReadFromJsonAsync<HireYar.Application.Billing.PurchaseResult>(BillingJson.Options);
+        var pending = await (await account.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(package.Periods.Single(x => x.Months == 1).Id))).Content.ReadFromJsonAsync<HireYar.Api.Billing.RialPurchaseResult>(BillingJson.Options);
         Assert.Equal(HttpStatusCode.OK, (await account.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending!.Payment.Id}/verify")).StatusCode);
         await using var scope = Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var org = await db.Users.Where(x => x.Id == account.Id).Select(x => x.OrganizationId).SingleAsync();
         await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 100m, "Synthetic interview test credit"), default);
     }
 }
-public sealed record PricingResponse(IReadOnlyList<HireYar.Application.Billing.PackageDto> Packages);
+public sealed record PricingResponse(IReadOnlyList<HireYar.Api.Billing.RialPackageDto> Packages);
 public sealed record Account(Browser Client, string Mobile, Guid Id);
 public sealed class Browser(HttpClient client)
 {

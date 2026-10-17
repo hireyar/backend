@@ -1,3 +1,4 @@
+using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Json;
 using HireYar.Application.Auth;
@@ -21,25 +22,25 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
     public Task InitializeAsync() => f.InitializeAsync();
     public Task DisposeAsync() => ((IAsyncLifetime)f).DisposeAsync();
     private static string Mobile() => "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
-    private async Task<PackageDto> Package(string code) => (await (await f.Browser().Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!.Packages.Single(x => x.Code == code);
+    private async Task<RialPackageDto> Package(string code) => (await (await f.Browser().Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!.Packages.Single(x => x.Code == code);
     private async Task<T> Read<T>(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode) Assert.Fail($"HTTP {(int)response.StatusCode}: " + await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<T>(BillingJson.Options))!;
     }
-    private async Task<SubscriptionDto> Buy(Account owner, string code = "basic", int? capacity = null)
+    private async Task<RialSubscriptionDto> Buy(Account owner, string code = "basic", int? capacity = null)
     {
         var p = await Package(code);
-        var pending = await Read<PurchaseResult>(await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(p.Periods.Single(x => x.Months == 1).Id, capacity)));
+        var pending = await Read<RialPurchaseResult>(await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(p.Periods.Single(x => x.Months == 1).Id, capacity)));
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Payment.Id}/verify")).StatusCode);
-        return (await Read<SubscriptionOverviewDto>(await owner.Client.Send(HttpMethod.Get, "/api/billing/subscription"))).Current!;
+        return (await Read<RialSubscriptionOverviewDto>(await owner.Client.Send(HttpMethod.Get, "/api/billing/subscription"))).Current!;
     }
-    private async Task<TeamSeatStateDto> State(Account owner) => await Read<TeamSeatStateDto>(await owner.Client.Send(HttpMethod.Get, "/api/billing/team-seats"));
-    private async Task<TeamSeatQuoteDto> Quote(Account owner, int capacity, DateTimeOffset? at = null) =>
-        await Read<TeamSeatQuoteDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/quote", new TeamSeatQuoteRequest(capacity, at)));
-    private static TeamSeatQuoteRequest Request(TeamSeatQuoteDto quote) => new(quote.TargetCapacity, quote.QuotedAtUtc, quote.QuoteFingerprint);
-    private async Task<TeamSeatCheckoutDto> Checkout(Account owner, TeamSeatQuoteDto quote) =>
-        await Read<TeamSeatCheckoutDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/checkout", Request(quote)));
+    private async Task<RialTeamSeatStateDto> State(Account owner) => await Read<RialTeamSeatStateDto>(await owner.Client.Send(HttpMethod.Get, "/api/billing/team-seats"));
+    private async Task<RialTeamSeatQuoteDto> Quote(Account owner, int capacity, DateTimeOffset? at = null) =>
+        await Read<RialTeamSeatQuoteDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/quote", new TeamSeatQuoteRequest(capacity, at)));
+    private static TeamSeatQuoteRequest Request(RialTeamSeatQuoteDto quote) => new(quote.TargetCapacity, quote.QuotedAtUtc, quote.QuoteFingerprint);
+    private async Task<RialTeamSeatCheckoutDto> Checkout(Account owner, RialTeamSeatQuoteDto quote) =>
+        await Read<RialTeamSeatCheckoutDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/checkout", Request(quote)));
     private async Task Invite(Account owner) => Assert.Equal(HttpStatusCode.Created,
         (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(Mobile(), "نام", "آزمایشی"))).StatusCode);
     private async Task AddMembers(Account owner, int count)
@@ -79,17 +80,17 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
         var at = sub.ExpiresAtUtc.AddDays(-15);
         f.Clock.Offset = at - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1);
         var quote = await Quote(owner, 4, at);
-        Assert.Equal(100_000m, quote.AmountIrt); Assert.Equal(0.5m, quote.RemainingBillingMonths);
+        Assert.Equal(100_000m * 10m, quote.AmountRial); Assert.Equal(0.5m, quote.RemainingBillingMonths);
         var pending = await Checkout(owner, quote);
         Assert.Equal(PaymentType.TeamSeats, pending.Checkout.Payment.Type);
         Assert.Equal(3, (await State(owner)).Capacity);
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Checkout.Payment.Id}/verify")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Checkout.Payment.Id}/verify")).StatusCode);
         Assert.Equal(4, (await State(owner)).Capacity);
-        var invoice = await Read<InvoiceDto>(await owner.Client.Send(HttpMethod.Get, $"/api/billing/payments/{pending.Checkout.Payment.Id}/invoice"));
-        Assert.Equal(100_000m, invoice.TotalAmount); Assert.Equal(100_000m, invoice.TeamSeats!.AmountIrt);
-        var history = await Read<FinancialHistoryDto>(await owner.Client.Send(HttpMethod.Get, "/api/billing/financial-history?creditType=teamSeats"));
-        Assert.Equal(100_000m, history.Totals.TeamSeatsPaidIrt); Assert.Equal("IRT", Assert.Single(history.Transactions.Items).Currency);
+        var invoice = await Read<RialInvoiceDto>(await owner.Client.Send(HttpMethod.Get, $"/api/billing/payments/{pending.Checkout.Payment.Id}/invoice"));
+        Assert.Equal(100_000m * 10m, invoice.TotalAmount); Assert.Equal(100_000m * 10m, invoice.TeamSeats!.AmountRial);
+        var history = await Read<RialFinancialHistoryDto>(await owner.Client.Send(HttpMethod.Get, "/api/billing/financial-history?creditType=teamSeats"));
+        Assert.Equal(100_000m * 10m, history.Totals.TeamSeatsPaidRial); Assert.Equal("IRR", Assert.Single(history.Transactions.Items).Currency);
         await f.Db(async db => { Assert.Single(await db.TeamSeatPurchases.ToListAsync()); Assert.Empty(await db.AiCreditTransactions.ToListAsync()); });
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Checkout.Payment.Id}/verify")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/billing/payments/{pending.Checkout.Payment.Id}/invoice")).StatusCode);
@@ -104,10 +105,10 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
         await Invite(owner); await Invite(owner);
         Assert.Equal(32, (await State(owner)).OccupiedUsers);
         var period = (await Package("basic")).Periods.Single(x => x.Months == 1);
-        var summary = await Read<CheckoutSummaryDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/quote", new SubscriptionQuoteRequest(period.Id, "renewal")));
-        Assert.Equal(30, summary.TeamCapacity); Assert.Equal(27 * 200_000m, summary.TeamSeatAmountIrt);
-        Assert.Equal(period.Price + summary.TeamSeatAmountIrt, summary.SubtotalAmount);
-        var result = await Read<PanelCheckoutResult>(await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/checkout",
+        var summary = await Read<RialCheckoutSummaryDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/quote", new SubscriptionQuoteRequest(period.Id, "renewal")));
+        Assert.Equal(30, summary.TeamCapacity); Assert.Equal(27 * 200_000m * 10m, summary.TeamSeatAmountRial);
+        Assert.Equal(period.Price + summary.TeamSeatAmountRial, summary.SubtotalAmount);
+        var result = await Read<RialPanelCheckoutResult>(await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/checkout",
             new SubscriptionQuoteRequest(period.Id, "renewal", summary.QuoteFingerprint)));
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{result.Checkout.Payment.Id}/verify")).StatusCode);
         await f.Db(async db => {
@@ -122,14 +123,14 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
         var admin = await f.RegisterAdmin(); var p = await Package("advanced");
         var owner = await f.RegisterOwner(); await Buy(owner, "advanced");
         var quote = await Quote(owner, 6); var pending = await Checkout(owner, quote);
-        var changed = await Read<PackageDto>(await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}",
+        var changed = await Read<RialPackageDto>(await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}",
             new PackageUpdateRequest(new(p.Code, p.Name, p.Description, p.IsActive, p.IsPublic, p.SortOrder,
                 p.AiPricePerMinuteUsd, p.RetentionDays, 7, 9, 350_000m), p.RowVersion)));
-        Assert.Equal(7, changed.IncludedTeamUsers); Assert.Equal(9, changed.PaidTeamUserLimit); Assert.Equal(350_000m, changed.TeamUserMonthlyPriceIrt);
+        Assert.Equal(7, changed.IncludedTeamUsers); Assert.Equal(9, changed.PaidTeamUserLimit); Assert.Equal(350_000m * 10m, changed.TeamUserMonthlyPriceRial);
         Assert.Equal(HttpStatusCode.Conflict, (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}",
             new PackageUpdateRequest(new(p.Code, p.Name, p.Description, true, true, 0, p.AiPricePerMinuteUsd, p.RetentionDays), p.RowVersion))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Checkout.Payment.Id}/verify")).StatusCode);
-        var oldState = await State(owner); Assert.Equal(5, oldState.IncludedTeamUsers); Assert.Equal(200_000m, oldState.TeamUserMonthlyPriceIrt); Assert.Equal(6, oldState.Capacity);
+        var oldState = await State(owner); Assert.Equal(5, oldState.IncludedTeamUsers); Assert.Equal(200_000m * 10m, oldState.TeamUserMonthlyPriceRial); Assert.Equal(6, oldState.Capacity);
         var fresh = await f.RegisterOwner(); await Buy(fresh, "advanced", 9);
         var state = await State(fresh); Assert.True(state.IsUnlimited); Assert.Equal(7, state.IncludedTeamUsers);
         await AddMembers(fresh, 8); await Invite(fresh);
@@ -144,10 +145,10 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
         var quote = await Quote(owner, 4);
         Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/checkout", Request(quote) with { QuoteFingerprint = new string('0', 64) })).StatusCode);
         var responses = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/checkout", Request(quote))));
-        var pending = await Read<TeamSeatCheckoutDto>(Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK));
+        var pending = await Read<RialTeamSeatCheckoutDto>(Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK));
         Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Conflict);
-        f.PaymentGateway.Results[pending.Checkout.Payment.Id] = new(true, "synthetic-mismatch", quote.AmountIrt + 1, "IRT");
-        var failed = await Read<PaymentDto>(await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Checkout.Payment.Id}/verify"));
+        f.PaymentGateway.Results[pending.Checkout.Payment.Id] = new(true, "synthetic-mismatch", quote.AmountRial / 10m + 1, "IRT");
+        var failed = await Read<RialPaymentDto>(await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending.Checkout.Payment.Id}/verify"));
         Assert.Equal(PaymentStatus.Failed, failed.Status); Assert.Equal(3, (await State(owner)).Capacity);
         var replacement = await Checkout(owner, await Quote(owner, 4));
         await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{replacement.Checkout.Payment.Id}/verify");
@@ -201,7 +202,7 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
         var trial = await f.RegisterOwner(signupTrial: true);
         Assert.Equal(5, (await State(trial)).Capacity);
         var admin = await f.RegisterAdmin(); var p = await Package("advanced");
-        await Read<PackageDto>(await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}",
+        await Read<RialPackageDto>(await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{p.Id}",
             new PackageUpdateRequest(new(p.Code, p.Name, p.Description, true, true, 0, p.AiPricePerMinuteUsd, p.RetentionDays, 7, 12, 0), p.RowVersion)));
         Assert.Equal(5, (await State(trial)).Capacity);
         var newer = await f.RegisterOwner(signupTrial: true); var state = await State(newer);
@@ -211,7 +212,7 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
         try
         {
             var owner = await disabled.RegisterOwner(signupTrial: true);
-            var q = await Read<TeamSeatQuoteDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/quote", new TeamSeatQuoteRequest(6)));
+            var q = await Read<RialTeamSeatQuoteDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/quote", new TeamSeatQuoteRequest(6)));
             Assert.Equal(HttpStatusCode.ServiceUnavailable, (await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/checkout", Request(q))).StatusCode);
             await disabled.Db(async db => { Assert.Empty(await db.TeamSeatPurchases.ToListAsync()); Assert.Empty(await db.Payments.ToListAsync()); });
         }
@@ -227,8 +228,8 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
         var expired = await State(owner); Assert.Null(expired.SubscriptionId); Assert.Equal(3, expired.Capacity);
         Assert.Equal(HttpStatusCode.Forbidden, (await owner.Client.Send(HttpMethod.Post, "/api/billing/team-seats/quote", new TeamSeatQuoteRequest(5))).StatusCode);
         var period = (await Package("basic")).Periods.Single(x => x.Months == 3);
-        var q = await Read<CheckoutSummaryDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/quote", new SubscriptionQuoteRequest(period.Id, "renewal")));
-        Assert.Equal(4, q.TeamCapacity); Assert.Equal(600_000m, q.TeamSeatAmountIrt);
+        var q = await Read<RialCheckoutSummaryDto>(await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/quote", new SubscriptionQuoteRequest(period.Id, "renewal")));
+        Assert.Equal(4, q.TeamCapacity); Assert.Equal(600_000m * 10m, q.TeamSeatAmountRial);
         Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/quote", new SubscriptionQuoteRequest(period.Id, "renewal", TeamCapacity: 3))).StatusCode);
     }
 

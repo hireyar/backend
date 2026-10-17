@@ -1,4 +1,5 @@
-﻿using System.Net;
+using HireYar.Api.Billing;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using HireYar.Application.Auth;
@@ -222,7 +223,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
             var features = (await response.Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
-            var subscription = (await (await pair.Owner.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<HireYar.Application.Billing.SubscriptionOverviewDto>(BillingJson.Options))!.Current!;
+            var subscription = (await (await pair.Owner.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<HireYar.Api.Billing.RialSubscriptionOverviewDto>(BillingJson.Options))!.Current!;
             Assert.True(features.HasActiveSubscription);
             Assert.Equal(subscription.IsTrial, features.IsTrial); Assert.Equal(subscription.ExpiresAtUtc, features.ExpiresAtUtc);
             Assert.Equal(subscription.Features.Select(x => (x.Code, x.Name, x.DataType, x.Value)), features.Features.Select(x => (x.Code, x.Name, x.DataType, x.Value)));
