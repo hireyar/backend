@@ -3,7 +3,7 @@ namespace HireYar.Api.OpenApi;
 internal static class OpenApiText
 {
     public const string Introduction = """
-        **ورود با موبایل:** `GET /api/auth/csrf` ← `POST /api/auth/otp/request` ← دریافت پیامک ← `POST /api/auth/otp/verify`. اگر موبایل حسابی نداشته باشد و دعوت تیم باز نداشته باشد، حساب Owner و سازمان اولیه ساخته می‌شود؛ موبایل دعوت‌شده باید مسیر پذیرش صریح دعوت را طی کند؛ نام سازمان را با `PUT /api/organization` تکمیل کنید. API key و نام قالب VerifyLookup کاوه‌نگار باید در تنظیمات محرمانه محیط باشند.
+        **ورود با موبایل:** `GET /api/auth/csrf` ← `POST /api/auth/otp/request` ← دریافت پیامک ← `POST /api/auth/otp/verify`. ورود فقط برای حساب موجود است؛ شماره تازه پس از OTP معتبر خطای registration_required می‌گیرد. برای ثبت‌نام، پس از دریافت OTP به `POST /api/auth/register` موبایل، کد، ایمیل، firstName، lastName و referralCode اختیاری بفرستید؛ حساب Owner و سازمان اولیه فقط در این مسیر ساخته می‌شود؛ موبایل دعوت‌شده باید مسیر پذیرش صریح دعوت را طی کند؛ نام سازمان را با `PUT /api/organization` تکمیل کنید. API key و نام قالب VerifyLookup کاوه‌نگار باید در تنظیمات محرمانه محیط باشند.
 
         **هر سازمان یک مالک دارد و می‌تواند زیرمجموعه Recruiter را با موبایل دعوت کند؛ ورود هر دو نقش با OTP است.** پذیرش دعوت با `POST /api/auth/team-invitations/{id}/accept` و OTP همان موبایل، بدون ساخت سازمان/هدیه جدید انجام می‌شود. مدیریت تیم، سازمان و امور مالی فقط مالک است؛ `docs/TEAM_MOBILE_API.md` قرارداد جاری دعوت است.
 
@@ -61,7 +61,8 @@ internal static class OpenApiText
         ("CandidateInterviews", "Diagnostics") => "لاگ زنده موقت مراحل مصاحبه بدون محتوای پرامپت",
         ("Auth", "Csrf") => "۱. دریافت توکن CSRF",
         ("Auth", "RequestOtp") => "۲. ارسال کد ورود به موبایل",
-        ("Auth", "VerifyOtp") => "۳. تأیید کد و ورود یا ثبت‌نام",
+        ("Auth", "VerifyOtp") => "۳. تأیید کد و ورود حساب موجود",
+        ("Auth", "Register") => "ثبت‌نام مستقل با OTP، ایمیل، نام و نام خانوادگی و کد معرف اختیاری",
         ("Auth", "Me") => "۵. مشاهده حساب جاری",
         ("Auth", "Update") => "ویرایش نام حساب جاری",
         ("Auth", "Refresh") => "تمدید نشست با کوکی refresh",

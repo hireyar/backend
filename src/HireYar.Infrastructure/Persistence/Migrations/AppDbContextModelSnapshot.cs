@@ -2618,6 +2618,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ReferralCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)

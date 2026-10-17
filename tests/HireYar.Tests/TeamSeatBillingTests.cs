@@ -241,9 +241,16 @@ public sealed class TeamSeatBillingTests : IAsyncLifetime
             var amount = (await db.Payments.SingleAsync()).Amount;
             await db.GetService<IMigrator>().MigrateAsync("20261014052638_AddMobileTeamInvitationNames");
             var org = await db.Users.Where(x => x.Id == owner.Id).Select(x => x.OrganizationId).SingleAsync();
-            for (var i = 0; i < 6; i++) db.Users.Add(new ApplicationUser { Id = Guid.NewGuid(), UserName = Guid.NewGuid().ToString(),
-                PhoneNumber = Mobile(), PhoneNumberConfirmed = true, OrganizationId = org, Role = OrganizationRole.Recruiter, FullName = "Legacy synthetic member" });
-            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            // Populate the historical schema explicitly: the current EF user model may
+            // contain columns added after the migration under test (e.g. ReferralCode).
+            for (var i = 0; i < 6; i++)
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO "AspNetUsers" ("Id", "UserName", "PhoneNumber", "PhoneNumberConfirmed", "OrganizationId", "Role", "FullName",
+                        "EmailConfirmed", "TwoFactorEnabled", "LockoutEnabled", "AccessFailedCount", "IsActive", "IsSystemAdmin", "CreatedAtUtc", "UpdatedAtUtc")
+                    VALUES ({Guid.NewGuid()}, {Guid.NewGuid().ToString()}, {Mobile()}, true, {org}, 'Recruiter', 'Legacy synthetic member',
+                        false, false, false, 0, true, false, {f.Clock.GetUtcNow()}, {f.Clock.GetUtcNow()})
+                    """);
+            db.ChangeTracker.Clear();
             await db.Database.MigrateAsync();
             var after = await db.SubscriptionPurchases.SingleAsync();
             Assert.Equal(before.Id, after.Id); Assert.Equal(before.PriceAmountSnapshot, after.PriceAmountSnapshot);

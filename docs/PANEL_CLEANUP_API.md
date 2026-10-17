@@ -1,5 +1,7 @@
 # حساب تک‌کاربر و حذف مراحل پنل — 2026-10-06
 
+اصلاح جاری2026-10-17: بخش تاریخی ورود/ثبت‌نام پایین با [REGISTRATION_API](REGISTRATION_API.md) جایگزین شده است: verify فقط ورود، register مستقل با ایمیل/نام/نام خانوادگی و معرف اختیاری. قواعد تیم جاری در [TEAM_MOBILE_API](TEAM_MOBILE_API.md) هستند؛ محدودیت تاریخی حذف تیم پایین جاری نیست.
+
 این قرارداد بخش ورود و تیم در راهنماهای قدیمی را جایگزین می‌کند. Angular در این ریپو نیست؛ عنوان فارسی Swagger حفظ شده است.
 
 ورود/ثبت‌نام فقط موبایل است: `GET /api/auth/csrf` → `POST /api/auth/otp/request` با mobile → `POST /api/auth/otp/verify` با mobile/code. CSRF، Bearer، کوکی refresh، rotation و logout/logout-all قرارداد قبلی را دارند. فقط حساب فعال Owner با موبایل تأییدشده به پنل دسترسی دارد. موبایل تازه سازمان مستقل خود را می‌سازد؛ پیوستن به سازمان دیگر وجود ندارد. نام حساب و سازمان با PUTهای me/organization تغییر می‌کند؛ Email nullable در me صرفاً metadata تاریخی است.

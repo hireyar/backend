@@ -18,6 +18,8 @@ public sealed class AuthController(IAccounts service, ICurrentUser user, IWebHos
     { Response.Headers.CacheControl = "no-store"; return new CsrfResponse(antiforgery.GetAndStoreTokens(HttpContext).RequestToken!); }
     [AllowAnonymous, HttpPost("otp/request")]
     public Task<OtpRequestResult> RequestOtp(RequestOtpRequest r, CancellationToken ct) => service.RequestOtpAsync(r, ct);
+    [AllowAnonymous, HttpPost("register")]
+    public async Task<AccessResponse> Register(RegisterRequest r, CancellationToken ct) => Session(await service.RegisterAsync(r, ct));
     [AllowAnonymous, HttpPost("otp/verify")]
     public async Task<AccessResponse> VerifyOtp(VerifyOtpRequest r, CancellationToken ct) => Session(await service.VerifyOtpAsync(r, ct));
     [AllowAnonymous, HttpPost("team-invitations/{id:guid}/accept")]

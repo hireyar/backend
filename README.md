@@ -1,6 +1,6 @@
 # HireYar Backend
 
-ورود و ثبت‌نام فقط با موبایل/OTP است؛ هر سازمان یک حساب فعال Owner دارد. مسیرهای ایمیل/رمز و دعوت/مدیریت اعضای تیم حذف شدند. دعوت کارجو، مصاحبه و Billing باقی‌اند. قرارداد جاری: [PANEL_CLEANUP_API](docs/PANEL_CLEANUP_API.md)، [PANEL_WIZARD_API](docs/PANEL_WIZARD_API.md)، [SUBSCRIPTION_CREDIT_API](docs/SUBSCRIPTION_CREDIT_API.md).
+ورود حساب موجود فقط موبایل/OTP است؛ ثبت‌نام مستقل با موبایل/OTP، ایمیل، نام، نام خانوادگی و کد معرف اختیاری انجام می‌شود. هر سازمان یک Owner فعال و اعضای Recruiter دعوت‌شده دارد؛ مسیرهای ایمیل/رمز فعال نیستند. قرارداد جاری حساب: [REGISTRATION_API](docs/REGISTRATION_API.md) و [TEAM_MOBILE_API](docs/TEAM_MOBILE_API.md). دعوت کارجو، مصاحبه و Billing باقی‌اند؛ [PANEL_WIZARD_API](docs/PANEL_WIZARD_API.md) و [SUBSCRIPTION_CREDIT_API](docs/SUBSCRIPTION_CREDIT_API.md).
 
 DELETE موقعیت/قالب/مصاحبه، موارد را از پنل پنهان می‌کند و سوابق مصاحبه و مالی را حفظ می‌کند. پیش از انتشار، migration `20261006071854_SimplifyAccountsAndPanelDeletion` را اعمال و Ownerهای ایمیلی فاقد شماره را به موبایل معتبر همان حساب متصل کنید؛ Angular در این ریپو نیست.
 
@@ -60,8 +60,8 @@ dotnet run --project src/HireYar.Api -- --urls http://localhost:5080
 ## اتصال Angular و جریان نمونه
 
 ۱. با `withCredentials: true` از `GET /api/auth/csrf` توکن بگیر؛ cookie مربوط به antiforgery خودکار ذخیره می‌شود. مقدار JSON را در حافظه نگه دار و در `X-CSRF-TOKEN` برای تمام درخواست‌های غیر GET مسیر auth بفرست.
-۲. شماره mobile را به `POST /api/auth/otp/request` بفرست؛ سپس mobile/code را به `POST /api/auth/otp/verify` بده.
-۳. verify توکن access و کوکی refresh HttpOnly می‌دهد؛ access در حافظه فرانت نگه‌داری و در هدر Bearer ارسال شود.
+۲. شماره mobile را به `POST /api/auth/otp/request` بفرست؛ برای ورود حساب موجود mobile/code را به `POST /api/auth/otp/verify` بده. برای ثبت‌نام، mobile/code/email/firstName/lastName و referralCode اختیاری را به `POST /api/auth/register` بفرست. verify حساب تازه نمی‌سازد و registration_required می‌دهد.
+۳. verify یا register موفق توکن access و کوکی refresh HttpOnly می‌دهد؛ access در حافظه فرانت نگه‌داری و در هدر Bearer ارسال شود.
 ۴. پس از verify یا تغییر هویت bearer، CSRF جدید با همان bearer دریافت کن. توکن CSRF وابسته به هویت درخواست است. هنگام انقضای access، برای دریافت CSRF و refresh هر دو Authorization را حذف کن؛ سپس access جدید و CSRF متناسب با هویت جدید بگیر. refresh هم‌زمان در چند tab را هماهنگ کن؛ بازپخش، خانواده همان نشست را باطل می‌کند.
 ۵. موقعیت بساز، شناسه آن را برای ساخت قالب همراه سؤال‌ها استفاده کن. در ویرایش `rowVersion` پاسخ قبلی را بفرست؛ 409 نیازمند reload و تصمیم کاربر است. آرشیو موقعیت با `status=Archived` و آرشیو قالب با `isArchived=true` در PUT انجام می‌شود.
 
