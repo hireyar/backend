@@ -1,3 +1,4 @@
+using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
@@ -44,7 +45,7 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
                 Assert.Contains("Cannot remove registration trial history", error.MessageText);
                 Assert.False(db.Database.HasPendingModelChanges());
             });
-            var wallet = await (await owner.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<WalletDto>(BillingJson.Options);
+            var wallet = await (await owner.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<RialWalletDto>(BillingJson.Options);
             Assert.Equal(0.5m, wallet!.Balance);
             test.Clock.Offset = TimeSpan.FromDays(2) + TimeSpan.FromMinutes(1);
             using var scope = test.Services.CreateScope();
@@ -87,11 +88,11 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
     public async Task Signup_grants_all_package_features_and_one_dollar_exactly_once()
     {
         var a = await f.RegisterOwner(signupTrial: true);
-        var overview = await (await a.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<SubscriptionOverviewDto>(BillingJson.Options);
-        var trial = Assert.IsType<SubscriptionDto>(overview!.Current);
+        var overview = await (await a.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<RialSubscriptionOverviewDto>(BillingJson.Options);
+        var trial = Assert.IsType<RialSubscriptionDto>(overview!.Current);
         Assert.True(trial.IsTrial); Assert.Equal("registration_trial", trial.PackageCode);
         Assert.Equal(TimeSpan.FromDays(3), trial.ExpiresAtUtc - trial.StartedAtUtc);
-        var wallet = await (await a.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<WalletDto>(BillingJson.Options);
+        var wallet = await (await a.Client.Send(HttpMethod.Get, "/api/billing/ai-credit")).Content.ReadFromJsonAsync<RialWalletDto>(BillingJson.Options);
         Assert.Equal(1m, wallet!.Balance); Assert.Equal(1m, wallet.AvailableCredit);
         await f.Db(async db => {
             var org = await db.Users.Where(x => x.Id == a.Id).Select(x => x.OrganizationId).SingleAsync();
@@ -123,9 +124,9 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
         var trial = (await entitlement.RequireAsync(org, ["technical_interview", "hr_interview", "ai_interview"], default));
         var catalog = await (await a.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options);
         var period = catalog!.Packages.Single(x => x.Code == "basic").Periods.Single(x => x.Months == 1);
-        var pending = await (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options);
+        var pending = await (await a.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options);
         Assert.Equal(HttpStatusCode.OK, (await a.Client.Send(HttpMethod.Post, $"/api/billing/payments/{pending!.Payment.Id}/verify")).StatusCode);
-        var overview = await (await a.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<SubscriptionOverviewDto>(BillingJson.Options);
+        var overview = await (await a.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<RialSubscriptionOverviewDto>(BillingJson.Options);
         Assert.True(overview!.Current!.IsTrial); Assert.Equal(trial.ExpiresAtUtc, Assert.Single(overview.Scheduled).StartedAtUtc);
         f.Clock.Offset = TimeSpan.FromDays(3) + TimeSpan.FromMinutes(1);
         try

@@ -1,3 +1,4 @@
+using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -176,8 +177,8 @@ public sealed class PanelCleanupTests(ApiFixture f)
             Assert.Equal(HttpStatusCode.NoContent, (await owner.Client.Send(HttpMethod.Delete, $"/api/interviews/{id}")).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.Send(HttpMethod.Delete, $"/api/interviews/{id}")).StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, (await candidate.GetAsync($"/api/candidate/interviews/{id}/current")).StatusCode);
-            var panel = (await (await owner.Client.Send(HttpMethod.Get, "/api/billing/panel")).Content.ReadFromJsonAsync<BillingPanelDto>(BillingJson.Options))!; Assert.Equal(0, panel.Wallet.ReservedCredit);
-            var history = (await (await owner.Client.Send(HttpMethod.Get, "/api/billing/financial-history?transactionType=usage")).Content.ReadFromJsonAsync<FinancialHistoryDto>(BillingJson.Options))!;
+            var panel = (await (await owner.Client.Send(HttpMethod.Get, "/api/billing/panel")).Content.ReadFromJsonAsync<RialBillingPanelDto>(BillingJson.Options))!; Assert.Equal(0, panel.Wallet.ReservedCredit);
+            var history = (await (await owner.Client.Send(HttpMethod.Get, "/api/billing/financial-history?transactionType=usage")).Content.ReadFromJsonAsync<RialFinancialHistoryDto>(BillingJson.Options))!;
             var usage = Assert.Single(history.Transactions.Items); Assert.Equal(id, usage.InterviewId); Assert.True(usage.BillableSeconds >= 20); Assert.Equal("Synthetic Candidate", usage.CandidateName);
             await f.Db(async db =>
             {

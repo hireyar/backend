@@ -1,3 +1,4 @@
+using HireYar.Api.Billing;
 using System.Net;
 using HireYar.Domain.Interviews;
 using System.Net.Http.Headers;
@@ -148,7 +149,7 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.Forbidden, (await Invite(hr, job.Id, template.Id)).StatusCode);
         var packages = (await (await hr.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
         var period = packages.Packages.Single(x => x.Code == "basic").Periods.Single(x => x.Months == 1);
-        var purchase = (await (await hr.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<HireYar.Application.Billing.PurchaseResult>(BillingJson.Options))!;
+        var purchase = (await (await hr.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<HireYar.Api.Billing.RialPurchaseResult>(BillingJson.Options))!;
         Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Post, $"/api/billing/payments/{purchase.Payment.Id}/verify")).StatusCode);
         var general = await Invite(hr, job.Id, template.Id); Assert.Equal(HttpStatusCode.OK, general.StatusCode);
         var issued = (await general.Content.ReadFromJsonAsync<PanelInvitationResult>())!;

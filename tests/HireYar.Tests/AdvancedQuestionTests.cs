@@ -1,3 +1,4 @@
+using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -38,7 +39,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         {
             var pricing = (await (await owner.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
             var period = pricing.Packages.Single(p => p.Code == "basic").Periods.Single(p => p.Months == 1);
-            var purchase = (await (await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options))!;
+            var purchase = (await (await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options))!;
             Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{purchase.Payment.Id}/verify")).StatusCode);
         }
         var job = (await (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("توسعه‌دهنده مصنوعی", "شرح شغل مصنوعی SQL و API"))).Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
@@ -315,7 +316,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         var (owner, job) = await Setup(); var template = await Save(owner, Template(job.Id, 5));
         var pricing = (await (await owner.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
         var basic = pricing.Packages.Single(p => p.Code == "basic").Periods.Single(p => p.Months == 1);
-        var purchase = (await (await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(basic.Id))).Content.ReadFromJsonAsync<PurchaseResult>(BillingJson.Options))!;
+        var purchase = (await (await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(basic.Id))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options))!;
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{purchase.Payment.Id}/verify")).StatusCode);
         DateTimeOffset expiry = default;
         await f.Db(async db => { var org = await db.Users.Where(u => u.Id == owner.Id).Select(u => u.OrganizationId).SingleAsync();
