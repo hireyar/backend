@@ -63,6 +63,7 @@ public static class InterviewDependencyInjection
                 "Invalid answer assessment timing.").ValidateOnStart();
         services.AddSingleton(s => s.GetRequiredService<IOptions<AnswerAssessmentOptions>>().Value);
         services.AddScoped<AnswerAssessmentService>();
+        services.AddScoped<ReportNarrativeService>();
         services.AddHostedService<AnswerAssessmentWorker>();
         services.AddScoped<InterviewReviewService>();
         services.AddScoped<InterviewAccessStatusService>();
@@ -113,9 +114,10 @@ public static class InterviewDependencyInjection
     }
 
     private static void RegisterProvider<TClient>(IServiceCollection services)
-        where TClient : class, ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IAnswerAssessmentProvider
+        where TClient : class, ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IAnswerAssessmentProvider, IReportNarrativeProvider
     {
         services.AddScoped<IAnswerAssessmentProvider>(s => s.GetRequiredService<TClient>());
+        services.AddScoped<IReportNarrativeProvider>(s => s.GetRequiredService<TClient>());
         services.AddScoped<IQuestionSuggestionProvider>(s => s.GetRequiredService<TClient>());
         services.AddScoped<ISpeechToTextService>(s => s.GetRequiredService<TClient>());
         services.AddScoped<IInterviewDecisionService>(s => s.GetRequiredService<TClient>());

@@ -125,7 +125,7 @@ public sealed class SecurityTests(ApiFixture f)
         {
             if (path.Name == "/health") continue;
             foreach (var method in path.Value.EnumerateObject())
-                Assert.False(string.IsNullOrWhiteSpace(method.Value.GetProperty("summary").GetString()), $"Missing Persian summary: {method.Name} {path.Name}");
+                Assert.True(method.Value.TryGetProperty("summary", out var summary) && !string.IsNullOrWhiteSpace(summary.GetString()), $"Missing Persian summary: {method.Name} {path.Name}");
         }
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
     }

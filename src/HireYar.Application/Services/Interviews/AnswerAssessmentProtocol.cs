@@ -16,7 +16,10 @@ public static class AnswerAssessmentProtocol
         Incorrect or off-topic answers may receive low/zero score if supported by the answer's excerpts.
         If the question/answer cannot be assessed from the supplied evidence, use insufficient_evidence,
         score:null, confidence:null, evidenceIds:[] and explain why. Do not guess missing content.
-        Also return "dimensions": an array for the supplied dimension codes. Each item contains code, verdict,
+        The root object MUST also contain "dimensions", even when the primary score is insufficient_evidence.
+        Emit exactly one dimension item for EACH supplied dimension code, including explicitly unscorable dimensions.
+        Never omit the dimensions array, substitute overall scores for dimensions, or output an object keyed by code.
+        Each item contains code, verdict,
         score, confidence, explanation (max 500 characters), evidenceIds, using exactly the same rules as the primary score.
         Assess each dimension independently using its guidance. Use insufficient_evidence when this answer does not
         support that dimension; do not transfer the overall score to unrelated dimensions. Job alignment needs explicit

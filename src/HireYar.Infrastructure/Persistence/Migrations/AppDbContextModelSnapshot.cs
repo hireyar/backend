@@ -1110,6 +1110,19 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasPrecision(7, 6)
                         .HasColumnType("numeric(7,6)");
 
+                    b.Property<Guid?>("DimensionAttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DimensionAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DimensionFailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("DimensionLeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("DimensionsJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1185,6 +1198,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("AnswerAssessments", t =>
                         {
+                            t.HasCheckConstraint("CK_AnswerAssessment_DimensionAttempts", "\"DimensionAttempts\" BETWEEN 0 AND 3");
+
+                            t.HasCheckConstraint("CK_AnswerAssessment_DimensionLease", "(\"DimensionAttemptId\" IS NULL) = (\"DimensionLeaseExpiresAtUtc\" IS NULL)");
+
                             t.HasCheckConstraint("CK_AnswerAssessment_Lease", "(\"State\" = 'Processing' AND \"AttemptId\" IS NOT NULL AND \"LeaseExpiresAtUtc\" IS NOT NULL AND \"StartedAtUtc\" IS NOT NULL) OR (\"State\" <> 'Processing' AND \"AttemptId\" IS NULL AND \"LeaseExpiresAtUtc\" IS NULL)");
 
                             t.HasCheckConstraint("CK_AnswerAssessment_Result", "jsonb_typeof(\"EvidenceJson\") = 'array' AND ((\"State\" = 'Succeeded' AND \"Score\" IS NOT NULL AND \"Score\" BETWEEN 0 AND 100 AND \"Confidence\" IS NOT NULL AND \"Confidence\" BETWEEN 0 AND 1 AND \"Explanation\" IS NOT NULL AND jsonb_array_length(\"EvidenceJson\") BETWEEN 1 AND 5) OR (\"State\" <> 'Succeeded' AND \"Score\" IS NULL AND \"Confidence\" IS NULL AND jsonb_array_length(\"EvidenceJson\") = 0))");
@@ -2133,6 +2150,73 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasKey("OrganizationId", "AudioHash");
 
                     b.ToTable("QuestionAudios");
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.SessionReportNarrative", b =>
+                {
+                    b.Property<Guid>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InputHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("AttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ReportFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("RequestedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("InterviewSessionId", "InputHash");
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId");
+
+                    b.ToTable("SessionReportNarratives", t =>
+                        {
+                            t.HasCheckConstraint("CK_ReportNarrative_Lease", "(\"State\" = 'Processing' AND \"AttemptId\" IS NOT NULL AND \"LeaseExpiresAtUtc\" IS NOT NULL) OR (\"State\" <> 'Processing' AND \"AttemptId\" IS NULL AND \"LeaseExpiresAtUtc\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_ReportNarrative_Result", "jsonb_typeof(\"ResultJson\") = 'object'");
+
+                            t.HasCheckConstraint("CK_ReportNarrative_State", "\"State\" IN ('Processing','Succeeded','Failed') AND \"Attempts\" BETWEEN 1 AND 3");
+                        });
                 });
 
             modelBuilder.Entity("HireYar.Domain.Interviews.SessionReportPolicy", b =>
@@ -3342,6 +3426,16 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Organizations.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Interviews.SessionReportNarrative", b =>
+                {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Authorize(Roles = "Owner,Recruiter"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class SessionReportsController(SessionReportService reports, IApplicationDbContext db, ICurrentUser user, AnswerAssessmentService assessments, SessionReportDecisionService decisions) : ControllerBase
+public sealed class SessionReportsController(SessionReportService reports, IApplicationDbContext db, ICurrentUser user, AnswerAssessmentService assessments, SessionReportDecisionService decisions, ReportNarrativeService narratives) : ControllerBase
 {
     [HttpGet("api/interviews/{id:guid}/report")]
     public async Task<IActionResult> Read(Guid id, CancellationToken ct) => new JsonResult(SessionReportOutput.Public(await reports.ReadAsync(id, ct)));
@@ -43,6 +43,22 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
     [HttpPost("api/interviews/{id:guid}/report/review")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> RecordDecision(Guid id, ReportDecisionRequest request, CancellationToken ct) => new JsonResult(SessionReportOutput.Public(await decisions.RecordAsync(id, request, ct)));
+
+    [Authorize(Roles = "Owner")]
+    [HttpPost("api/interviews/{id:guid}/report/answers/{answerId:guid}/dimensions/retry")]
+    [ProducesResponseType(typeof(RetryAnswerAssessmentResponse),StatusCodes.Status200OK)]
+    public async Task<ActionResult<RetryAnswerAssessmentResponse>> RepairDimensions(Guid id,Guid answerId,CancellationToken ct)
+    {
+        await reports.ReadAsync(id,ct);
+        await assessments.RepairDimensionsAsync(user.OrganizationId,id,answerId,ct);
+        var report=await reports.ReadAsync(id,ct);
+        return Ok(new RetryAnswerAssessmentResponse(id,answerId,report.Questions.Single(q=>q.Answer?.AnswerId==answerId).Assessment));
+    }
+    [Authorize(Roles = "Owner")]
+    [HttpPost("api/interviews/{id:guid}/report/narrative")]
+    [ProducesResponseType(typeof(ReportNarrative),StatusCodes.Status200OK)]
+    public async Task<ActionResult<ReportNarrative>> GenerateNarrative(Guid id,GenerateReportNarrativeRequest request,CancellationToken ct) =>
+        Ok(await narratives.GenerateAsync(id,request.ReportFingerprint,ct));
 
     [HttpGet("api/interviews/{id:guid}/evaluation-report")]
     [HttpGet("api/interviews/{id:guid}/evaluation-report/status")]

@@ -49,9 +49,14 @@ public static class SessionReportPage
             p.Append(Persian($"{calendar.GetYear(utc):0000}/{calendar.GetMonth(utc):00}/{calendar.GetDayOfMonth(utc):00} ـ {utc:HH:mm}")).Append(" UTC");
         }
         else p.Append("زمان شروع ثبت نشده");
-        p.Append("</span><span class='bdg'>مدت: ").Append(N(report.Identity.ElapsedSeconds is { } seconds ? Math.Round(seconds / 60m, 1) : null)).Append(" دقیقه</span></div></div><div class='card donut-box' data-section='score'>");
+        p.Append("</span><span class='bdg'>مدت: ").Append(N(report.Identity.ElapsedSeconds is { } seconds ? Math.Round(seconds / 60m, 1) : null))            .Append(" دقیقه</span></div>");
+        if(report.Narrative?.Experience is { Statements.Count: >0 } experience) {
+            p.Append("<div class='missing'>سابقه اعلام‌شده کارجو:</div>");
+            foreach(var statement in experience.Statements) p.Append("<p class='missing'>").Append(E(statement.Text)).Append("</p>");
+        }
+        p.Append("</div><div class='card donut-box' data-section='score'>");
         Ring(report.OverallScore.Value, true, "امتیاز کل", color);
-        p.Append("<div class='donut-label'>").Append(E(State(report.OverallScore.State))).Append("</div><div class='donut-sub'>").Append(general ? "میانگین ارزیابی سوالات عمومی پاسخ‌داده‌شده" : "میانگین وزنی ارزیابی سوالات پرسیده‌شده").Append("</div></div><div class='card fit'><h3>").Append(general ? "ارزیابی کلی" : "میزان تناسب با موقعیت").Append("</h3><div class='verdict'><div class='ic'>").Append(report.Coverage.IsProvisional ? "◌" : "●").Append("</div><div><div class='t'>").Append(report.Coverage.IsProvisional ? "شواهد ناقص ـ نیازمند بررسی انسانی" : "در انتظار بررسی انسانی").Append("</div><div class='d'>اطمینان ارزیابی: ").Append(Percent(report.OverallScore.Confidence * 100)).Append("</div></div></div>");
+        p.Append("<div class='donut-label'>").Append(E(State(report.OverallScore.State))).Append("</div><div class='donut-sub'>").Append(general ? "میانگین ارزیابی سوالات عمومی پاسخ‌داده‌شده" : "میانگین وزنی ارزیابی سوالات پرسیده‌شده").Append("</div></div><div class='card fit' data-section='positionFit'><h3>").Append(general ? "ارزیابی کلی" : "میزان تناسب با موقعیت").Append("</h3><div class='verdict'><div class='ic'>").Append(report.Coverage.IsProvisional ? "◌" : "●").Append("</div><div><div class='t'>").Append(report.Coverage.IsProvisional ? "شواهد ناقص ـ نیازمند بررسی انسانی" : "در انتظار بررسی انسانی").Append("</div><div class='d'>اطمینان ارزیابی: ").Append(Percent(report.OverallScore.Confidence * 100)).Append("</div></div></div>");
         if (general)
             foreach (var code in new[] { "communication", "motivation", "work_alignment" })
             {
@@ -60,9 +65,14 @@ public static class SessionReportPage
             }
         else
         {
-            MissingBar("تناسب با شرح شغل", "این شاخص در خروجی عمومی فعلی ارائه نمی‌شود.");
+            Bar("تناسب کلی با موقعیت", report.PositionFit.Value, color, true);
+            p.Append("<div class='missing'>پوشش شواهد نقش: ").Append(Percent(report.PositionFit.Coverage*100)).Append(" ـ ").Append(E(State(report.PositionFit.State))).Append("</div>");
             Bar("عمق دانش فنی", profile.Metrics.SingleOrDefault(m => m.Code == "knowledge_depth")?.Value, color, true);
-            MissingBar("سطح پاسخ‌ها نسبت به انتظار", "شاخص مستقلی با این تعریف ثبت نشده است.");
+            p.Append("<div class='row'><span>سطح پاسخ‌ها نسبت به انتظار</span></div><div class='missing' title='مقایسه دشواری سؤال دارای پاسخ ارزیابی‌شده با سطح هدف نقش؛ این شمارش نمره کیفیت نیست'>");
+            if(report.ExpectedLevel is { Answers.Count: >0 } expected)
+                p.Append("پایین‌تر: ").Append(N(expected.BelowTargetAnswers)).Append(" ـ هم‌سطح: ").Append(N(expected.AtTargetAnswers)).Append(" ـ بالاتر: ").Append(N(expected.AboveTargetAnswers));
+            else p.Append("شواهد کافی نیست");
+            p.Append("</div>");
         }
         p.Append("</div></div><div class='kpis' data-section='statistics'>");
         Kpi("سوالات پرسیده‌شده", N(report.Statistics.AskedQuestions) + " از " + N(report.Statistics.BankQuestions), general ? "بانک سوالات عمومی" : "موضوع‌های پرسیده‌شده: " + N(profile.Axes.Count));
@@ -71,7 +81,7 @@ public static class SessionReportPage
         if (general) Kpi("ویدیو و صدا", State(report.Media.State), "کامل‌بودن ضبط تأیید نشده است");
         else Kpi("سطح دشواری طی‌شده", report.Statistics.AskedDifficultyLevels.Count == 0 ? "ثبت نشده" : string.Join("، ", report.Statistics.AskedDifficultyLevels.Select(Level).Distinct()), N(report.Questions.Count(q => q.Difficulty >= 4 && q.Answer is not null)) + " پاسخ در سطح سخت");
         Kpi(general ? "مدت پاسخ‌ها" : "زمان پاسخ‌گویی میانگین", N(report.Statistics.AverageAnswerSeconds) + " ثانیه", "از مدت‌های ثبت‌شده");
-        p.Append("</div><div class='grid2'><div class='card ai-sum' data-section='summary'><h3><span class='ic'>✦</span> جمع‌بندی هوش مصنوعی <span class='tag'>از ارزیابی پاسخ‌های واقعی</span></h3><p>").Append(E(report.Summary.Text)).Append("</p><div class='conf'>پوشش ارزیابی: ").Append(Percent(report.Coverage.Ratio * 100)).Append(" ـ جمع‌بندی محاسباتی</div></div><div class='sw' data-section='strengthsAndImprovements'>");
+        p.Append("</div><div class='grid2'><div class='card ai-sum' data-section='summary'><h3><span class='ic'>✦</span> جمع‌بندی هوش مصنوعی <span class='tag'>از ارزیابی پاسخ‌های واقعی</span></h3><p>").Append(E(report.Narrative?.Summary?.Text ?? report.Summary.Text)).Append("</p><div class='conf'>پوشش ارزیابی: ").Append(Percent(report.Coverage.Ratio * 100)).Append(report.Narrative?.Summary is null ? " ـ جمع‌بندی محاسباتی" : " ـ روایت AI با شاهد").Append("</div></div><div class='sw' data-section='strengthsAndImprovements'>");
         Findings(report.Strengths, "▲ نقاط قوت", "up");
         Findings(report.Improvements, "▼ نقاط ضعف و ریسک", "down");
         p.Append("</div></div><div class='charts' data-section='").Append(general ? "generalProfile" : "specializedProfile").Append("'><div class='card'><h3>").Append(general ? "شکاف امتیاز ـ توزیع پاسخ‌ها" : "پروفایل مهارتی ـ موضوعات پرسیده‌شده").Append("</h3>");
@@ -105,6 +115,11 @@ public static class SessionReportPage
         }
         if (report.Questions.Count == 0) p.Append("<p class='missing'>هنوز سؤالی پرسیده نشده است.</p>");
         p.Append("</div><div class='rec'><div class='card rec-main' data-section='humanReview'><h3>پیشنهاد نهایی</h3><div class='verdict'><div class='ic'>🎯</div><div><div class='t'>").Append(report.HumanReview.Latest is { } latest ? E(State(latest.Decision)) : "تصمیم انسانی ثبت نشده است").Append("</div><div class='d'>امتیاز ").Append(Percent(report.OverallScore.Value)).Append("</div></div></div><p class='missing'>").Append(E(report.HumanReview.Message)).Append("</p>");
+        if(report.Narrative?.NextStep is { } next) p.Append("<p class='fb'>").Append(E(next.Text)).Append("</p>");
+        if(report.Narrative is { FollowUpQuestions.Count: >0 } narrative) {
+            p.Append("<div class='lbl'>سؤال‌های پیشنهادی مرحله بعد</div>");
+            foreach(var followUp in narrative.FollowUpQuestions) p.Append("<p class='fb'>").Append(E(followUp.Text)).Append("<br><small>").Append(E(followUp.Reason)).Append("</small></p>");
+        }
         if (report.HumanReview.Latest is { } review) p.Append("<p>").Append(E(review.Note)).Append("</p>");
         p.Append("<div class='rec-actions'><button class='btn btn-p' disabled>✓ ").Append(general ? "عبور از غربالگری اولیه" : "پذیرش و دعوت به مرحله بعد").Append("</button><button class='btn' disabled>بررسی توسط کارشناس</button><button class='btn' disabled>↩ رد</button></div></div><div class='card flags' data-section='signals'><h3>نشانه‌ها و هشدارها</h3><div class='fl'>رضایت ضبط: ").Append(E(State(report.Signals.ConsentState))).Append("</div><div class='fl'>ویدیو و صدا: ").Append(E(State(report.Media.State))).Append("</div>");
         foreach (var signal in report.Signals.Events) p.Append("<div class='fl'>").Append(E(Signal(signal.Kind))).Append(" ـ ").Append(E((signal.OccurredAtUtc ?? signal.RecordedAtUtc).ToString("u", CultureInfo.InvariantCulture))).Append("</div>");
@@ -131,7 +146,6 @@ public static class SessionReportPage
             if (value is not null) p.Append("<i style='width:").Append(RawNumber(Math.Clamp(value.Value, 0, 100))).Append("%;background:").Append(tint).Append("'></i>");
             p.Append(hero ? "</div>" : "</span><span class='pc'>" + Percent(value) + "</span></div>");
         }
-        void MissingBar(string title, string reason) { Bar(title, null, color, true); p.Append("<div class='missing' title='").Append(E(reason)).Append("'>داده در دسترس نیست</div>"); }
         void Findings(ReportNotes notes, string title, string css)
         {
             p.Append("<div class='sw-box ").Append(css).Append("'><h4>").Append(E(title)).Append("</h4><div class='chips'>");

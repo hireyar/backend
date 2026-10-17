@@ -60,7 +60,11 @@ public static class ComprehensiveReportBuilder
             var known=questions.Select(q=>new {Q=q,D=q.Assessment.Dimensions?.SingleOrDefault(d=>d.Code==definition.Code && d.State=="Succeeded")}).Where(x=>x.D?.Value is not null).ToArray();
             return new(definition.Code,definition.Title,State(known.Length,questions.Count,completed),known.Length==0?null:R(known.Average(x=>x.D!.Value!.Value)),
                 known.Length==0?null:R(known.Average(x=>x.D!.Confidence!.Value)),known.Length,questions.Count,known.Select(x=>x.Q.QuestionId).ToArray(),known.SelectMany(x=>x.D!.Evidence).ToArray(),
-                known.Length==0?"در پاسخ‌های موجود شاهد کافی برای این شاخص ثبت نشده است.":"میانگین ارزیابی‌های مستند همان شاخص؛ مقادیر نامعلوم در میانگین صفر محسوب نشده‌اند.");
+                                known.Length==0?"در پاسخ‌های موجود شاهد کافی برای این شاخص ثبت نشده است.":"میانگین ارزیابی‌های مستند همان شاخص؛ مقادیر نامعلوم در میانگین صفر محسوب نشده‌اند.",
+                questions.Select(q=>new { Q=q, D=q.Assessment.Dimensions?.SingleOrDefault(d=>d.Code==definition.Code) })
+                    .Where(x=>x.D?.State!="Succeeded").Select(x=>new ReportMetricIssue(x.Q.QuestionId,x.D?.State??x.Q.Assessment.State,
+                        definition.Code is "job_alignment" or "work_alignment" && string.IsNullOrWhiteSpace(session.PositionDescriptionSnapshot) ? "job_description_missing" :
+                        x.Q.Assessment.State=="Succeeded" && x.Q.Assessment.EvaluatorVersion=="answer-quality/1" ? "legacy_assessment_without_dimensions" : x.D?.FailureCode ?? (x.Q.Assessment.State=="Succeeded" ? "dimension_not_returned" : x.Q.Assessment.FailureCode??"primary_assessment_not_available"))).ToArray());
         }
         var performance=new ReportMetric("performance","کیفیت پاسخ‌ها",score.State,score.Value,score.Confidence,scored.Length,questions.Count,scored.Select(q=>q.QuestionId).ToArray(),scored.SelectMany(q=>q.Assessment.Evidence).ToArray(),"بر اساس ارزیابی مستقل پاسخ‌های نهایی");
         ReportProfile Profile(bool isGeneral,bool applicable) {
@@ -84,7 +88,7 @@ public static class ComprehensiveReportBuilder
             "این جمع‌بندی محاسباتی است؛ تصمیم نهایی با کارشناس است.";
         var fingerprint=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new {
             Version="comprehensive-report/1",session.Id,session.Status,session.PositionTitleSnapshot,session.PositionDescriptionSnapshot,
-            Skills=session.Skills.OrderBy(s=>s.SkillId),Policy=policy with {CanEdit=false},Questions=questions
+            Skills=session.Skills.OrderBy(s=>s.SkillId),Policy=policy with {CanEdit=false},Questions=questions.Select(q=>q with {Assessment=q.Assessment with {DimensionRecovery=null}})
         }))));
         static ReportReviewSnapshot? Snapshot(string? json) {
             if(json is null) return null;

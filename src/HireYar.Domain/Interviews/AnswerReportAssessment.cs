@@ -20,6 +20,10 @@ public sealed class AnswerReportAssessment
     public decimal? Score { get; set; }
     public decimal? Confidence { get; set; }
     public string? Explanation { get; set; }
+    public int DimensionAttempts { get; set; }
+    public Guid? DimensionAttemptId { get; set; }
+    public DateTimeOffset? DimensionLeaseExpiresAtUtc { get; set; }
+    public string? DimensionFailureCode { get; set; }
     public string DimensionsJson { get; set; } = "[]";
     public string EvidenceJson { get; set; } = "[]";
     public string? Provider { get; set; }

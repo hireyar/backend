@@ -19,13 +19,13 @@ public static class AnswerDimensionProtocol
         new("communication", "شفافیت و ساختار پاسخ", "Only clarity and structure in the transcript; do not score voice, accent or personality."),
         new("job_alignment", "ارتباط شواهد با شرح نقش", "Only explicit job requirements supported by this answer. Unknown if job description or evidence is absent.")
     ];
-    private static AnswerDimension Missing(string code, string state = "InsufficientEvidence", string reason = "dimension_not_observed") => new(code,state,null,null,null,[],reason);
+    private static AnswerDimension Missing(string code, string state = "InsufficientEvidence", string reason = "dimension_not_returned") => new(code,state,null,null,null,[],reason);
     public static IReadOnlyList<AnswerDimension> Parse(string json, Guid answerId, AnswerAssessmentInput input)
     {
         var catalog = Catalog(input.InterviewType);
         try {
             using var doc=JsonDocument.Parse(json,new JsonDocumentOptions{MaxDepth=10});
-            if(!doc.RootElement.TryGetProperty("dimensions",out var dimensions)) return catalog.Select(c=>Missing(c.Code)).ToArray();
+            if(doc.RootElement.ValueKind!=JsonValueKind.Object || doc.RootElement.EnumerateObject().GroupBy(p=>p.Name).Any(g=>g.Count()>1)) throw new JsonException(); if(!doc.RootElement.TryGetProperty("dimensions",out var dimensions)) return catalog.Select(c=>Missing(c.Code)).ToArray();
             var entries=dimensions.EnumerateArray().Take(30).ToArray();
             return catalog.Select(c=> {
                 try {
@@ -35,7 +35,7 @@ public static class AnswerDimensionProtocol
                     if(c.Code is "job_alignment" or "work_alignment" && string.IsNullOrWhiteSpace(input.PositionDescription)) return Missing(c.Code,reason:"job_description_missing");
                     var parsed=AnswerAssessmentProtocol.Parse(matches[0].GetRawText(),answerId,input.Excerpts);
                     if(parsed.Explanation.Length>500) throw new JsonException();
-                    return new AnswerDimension(c.Code,parsed.Score is null?"InsufficientEvidence":"Succeeded",parsed.Score,parsed.Confidence,parsed.Explanation,parsed.Evidence,null);
+                    return new AnswerDimension(c.Code,parsed.Score is null?"InsufficientEvidence":"Succeeded",parsed.Score,parsed.Confidence,parsed.Explanation,parsed.Evidence,parsed.Score is null ? "dimension_insufficient_evidence" : null);
                 } catch(Exception e) when(e is JsonException or InterviewProviderException or InvalidOperationException) {return Missing(c.Code,"Unavailable","dimension_invalid_output");}
             }).ToArray();
         } catch(Exception e) when(e is JsonException or InvalidOperationException) {return catalog.Select(c=>Missing(c.Code,"Unavailable","dimension_invalid_output")).ToArray();}
@@ -50,7 +50,7 @@ public static class AnswerDimensionProtocol
             if(found.Length==0) return Missing(c.Code);
             var d=found[0];
             if(found.Length!=1 || d.State is not ("Succeeded" or "InsufficientEvidence" or "Unavailable")) return Missing(c.Code,"Unavailable","dimension_storage_invalid");
-            if(d.State!="Succeeded") return Missing(c.Code,d.State,d.FailureCode??"dimension_not_observed");
+            if(d.State!="Succeeded") return d with { Value=null, Confidence=null, Evidence=[], FailureCode=d.FailureCode??"dimension_insufficient_evidence" };
             if(d.Value is null or <0 or >100 || d.Confidence is null or <0 or >1 || string.IsNullOrWhiteSpace(d.Explanation) || d.Explanation.Length>500 || d.Evidence is null || d.Evidence.Count is <1 or >5 ||
                 d.Evidence.Any(e=>e is null || e.AnswerId!=answerId || e.Start<0 || e.Length<=0 || e.Start>transcript.Length-e.Length || transcript.Substring(e.Start,e.Length)!=e.Quote)) return Missing(c.Code,"Unavailable","dimension_storage_invalid");
             return d;

@@ -43,3 +43,25 @@ public sealed class AnswerAssessmentProviderTests
         Assert.Equal("assessment_invalid_envelope",(await Assert.ThrowsAsync<InterviewProviderException>(()=>client.AssessAnswerAsync(Input(),default))).Code);
     }
 }
+
+public sealed class ReportNarrativeProviderTests
+{
+    private sealed class Handler(Func<HttpRequestMessage,CancellationToken,Task<HttpResponseMessage>> action):HttpMessageHandler
+    {protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>action(request,ct);}
+    [Fact]
+    public async Task Narrative_uses_the_independent_report_model_and_server_source_catalog()
+    {
+        var input=new ReportNarrativeInput("Synthetic role","Synthetic criteria",[new(1,"answer",Guid.NewGuid(),0,"Synthetic source")],[]);
+        using var http=new HttpClient(new Handler(async(request,ct)=> {
+            using var doc=JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+            Assert.Equal("synthetic-report-model",doc.RootElement.GetProperty("model").GetString());
+            Assert.Equal(ReportNarrativeProtocol.Prompt,doc.RootElement.GetProperty("messages")[0].GetProperty("content").GetString());
+            var context=JsonSerializer.Deserialize<ReportNarrativeInput>(doc.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!,new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            Assert.Equal(input.Sources[0],Assert.Single(context.Sources));
+            return new(HttpStatusCode.OK){Content=new StringContent(JsonSerializer.Serialize(new{choices=new[]{new{message=new{content=FakeReportNarrativeProvider.Valid(input).Json}}}}))};
+        }));
+        var client=new LiaraClient(http,Options.Create(new LiaraOptions{BaseUrl="https://synthetic.example.test/v1",ApiKey="synthetic-key",AnswerAssessmentModel="synthetic-report-model"}),NullLogger<LiaraClient>.Instance);
+        var response=await client.GenerateNarrativeAsync(input,default);Assert.Equal("synthetic-report-model",response.Model);
+        Assert.NotEmpty(ReportNarrativeProtocol.Validate(response.Json,input));
+    }
+}

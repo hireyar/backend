@@ -52,7 +52,7 @@ public sealed partial class InterviewFlowTests
         await Assess(f,x.Org,x.Answers[1]);Assert.Equal(2,f.AssessmentAi.Calls);
         Assert.Equal(HttpStatusCode.Conflict,(await x.Hr.Client.Send(HttpMethod.Post,RetryUrl(x.Session,x.Answers[1]))).StatusCode);
         var html=await(await x.Hr.Client.Send(HttpMethod.Get,$"/api/interviews/{x.Session}/report/print")).Content.ReadAsStringAsync();
-        Assert.Contains("امتیاز پاسخ",html);Assert.Contains("80",html);
+        Assert.Contains("ارزیابی AI",html);Assert.Contains("۴ / ۵",html);Assert.Contains("Synthetic job-related answer",html);
     }
 
     [PostgresFact]

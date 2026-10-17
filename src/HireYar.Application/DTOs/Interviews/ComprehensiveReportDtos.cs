@@ -14,7 +14,7 @@ public sealed record ReportDistribution(int Strong, int Satisfactory, int NeedsI
     decimal PassingScore, decimal StrongScore);
 public sealed record ReportMetric(string Code, string Title, string State, decimal? Value, decimal? Confidence,
     int ScoredAnswers, int ExpectedAnswers, IReadOnlyList<Guid> QuestionIds,
-    IReadOnlyList<AnswerAssessmentEvidence> Evidence, string Message);
+    IReadOnlyList<AnswerAssessmentEvidence> Evidence, string Message, IReadOnlyList<ReportMetricIssue>? Issues = null);
 public sealed record ReportProfileAxis(Guid SkillId, string Topic, string State, decimal? Value, decimal? Confidence,
     int AskedQuestions, int ScoredQuestions, IReadOnlyList<int> DifficultyLevels,
     IReadOnlyList<Guid> QuestionIds, IReadOnlyList<AnswerAssessmentEvidence> Evidence);
@@ -28,7 +28,8 @@ public sealed record ReportReviewDecision(Guid Id, Guid ActorUserId, string Deci
     DateTimeOffset RecordedAtUtc, string? ReportFingerprint, bool MatchesCurrentReport, ReportReviewSnapshot? Snapshot = null);
 public sealed record ReportHumanReview(string State, bool CanSubmit, string SubmitUrl, string ReportFingerprint,
     ReportReviewDecision? Latest, IReadOnlyList<ReportReviewDecision> History, string Message);
-public sealed record ReportReviewSnapshot(string Version, ReportScore Score, ReportCoverage Coverage, ReportPositionFit Fit, ReportPolicy Policy);
+public sealed record ReportReviewSnapshot(string Version, ReportScore Score, ReportCoverage Coverage, ReportPositionFit Fit, ReportPolicy Policy, ReportNarrative? Narrative = null);
 public sealed record ReportDecisionRequest(Guid RequestId, string Decision, string ReportFingerprint, string? Note = null);
 public sealed record AnswerDimension(string Code, string State, decimal? Value, decimal? Confidence,
     string? Explanation, IReadOnlyList<AnswerAssessmentEvidence> Evidence, string? FailureCode);
+public sealed record ReportMetricIssue(Guid QuestionId, string State, string ReasonCode);
