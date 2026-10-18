@@ -36,7 +36,14 @@ public sealed record RialPackageDto(
     decimal TeamUserMonthlyPriceRial,
     decimal AiPricePerMinuteUsd,
     string Currency,
-    AiDisplayRateDto? DisplayRate);
+    AiDisplayRateDto? DisplayRate,
+    decimal? SpecializedAiPricePerMinuteUsd = null)
+{
+    public decimal GeneralAiPricePerMinuteUsd => AiPricePerMinuteUsd;
+    public decimal? GeneralAiPricePerMinuteRial => AiPricePerMinuteRial;
+    public decimal? SpecializedAiPricePerMinuteRial => DisplayRate is null || SpecializedAiPricePerMinuteUsd is null ? null
+        : decimal.Round(SpecializedAiPricePerMinuteUsd.Value * DisplayRate.RialPerUsdt, 6, MidpointRounding.ToEven);
+}
 
 public sealed record RialCreditPackageDto(
     Guid Id,

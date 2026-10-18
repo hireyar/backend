@@ -17,12 +17,23 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
 
     // Entitlement validation happens first; pricing always comes from the subscribed package row.
     // Hidden/archived catalog rows remain available to their existing subscribers.
-    internal static async Task<decimal> ActivePackageRateAsync(IApplicationDbContext db, Guid org, Guid subscriptionId, CancellationToken ct)
-        => await (from subscription in db.OrganizationSubscriptions.AsNoTracking()
-                  join package in db.PricingPackages.AsNoTracking() on subscription.PackageId equals package.Id
-                  where subscription.OrganizationId == org && subscription.Id == subscriptionId
-                  select (decimal?)package.AiPricePerMinuteUsd).SingleOrDefaultAsync(ct)
+    internal static async Task<decimal> ActivePackageRateAsync(IApplicationDbContext db, Guid org, Guid subscriptionId, string interviewType, CancellationToken ct)
+    {
+        var prices = await (from subscription in db.OrganizationSubscriptions.AsNoTracking()
+                            join package in db.PricingPackages.AsNoTracking() on subscription.PackageId equals package.Id
+                            where subscription.OrganizationId == org && subscription.Id == subscriptionId
+                            select new { package.AiPricePerMinuteUsd, package.SpecializedAiPricePerMinuteUsd }).SingleOrDefaultAsync(ct)
             ?? throw AppException.NotFound();
+        return RateForType(prices.AiPricePerMinuteUsd, prices.SpecializedAiPricePerMinuteUsd, interviewType);
+    }
+
+    internal static decimal RateForType(decimal general, decimal? specialized, string interviewType)
+        => interviewType switch
+        {
+            "general" => general,
+            "specialized" => specialized ?? throw new AppException(409, "package_interview_price_not_configured", "The specialized interview price is not configured for this package."),
+            _ => throw AppException.Invalid("invalid_interview_type")
+        };
 
     public async Task<PackageDto> GetAsync(Guid id, CancellationToken ct) => Map(await Packages.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound(), false);
     public async Task<Page<PackageDto>> AdminPackagesAsync(PageQuery page, CancellationToken ct, string? search = null)
@@ -60,6 +71,7 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
         if (id is null) db.PricingPackages.Add(p); else db.SetOriginalVersion(p, version!);
         p.Code = r.Code; p.Name = r.Name.Trim(); p.Description = r.Description.Trim(); p.IsActive = r.IsActive; p.IsPublic = r.IsPublic;
         p.SortOrder = r.SortOrder; p.AiPricePerMinuteUsd = r.AiPricePerMinuteUsd; p.InterviewRetentionDays = r.InterviewRetentionDays; p.UpdatedAtUtc = time.GetUtcNow();
+        if (r.SpecializedAiPricePerMinuteUsd is { } specialized) p.SpecializedAiPricePerMinuteUsd = specialized;
         p.IncludedTeamUsers = r.IncludedTeamUsers; p.PaidTeamUserLimit = r.PaidTeamUserLimit; p.TeamUserMonthlyPriceIrt = r.TeamUserMonthlyPriceIrt;
         await db.SaveChangesAsync(ct); return Map(p, false);
     }
@@ -116,6 +128,8 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
     }
     private static void ValidatePackage(PackageRequest r)
     {
+        if (r.SpecializedAiPricePerMinuteUsd is { } specialized && (specialized is <= 0 or > 1000 || !BillingMath.HasPrecision(specialized, 6)))
+            throw AppException.Invalid("invalid_specialized_ai_price");
         if (r.IncludedTeamUsers < 1 || r.PaidTeamUserLimit < r.IncludedTeamUsers || r.PaidTeamUserLimit > 10000 ||
             r.TeamUserMonthlyPriceIrt is < 0 or > 1000000000000m || !BillingMath.HasPrecision(r.TeamUserMonthlyPriceIrt, 0)) throw AppException.Invalid("invalid_team_pricing");
         if (string.IsNullOrWhiteSpace(r.Name) || !System.Text.RegularExpressions.Regex.IsMatch(r.Code, "^[a-z][a-z0-9_]{1,63}$") ||
@@ -125,6 +139,6 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
         p.AiPricePerMinuteUsd, p.InterviewRetentionDays, p.RowVersion,
         p.Features.Where(x => !publicOnly || x.IsEnabled).OrderBy(x => x.Feature.Code).Select(x => new FeatureDto(x.FeatureId, x.Feature.Code, x.Feature.Name, x.Feature.Description, x.Feature.DataType, x.IsEnabled, x.Value)).ToArray(),
         p.Periods.Where(x => !publicOnly || x.IsActive).OrderBy(x => x.SortOrder).ThenBy(x => x.Months).Select(x => new PeriodDto(x.Id, x.Months, x.PriceAmount, x.Currency, x.DiscountPercent, x.IsActive, x.SortOrder)).ToArray(),
-        p.IncludedTeamUsers, p.PaidTeamUserLimit, p.TeamUserMonthlyPriceIrt);
+        p.IncludedTeamUsers, p.PaidTeamUserLimit, p.TeamUserMonthlyPriceIrt, p.SpecializedAiPricePerMinuteUsd);
     private static CreditPackageDto MapCredit(AiCreditPackage p) => new(p.Id, p.Name, p.CreditAmountRial, p.SellPriceAmount, p.SellPriceCurrency, p.IsActive, p.IsPublic, p.SortOrder, p.RowVersion);
 }

@@ -23,7 +23,7 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
         // usable during an outage, with its original fetched timestamp kept for audit.
         if (quote.Currency != "IRR" || quote.RialPerUsdt <= 0)
             throw new AppException(503, "ai_display_rate_unavailable", "Refresh the current exchange rate.");
-        var usdRate = await PricingService.ActivePackageRateAsync(db, session.OrganizationId, subscription.Id, ct);
+        var usdRate = await PricingService.ActivePackageRateAsync(db, session.OrganizationId, subscription.Id, session.RequiredCapabilityCode == "technical_interview" ? "specialized" : "general", ct);
         var rialRate = decimal.Round(usdRate * quote.RialPerUsdt, 6, MidpointRounding.ToEven);
         if (rialRate <= 0) throw AppException.Invalid("invalid_ai_rate");
         var maximum = BillingMath.Cost(session.MaxDurationSeconds, rialRate);

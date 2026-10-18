@@ -20,6 +20,8 @@ internal static class BillingConfigurations
         var p = m.Entity<PricingPackage>(); p.HasKey(x => x.Id); p.HasIndex(x => x.Code).IsUnique();
         p.Property(x => x.Code).HasMaxLength(64); p.Property(x => x.Name).HasMaxLength(200); p.Property(x => x.Description).HasMaxLength(4000);
         p.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever(); Money(p, nameof(PricingPackage.AiPricePerMinuteUsd));
+        p.Property(x => x.SpecializedAiPricePerMinuteUsd).HasPrecision(18, 6);
+        p.ToTable(t => t.HasCheckConstraint("CK_Package_SpecializedPrice", "\"SpecializedAiPricePerMinuteUsd\" IS NULL OR (\"SpecializedAiPricePerMinuteUsd\" > 0 AND \"SpecializedAiPricePerMinuteUsd\" <= 1000)"));
         p.HasMany(x => x.Periods).WithOne().HasForeignKey(x => x.PackageId);
         p.HasMany(x => x.Features).WithOne().HasForeignKey(x => x.PackageId);
         p.ToTable(t => t.HasCheckConstraint("CK_Package_Values", "\"AiPricePerMinuteUsd\" > 0 AND \"InterviewRetentionDays\" BETWEEN 1 AND 3650"));

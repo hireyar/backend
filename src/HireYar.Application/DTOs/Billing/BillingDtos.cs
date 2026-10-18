@@ -7,7 +7,7 @@ public sealed record PackageRequest([Required, RegularExpression("^[a-z][a-z0-9_
     bool IsActive, bool IsPublic, [Range(0, 10000)] int SortOrder,
     [Range(typeof(decimal), "0.000001", "1000")] decimal AiPricePerMinuteUsd, [Range(1, 3650)] int InterviewRetentionDays,
     [Range(1, 10000)] int IncludedTeamUsers = 3, [Range(1, 10000)] int PaidTeamUserLimit = 30,
-    [Range(typeof(decimal), "0", "1000000000000")] decimal TeamUserMonthlyPriceIrt = 200_000m);
+    [Range(typeof(decimal), "0", "1000000000000")] decimal TeamUserMonthlyPriceIrt = 200_000m, decimal? SpecializedAiPricePerMinuteUsd = null);
 public sealed record PackageUpdateRequest(PackageRequest Package, [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
 public sealed record PeriodRequest([Range(1, 120)] int Months, [Range(typeof(decimal), "1", "1000000000000")] decimal PriceAmount,
     [Required, RegularExpression("^IRT$")] string Currency, [Range(typeof(decimal), "0", "100")] decimal DiscountPercent,
@@ -30,7 +30,11 @@ public sealed record FeatureDto(Guid Id, string Code, string Name, string Descri
 public sealed record PeriodDto(Guid Id, int Months, decimal Price, string Currency, decimal DiscountPercent, bool IsActive, int SortOrder);
 public sealed record PackageDto(Guid Id, string Code, string Name, string Description, bool IsActive, bool IsPublic, int SortOrder,
     decimal AiPricePerMinuteUsd, int RetentionDays, byte[] RowVersion, IReadOnlyList<FeatureDto> Features, IReadOnlyList<PeriodDto> Periods,
-    int IncludedTeamUsers = 3, int PaidTeamUserLimit = 30, decimal TeamUserMonthlyPriceIrt = 200_000m);
+    int IncludedTeamUsers = 3, int PaidTeamUserLimit = 30, decimal TeamUserMonthlyPriceIrt = 200_000m, decimal? SpecializedAiPricePerMinuteUsd = null)
+{
+    public decimal GeneralAiPricePerMinuteUsd => AiPricePerMinuteUsd;
+}
+
 public sealed record CreditPackageDto(Guid Id, string Name, decimal CreditAmountRial, decimal SellPriceAmount, string SellPriceCurrency,
     bool IsActive, bool IsPublic, int SortOrder, byte[] RowVersion);
 public sealed record EntitlementDto(string Code, string Name, FeatureDataType DataType, string? Value);

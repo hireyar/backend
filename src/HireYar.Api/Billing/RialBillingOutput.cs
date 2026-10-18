@@ -42,7 +42,8 @@ public static class RialBillingOutput
         x.TeamUserMonthlyPriceIrt * 10m,
         x.AiPricePerMinuteUsd,
         "IRR",
-        rate);
+        rate,
+        x.SpecializedAiPricePerMinuteUsd);
 
     public static RialCreditPackageDto Map(CreditPackageDto x, AiDisplayRateDto? rate) => new(
         x.Id,
