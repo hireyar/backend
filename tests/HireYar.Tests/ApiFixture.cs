@@ -61,6 +61,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public FakePaymentGateway PaymentGateway { get; } = new();
     public TestClock Clock { get; } = new();
     public TestAiDisplayRates DisplayRates { get; } = new();
+    public HireYar.Application.Billing.IAiDisplayRateProvider? DisplayRateProviderOverride { get; set; }
     public TestPhoneOtp PhoneOtp { get; } = new();
     public FakeInvitationNotifier Invitations { get; } = new();
     public FakeQuestionSuggestionProvider QuestionAi { get; } = new();
@@ -108,7 +109,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         {
             DisplayRates.Clock = Clock;
             s.RemoveAll<HireYar.Application.Billing.IAiDisplayRateProvider>();
-            s.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(DisplayRates);
+            s.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(DisplayRateProviderOverride ?? DisplayRates);
             s.RemoveAll<IReportNarrativeProvider>(); s.AddSingleton<IReportNarrativeProvider>(NarrativeAi);
             s.RemoveAll<IAnswerAssessmentProvider>(); s.AddSingleton<IAnswerAssessmentProvider>(AssessmentAi);
             s.RemoveAll<IAdminCaptcha>(); s.AddSingleton<IAdminCaptcha>(AdminCaptcha);

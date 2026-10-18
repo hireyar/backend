@@ -53,6 +53,7 @@ public sealed class SecurityTests(ApiFixture f)
         using var production = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddProvider(logs); });
+            builder.ConfigureServices(services => services.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(new TestAiDisplayRates()));
             builder.UseEnvironment("Production");
             builder.UseSetting("InterviewStorage:VideoProvider", "Local");
             builder.UseSetting("ConnectionStrings:Default", "Host=localhost;Database=hireyar_test;Username=test;Password=test");
@@ -89,6 +90,7 @@ public sealed class SecurityTests(ApiFixture f)
     {
         using var production = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
+            builder.ConfigureServices(services => services.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(new TestAiDisplayRates()));
             builder.UseEnvironment("Production");
             builder.UseSetting("InterviewStorage:VideoProvider", "Local");
             builder.UseSetting("ConnectionStrings:Default", "Host=localhost;Database=hireyar_test;Username=test;Password=test");

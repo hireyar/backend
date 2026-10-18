@@ -14,6 +14,6 @@ public sealed class TestAiDisplayRates : IAiDisplayRateProvider
         ct.ThrowIfCancellationRequested();
         if (Unavailable) throw new AppException(503, "ai_display_rate_unavailable", "Synthetic rate failure.");
         var now = Clock.GetUtcNow();
-        return Task.FromResult(new AiDisplayRateDto("IRR", RialPerUsdt, now, now.AddSeconds(5), 5));
+        return Task.FromResult(new AiDisplayRateDto("IRR", RialPerUsdt, now, now.AddMinutes(5), 300));
     }
 }
