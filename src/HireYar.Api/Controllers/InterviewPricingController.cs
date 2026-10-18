@@ -12,5 +12,6 @@ namespace HireYar.Api.Controllers;
 public sealed class InterviewPricingController(ICurrentUser user, InvitationPricingService pricing) : ControllerBase
 {
     [HttpGet("quote")]
-    public Task<InvitationPriceDto> Quote([FromQuery] Guid templateId, CancellationToken ct) => pricing.QuoteAsync(user.OrganizationId, templateId, ct);
+    public Task<InvitationPriceDto> Quote([FromQuery] Guid templateId, [FromQuery] Guid? packageId, CancellationToken ct)
+        => pricing.QuoteAsync(user.OrganizationId, templateId, ct, packageId);
 }

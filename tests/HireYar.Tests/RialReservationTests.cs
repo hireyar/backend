@@ -141,12 +141,12 @@ public sealed class RialReservationTests : IAsyncLifetime
     }
 
     [PostgresFact]
-    public async Task Employer_quote_has_minute_countdown_no_source_and_failure_does_not_create_invitation()
+    public async Task Employer_quote_has_five_minute_countdown_no_source_and_invalid_provider_does_not_create_invitation()
     {
         var (owner,job,template,org)=await Setup();
         var response=await owner.Client.Send(HttpMethod.Get,$"/api/interview-pricing/quote?templateId={template}");
         var quote=await Read<InvitationPriceDto>(response);
-        Assert.Equal(60,quote.Rate.RefreshAfterSeconds); Assert.Equal(TimeSpan.FromMinutes(1),quote.Rate.ExpiresAtUtc-quote.Rate.FetchedAtUtc);
+        Assert.Equal(300,quote.Rate.RefreshAfterSeconds); Assert.Equal(TimeSpan.FromMinutes(5),quote.Rate.ExpiresAtUtc-quote.Rate.FetchedAtUtc);
         Assert.Equal(250000m,quote.MaximumReservedRial); Assert.True(quote.HasSufficientCredit);
         var json=await response.Content.ReadAsStringAsync(); Assert.DoesNotContain("Wallex",json); Assert.DoesNotContain("source",json);
         var stranger=await f.RegisterOwner(); Assert.Equal(HttpStatusCode.NotFound,(await stranger.Client.Send(HttpMethod.Get,$"/api/interview-pricing/quote?templateId={template}")).StatusCode);
@@ -155,4 +155,71 @@ public sealed class RialReservationTests : IAsyncLifetime
         await f.Db(async db=> {Assert.Empty(await db.InterviewSessions.Where(x=>x.OrganizationId==org).ToListAsync()); Assert.Empty(await db.AiCreditReservations.Where(x=>x.OrganizationId==org).ToListAsync());});
         Assert.Equal(1000000m,(await Wallet(owner)).AvailableCredit);
     }
+    [PostgresFact]
+    public async Task Optional_package_uses_its_catalog_price_but_default_and_actual_reservation_keep_active_contract()
+    {
+        var (owner,job,template,org)=await Setup(); Guid basic=default; Guid advanced=default;
+        await f.Db(async db=> {
+            basic=await db.PricingPackages.Where(x=>x.Code=="basic").Select(x=>x.Id).SingleAsync();
+            advanced=await db.PricingPackages.Where(x=>x.Code=="advanced").Select(x=>x.Id).SingleAsync();
+            await db.PricingPackages.Where(x=>x.Id==advanced).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.AiPricePerMinuteUsd,.2m));
+        });
+        var url=$"/api/interview-pricing/quote?templateId={template}";
+        var current=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,url));
+        var selectedBasic=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,url+$"&packageId={basic}"));
+        var selectedAdvanced=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,url+$"&packageId={advanced}"));
+        Assert.Equal(50000m,current.RatePerMinuteRial);Assert.Equal(250000m,current.MaximumReservedRial);
+        Assert.Equal(30000m,selectedBasic.RatePerMinuteRial);Assert.Equal(150000m,selectedBasic.MaximumReservedRial);
+        Assert.Equal(200000m,selectedAdvanced.RatePerMinuteRial);Assert.Equal(1000000m,selectedAdvanced.MaximumReservedRial);
+        Assert.True(selectedAdvanced.HasSufficientCredit);Assert.Equal(300,selectedBasic.Rate.RefreshAfterSeconds);
+        await f.Db(async db=> {Assert.Empty(await db.InterviewSessions.Where(x=>x.OrganizationId==org).ToListAsync());Assert.Empty(await db.AiCreditReservations.Where(x=>x.OrganizationId==org).ToListAsync());});
+        var invitation=(await Read<PanelInvitationResult>(await Invite(owner,job,template))).Invitation;
+        await f.Db(async db=> {
+            var bill=await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId);
+            Assert.Equal(.05m,bill.RatePerMinuteUsd);Assert.Equal(50000m,bill.RatePerMinuteRial);
+            Assert.Equal(250000m,(await db.AiCreditReservations.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId)).ReservedAmountRial);
+        });
+    }
+
+    [PostgresFact]
+    public async Task Optional_package_rejects_hidden_inactive_unsaleable_unknown_and_foreign_template()
+    {
+        var (owner,_,template,_)=await Setup();Guid basic=default;
+        await f.Db(async db=>basic=await db.PricingPackages.Where(x=>x.Code=="basic").Select(x=>x.Id).SingleAsync());
+        var url=$"/api/interview-pricing/quote?templateId={template}";
+        Assert.Equal(HttpStatusCode.BadRequest,(await owner.Client.Send(HttpMethod.Get,url+"&packageId=invalid")).StatusCode);
+        foreach(var missing in new[]{Guid.Empty,Guid.NewGuid()})Assert.Equal(HttpStatusCode.NotFound,(await owner.Client.Send(HttpMethod.Get,url+$"&packageId={missing}")).StatusCode);
+        await f.Db(db=>db.PricingPackages.Where(x=>x.Id==basic).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.IsPublic,false)));
+        Assert.Equal(HttpStatusCode.NotFound,(await owner.Client.Send(HttpMethod.Get,url+$"&packageId={basic}")).StatusCode);
+        await f.Db(db=>db.PricingPackages.Where(x=>x.Id==basic).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.IsPublic,true).SetProperty(x=>x.IsActive,false)));
+        Assert.Equal(HttpStatusCode.NotFound,(await owner.Client.Send(HttpMethod.Get,url+$"&packageId={basic}")).StatusCode);
+        await f.Db(db=>db.PricingPackages.Where(x=>x.Id==basic).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.IsActive,true)));
+        await f.Db(db=>db.PackagePeriods.Where(x=>x.PackageId==basic).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.IsActive,false)));
+        Assert.Equal(HttpStatusCode.NotFound,(await owner.Client.Send(HttpMethod.Get,url+$"&packageId={basic}")).StatusCode);
+        var stranger=await f.RegisterOwner();Assert.Equal(HttpStatusCode.NotFound,(await stranger.Client.Send(HttpMethod.Get,url+$"&packageId={basic}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,(await f.Browser().Send(HttpMethod.Get,url+$"&packageId={basic}")).StatusCode);
+    }
+
+    [PostgresFact]
+    public async Task Selected_package_checks_its_own_capabilities_and_can_be_previewed_without_active_subscription()
+    {
+        var (owner,_,template,org)=await Setup();Guid basic=default;
+        await f.Db(async db=> {
+            basic=await db.PricingPackages.Where(x=>x.Code=="basic").Select(x=>x.Id).SingleAsync();
+        });
+        // Purchased financial history is immutable; simulate natural expiry with the service clock.
+        f.Clock.Offset=TimeSpan.FromDays(40);
+        var url=$"/api/interview-pricing/quote?templateId={template}";
+        Assert.Equal(HttpStatusCode.Forbidden,(await owner.Client.Send(HttpMethod.Get,url)).StatusCode);
+        var selected=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,url+$"&packageId={basic}"));
+        Assert.Equal(30000m,selected.RatePerMinuteRial);
+        await f.Db(async db=> {
+            var feature=await db.FeatureDefinitions.Where(x=>x.Code=="ai_interview").Select(x=>x.Id).SingleAsync();
+            await db.PackageFeatures.Where(x=>x.PackageId==basic&&x.FeatureId==feature).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.IsEnabled,false));
+        });
+        var denied=await owner.Client.Send(HttpMethod.Get,url+$"&packageId={basic}");
+        Assert.Equal(HttpStatusCode.Forbidden,denied.StatusCode);Assert.Contains("package_feature_required",await denied.Content.ReadAsStringAsync());
+        await f.Db(async db=> {Assert.Empty(await db.InterviewSessions.Where(x=>x.OrganizationId==org).ToListAsync());Assert.Empty(await db.AiCreditReservations.Where(x=>x.OrganizationId==org).ToListAsync());});
+    }
+
 }

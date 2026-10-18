@@ -19,7 +19,9 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
                 ? [session.RequiredCapabilityCode, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
                 : [session.RequiredCapabilityCode, "ai_interview"], ct);
         var now = time.GetUtcNow();
-        if (quote.Currency != "IRR" || quote.RialPerUsdt <= 0 || quote.ExpiresAtUtc <= now)
+        // ExpiresAtUtc is the next refresh deadline; a last-known provider quote remains
+        // usable during an outage, with its original fetched timestamp kept for audit.
+        if (quote.Currency != "IRR" || quote.RialPerUsdt <= 0)
             throw new AppException(503, "ai_display_rate_unavailable", "Refresh the current exchange rate.");
         var rialRate = decimal.Round(subscription.AiRatePerMinuteUsd * quote.RialPerUsdt, 6, MidpointRounding.ToEven);
         if (rialRate <= 0) throw AppException.Invalid("invalid_ai_rate");

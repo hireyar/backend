@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
 using HireYar.Application.Billing;
-using HireYar.Application.Common;
 
 namespace HireYar.Infrastructure.Billing;
 
@@ -10,34 +9,50 @@ public sealed class WallexAiDisplayRateProvider(IHttpClientFactory clients, Time
 {
     private readonly SemaphoreSlim gate = new(1, 1);
     private AiDisplayRateDto? cached;
-    private DateTimeOffset retryAfter;
+    public static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan InitialRetryInterval = TimeSpan.FromSeconds(5);
+    private DateTimeOffset nextAttemptAtUtc;
 
     public async Task<AiDisplayRateDto> GetAsync(CancellationToken ct)
     {
-        await gate.WaitAsync(ct);
-        try
+        // Before the first successful quote, retry on the server without inventing a rate.
+        // After that, a provider failure always returns the last successful amount.
+        while (true)
         {
-            var now = time.GetUtcNow();
-            if (cached is not null && now < cached.ExpiresAtUtc) return cached;
-            if (now < retryAfter) throw Unavailable();
+            ct.ThrowIfCancellationRequested();
+            TimeSpan delay;
+            await gate.WaitAsync(ct);
             try
             {
-                using var client = clients.CreateClient("WallexDisplayRate");
-                using var response = await client.GetAsync("v1/markets", ct);
-                response.EnsureSuccessStatusCode();
-                using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-                var rate = ParseRate(json.RootElement);
-                var fetched = time.GetUtcNow();
-                return cached = new("IRR", rate, fetched, fetched.AddSeconds(5), 5);
+                var now = time.GetUtcNow();
+                if (cached is not null && now < nextAttemptAtUtc) return cached;
+                if (now >= nextAttemptAtUtc)
+                {
+                    try
+                    {
+                        using var client = clients.CreateClient("WallexDisplayRate");
+                        using var response = await client.GetAsync("v1/markets", ct);
+                        response.EnsureSuccessStatusCode();
+                        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+                        var rate = ParseRate(json.RootElement);
+                        var fetched = time.GetUtcNow();
+                        nextAttemptAtUtc = fetched.Add(RefreshInterval);
+                        return cached = new("IRR", rate, fetched, nextAttemptAtUtc, (int)RefreshInterval.TotalSeconds);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                    catch (Exception e) when (e is HttpRequestException or OperationCanceledException or JsonException or
+                        InvalidOperationException or KeyNotFoundException or FormatException or OverflowException or IOException or ArgumentException)
+                    {
+                        nextAttemptAtUtc = time.GetUtcNow().Add(cached is null ? InitialRetryInterval : RefreshInterval);
+                        if (cached is not null)
+                            return cached = cached with { ExpiresAtUtc = nextAttemptAtUtc, IsStale = true };
+                    }
+                }
+                delay = nextAttemptAtUtc - time.GetUtcNow();
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception e) when (e is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
-            {
-                retryAfter = time.GetUtcNow().AddSeconds(5);
-                throw Unavailable();
-            }
+            finally { gate.Release(); }
+            if (delay > TimeSpan.Zero) await Task.Delay(delay, time, ct);
         }
-        finally { gate.Release(); }
     }
 
     public static decimal ParseRate(JsonElement root)
@@ -54,5 +69,4 @@ public sealed class WallexAiDisplayRateProvider(IHttpClientFactory clients, Time
         return value * 10m;
     }
 
-    private static AppException Unavailable() => new(503, "ai_display_rate_unavailable", "The live AI display rate is temporarily unavailable.");
 }
