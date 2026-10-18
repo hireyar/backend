@@ -43,7 +43,9 @@ public static class RialBillingOutput
         x.AiPricePerMinuteUsd,
         "IRR",
         rate,
-        x.SpecializedAiPricePerMinuteUsd);
+        x.SpecializedAiPricePerMinuteUsd,
+        (x.InterviewTypes ?? []).Select(t => new RialPackageInterviewTypeDto(t.Code, t.Name, t.EngineType, t.IsActive,
+            t.TypeIsActive, t.PricePerMinuteUsd, rate is null ? null : decimal.Round(t.PricePerMinuteUsd * rate.RialPerUsdt, 6, MidpointRounding.ToEven), "IRR")).ToArray());
 
     public static RialCreditPackageDto Map(CreditPackageDto x, AiDisplayRateDto? rate) => new(
         x.Id,

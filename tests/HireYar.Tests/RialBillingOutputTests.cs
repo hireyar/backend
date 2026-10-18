@@ -209,7 +209,7 @@ public sealed class RialBillingOutputTests
         foreach (var controller in new[] { typeof(BillingController), typeof(PricingController), typeof(AdminPricingController) })
         foreach (var method in controller.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
         {
-            if (new[] { "AiDisplayRate", "Features", "CreateFeature", "UpdateFeature" }.Contains(method.Name)) continue;
+            if (new[] { "AiDisplayRate", "Types", "Features", "CreateFeature", "UpdateFeature" }.Contains(method.Name)) continue;
             Assert.Contains("Rial", method.ReturnType.ToString());
         }
         var types = typeof(RialWalletDto).Assembly.GetTypes().Where(t => t.Namespace == "HireYar.Api.Billing" && t.Name.StartsWith("Rial") && t.Name.EndsWith("Dto"));
@@ -217,7 +217,7 @@ public sealed class RialBillingOutputTests
         foreach (var property in type.GetProperties())
         {
             Assert.False(property.Name.EndsWith("Irt"), $"{type.Name}.{property.Name} still uses toman.");
-            if (type == typeof(RialPackageDto) || type == typeof(RialCreditPackageDto)) continue;
+            if (type == typeof(RialPackageDto) || type == typeof(RialPackageInterviewTypeDto) || type == typeof(RialCreditPackageDto)) continue;
             Assert.False(property.Name.EndsWith("Usd"), $"{type.Name}.{property.Name} still exposes dollar amounts.");
         }
     }

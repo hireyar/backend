@@ -45,6 +45,8 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public void DetachEntity(object entity) => Entry(entity).State = EntityState.Detached;
     public DbSet<PricingPackage> PricingPackages => Set<PricingPackage>();
     public IQueryable<PricingPackage> PricingCatalog => PricingPackages.AsSingleQuery();
+    public DbSet<InterviewTypeDefinition> InterviewTypes => Set<InterviewTypeDefinition>();
+    public DbSet<PackageInterviewType> PackageInterviewTypes => Set<PackageInterviewType>();
     public DbSet<PackagePeriod> PackagePeriods => Set<PackagePeriod>();
     public DbSet<FeatureDefinition> FeatureDefinitions => Set<FeatureDefinition>();
     public DbSet<PackageFeature> PackageFeatures => Set<PackageFeature>();
@@ -73,7 +75,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
         // and rotate a 128-bit application-managed concurrency token on every write.
         foreach (var entry in ChangeTracker.Entries().Where(e =>
             e.State is EntityState.Added or EntityState.Modified &&
-            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is InterviewIntroduction || e.Entity is BankQuestion || e.Entity is PricingPackage || e.Entity is AiCreditPackage)))
+            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is InterviewIntroduction || e.Entity is BankQuestion || e.Entity is PricingPackage || e.Entity is AiCreditPackage || e.Entity is InterviewTypeDefinition)))
             entry.Property("RowVersion").CurrentValue = Guid.NewGuid().ToByteArray();
         return base.SaveChangesAsync(ct);
     }

@@ -41,6 +41,7 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
         await CheckTitle(r.Title, row.Id, row.Title, ct);
         // Existing session FKs require templates to retain their position. Cross-position reuse is a copy at invitation.
         if (id.HasValue && row.JobPositionId != r.JobPositionId) throw AppException.Invalid("template_position_immutable");
+        await HireYar.Application.Billing.InterviewTypeService.RequireTypeAsync(db, r.InterviewType, ct);
         row.InterviewType = r.InterviewType; row.WelcomeMessage = r.WelcomeMessage.Trim(); row.GoodbyeMessage = r.GoodbyeMessage.Trim();
         if (r.Topics is not null)
         {

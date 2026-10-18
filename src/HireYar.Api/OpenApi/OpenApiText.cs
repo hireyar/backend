@@ -122,7 +122,8 @@ internal static class OpenApiText
         ("CandidateInterviews", "Retry") => "پردازش دوباره همان پاسخ",
         ("CandidateInterviews", "Complete") => "پایان مصاحبه به درخواست داوطلب",
         ("CandidateInterviews", "Audio") => "دریافت خصوصی صوت سؤال",
-        ("InterviewPricing", "Quote") => "پیش‌نمایش هزینه با interviewType عمومی/تخصصی، پکیج فعال یا packageId اختیاری و نرخ پنج‌دقیقه‌ای",
+        ("InterviewPricing", "Quote") => "پیش‌نمایش تعرفه داینامیک نوع مصاحبه در پکیج با خروجی ریالی و نرخ پنج‌دقیقه‌ای",
+        ("Pricing", "Types") => "فهرست داینامیک انواع مصاحبه فعال",
         ("Pricing", _) => "مشاهده قیمت‌ها و پکیج‌های عمومی",
         ("Billing", "Panel") => "وضعیت اشتراک، اعتبار و زمان قابل استفاده سازمان",
         ("Billing", "Quote") => "خلاصه خرید، تخفیف، مالیات و اعتبار روزشمار ارتقا",
@@ -131,6 +132,10 @@ internal static class OpenApiText
         ("Billing", "Invoice") => "جزئیات فاکتور پرداخت موفق سازمان",
         ("Billing", _) => "اشتراک، اعتبار و پرداخت سازمان جاری",
         ("AdminPricing", _) => "مدیریت قیمت‌گذاری؛ فقط مدیر پلتفرم",
+        ("AdminInterviewTypes", "Types") => "فهرست تمام انواع مصاحبه؛ فقط سوپرادمین",
+        ("AdminInterviewTypes", "Create") => "ایجاد نوع مصاحبه با راهبرد اجرایی عمومی یا تخصصی؛ فقط سوپرادمین",
+        ("AdminInterviewTypes", "Update") => "ویرایش نام، ترتیب و وضعیت نوع مصاحبه با کنترل نسخه؛ فقط سوپرادمین",
+        ("AdminInterviewTypes", "SetPackage") => "تنظیم قیمت دلاری و وضعیت نوع مصاحبه در پکیج با کنترل نسخه؛ فقط سوپرادمین",
         ("PaymentCallbacks", _) => "تأیید پرداخت از درگاه؛ بدون پذیرش قیمت یا موفقیت از درخواست",
         _ => null
     };

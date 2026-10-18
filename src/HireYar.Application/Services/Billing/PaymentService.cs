@@ -10,7 +10,7 @@ public sealed class PaymentService(IApplicationDbContext db, IPaymentGateway gat
         var pending = await db.WithOrganizationBillingLockAsync(org, async () => {
         await CheckPendingUpgradeAsync(org, ct);
         // A single PostgreSQL statement snapshots the entire contract consistently despite the global split-query default.
-        var package = await db.PricingCatalog.AsNoTracking().Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature)
+        var package = await db.PricingCatalog.AsNoTracking().Include(x => x.InterviewTypes).Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature)
             .SingleOrDefaultAsync(x => x.IsActive && x.IsPublic && x.Periods.Any(p => p.Id == periodId && p.IsActive), ct) ?? throw AppException.NotFound();
         var period = package.Periods.Single(x => x.Id == periodId); var now = time.GetUtcNow();
         var capacity = await seats.PurchaseCapacityLockedAsync(org, package, teamCapacity, ct);

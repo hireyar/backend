@@ -6,8 +6,9 @@ namespace HireYar.Api.Controllers;
 
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 [ApiController, Route("api/pricing"), AllowAnonymous]
-public sealed class PricingController(PricingService service, IAiDisplayRateProvider displayRate, RialBillingResponses output) : ControllerBase
+public sealed class PricingController(PricingService service, IAiDisplayRateProvider displayRate, RialBillingResponses output, InterviewTypeService types) : ControllerBase
 {
+    [HttpGet("interview-types")] public Task<IReadOnlyList<InterviewTypeDto>> Types(CancellationToken ct) => types.ListAsync(true, ct);
     [HttpGet("ai-display-rate"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<AiDisplayRateDto> AiDisplayRate(CancellationToken ct) => displayRate.GetAsync(ct);
     [HttpGet("packages")] public async Task<RialPackageCatalogDto> Packages(CancellationToken ct) => new(await output.ConvertAsync(() => service.ListAsync(true, ct), ct));

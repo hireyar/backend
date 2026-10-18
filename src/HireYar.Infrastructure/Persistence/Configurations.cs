@@ -54,7 +54,8 @@ public sealed class TemplateConfiguration : IEntityTypeConfiguration<InterviewTe
     public void Configure(EntityTypeBuilder<InterviewTemplate> b)
     {
         b.HasKey(x => x.Id); b.Property(x => x.Title).HasMaxLength(200).IsRequired(); b.Property(x => x.Language).HasMaxLength(20).IsRequired();
-        b.Property(x => x.InterviewType).HasMaxLength(20).IsRequired();
+        b.Property(x => x.InterviewType).HasMaxLength(64).IsRequired();
+        b.HasOne<HireYar.Domain.Billing.InterviewTypeDefinition>().WithMany().HasForeignKey(x => x.InterviewType);
         b.Property(x => x.WelcomeMessage).HasMaxLength(2000).IsRequired();
         b.Property(x => x.GoodbyeMessage).HasMaxLength(2000).IsRequired();
         b.Property(x => x.CandidateIntroductionMessage).HasMaxLength(2000).IsRequired();
@@ -68,7 +69,6 @@ public sealed class TemplateConfiguration : IEntityTypeConfiguration<InterviewTe
         b.ToTable(t =>
         {
             t.HasCheckConstraint("CK_Template_Duration", "\"DurationMinutes\" BETWEEN 5 AND 60");
-            t.HasCheckConstraint("CK_Template_Type", "\"InterviewType\" IN ('general','specialized')");
             t.HasCheckConstraint("CK_Template_FollowUps", "\"MaxFollowUpQuestionsPerQuestion\" BETWEEN 0 AND 3");
         });
     }

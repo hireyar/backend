@@ -4,6 +4,9 @@ using HireYar.Domain.Billing;
 
 namespace HireYar.Api.Billing;
 
+public sealed record RialPackageInterviewTypeDto(string Code, string Name, string EngineType, bool IsActive,
+    bool TypeIsActive, decimal PricePerMinuteUsd, decimal? PricePerMinuteRial, string Currency);
+
 public sealed record RialPackageCatalogDto(IReadOnlyList<RialPackageDto> Packages);
 public sealed record RialCreditPackageCatalogDto(IReadOnlyList<RialCreditPackageDto> Packages);
 
@@ -37,7 +40,7 @@ public sealed record RialPackageDto(
     decimal AiPricePerMinuteUsd,
     string Currency,
     AiDisplayRateDto? DisplayRate,
-    decimal? SpecializedAiPricePerMinuteUsd = null)
+    decimal? SpecializedAiPricePerMinuteUsd = null, IReadOnlyList<RialPackageInterviewTypeDto>? InterviewTypes = null)
 {
     public decimal GeneralAiPricePerMinuteUsd => AiPricePerMinuteUsd;
     public decimal? GeneralAiPricePerMinuteRial => AiPricePerMinuteRial;

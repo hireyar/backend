@@ -76,6 +76,8 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
             .HasPrincipalKey(x => new { x.OrganizationId, x.Id });
         b.HasIndex(x => x.SupersededByInterviewId).IsUnique().HasFilter("\"SupersededByInterviewId\" IS NOT NULL");
         b.Property(x => x.RequiredCapabilityCode).HasMaxLength(64);
+        b.Property(x => x.PricingInterviewTypeCode).HasMaxLength(64);
+        b.HasOne<HireYar.Domain.Billing.InterviewTypeDefinition>().WithMany().HasForeignKey(x => x.PricingInterviewTypeCode);
         b.Property(x => x.PositionTitleSnapshot).HasMaxLength(200);
         b.Property(x => x.PositionDescriptionSnapshot).HasMaxLength(10000);
         b.Property(x => x.TemplateTitleSnapshot).HasMaxLength(200);

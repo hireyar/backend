@@ -130,7 +130,7 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         var (hr, job, template) = await Setup(); var stranger = await f.RegisterOwner();
         Assert.Equal(HttpStatusCode.BadRequest, (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", Template(job.Id, 4))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await Invite(hr, job.Id, template.Id, phone: "123")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await Invite(hr, job.Id, template.Id, interviewType: "unknown")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Invite(hr, job.Id, template.Id, interviewType: "unknown")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await Invite(hr, job.Id, template.Id, filename: "resume.pdf", bytes: "not-pdf"u8.ToArray())).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await Invite(stranger, job.Id, template.Id)).StatusCode);
         var empty = await (await hr.Client.Send(HttpMethod.Get, "/api/interviews")).Content.ReadFromJsonAsync<Page<PanelInterviewDto>>(); Assert.Empty(empty!.Items);
@@ -160,7 +160,7 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         var general = await Invite(hr, job.Id, template.Id); Assert.Equal(HttpStatusCode.OK, general.StatusCode);
         var issued = (await general.Content.ReadFromJsonAsync<PanelInvitationResult>())!;
         await f.Db(async db => Assert.Equal("hr_interview", (await db.InterviewSessions.SingleAsync(x => x.Id == issued.Invitation.InterviewId)).RequiredCapabilityCode));
-        Assert.Equal(HttpStatusCode.Forbidden, (await Invite(hr, job.Id, template.Id, interviewType: "specialized")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Invite(hr, job.Id, template.Id, interviewType: "specialized")).StatusCode);
         var rows = (await (await hr.Client.Send(HttpMethod.Get, "/api/interviews")).Content.ReadFromJsonAsync<Page<PanelInterviewDto>>())!;
         Assert.Equal("general", Assert.Single(rows.Items).InterviewType);
     }

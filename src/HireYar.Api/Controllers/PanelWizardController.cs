@@ -18,7 +18,7 @@ public sealed class WizardInvitationForm
     [Required, EmailAddress, StringLength(256)] public string Email { get; set; } = "";
     [Required, RegularExpression("^09[0-9]{9}$")] public string Phone { get; set; } = "";
     [Range(1, 14)] public int DeadlineDays { get; set; } = 3;
-    [Required, RegularExpression("^(general|specialized)$")] public string InterviewType { get; set; } = "general";
+    [Required, RegularExpression("^[a-z][a-z0-9_]{1,63}$")] public string InterviewType { get; set; } = "general";
     [Required] public IFormFile Resume { get; set; } = null!;
     [StringLength(32000)] public string? ResumeText { get; set; }
     public bool SendEmail { get; set; }

@@ -36,7 +36,7 @@ public sealed class BillingPanelService(IApplicationDbContext db, WalletService 
 
     internal async Task<(PricingPackage Package, PackagePeriod Period, CheckoutSummaryDto Summary)> BuildQuoteLockedAsync(Guid org, SubscriptionQuoteRequest r, CancellationToken ct)
     {
-        var package = await db.PricingCatalog.AsNoTracking().Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature)
+        var package = await db.PricingCatalog.AsNoTracking().Include(x => x.InterviewTypes).Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature)
             .SingleOrDefaultAsync(x => x.IsActive && x.IsPublic && x.Periods.Any(p => p.Id == r.PackagePeriodId && p.IsActive), ct) ?? throw AppException.NotFound();
         var period = package.Periods.Single(x => x.Id == r.PackagePeriodId); var now = time.GetUtcNow();
         var teamCapacity = await seats.PurchaseCapacityLockedAsync(org, package, r.TeamCapacity, ct);

@@ -77,7 +77,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         await CheckJob(jobId, ct);
         if (!await db.CandidateApplications.AnyAsync(x => x.Id == applicationId && x.OrganizationId == user.OrganizationId && x.JobPositionId == jobId, ct))
             throw AppException.NotFound();
-        await entitlements.RequireAsync(user.OrganizationId, [r.RequiredCapabilityCode, "ai_interview"], ct);
+        await entitlements.RequireAsync(user.OrganizationId, ["ai_interview"], ct);
         var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == r.TemplateId
         && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.JobPositionId == jobId && !x.IsArchived, ct)
             ?? throw AppException.NotFound();
@@ -97,7 +97,10 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         var token = invitationSecurity.CreateCode();
         var session = new InterviewSession(user.OrganizationId, jobId, applicationId, template.Id, questions, skills,
             r.MaxQuestionCount, template.DurationMinutes * 60, now, now.AddHours(r.ExpiresInHours));
-        session.SetRequiredCapability(r.RequiredCapabilityCode);
+        var type = await InterviewTypeService.RequireTypeAsync(db,
+            r.InterviewType ?? (r.RequiredCapabilityCode == "technical_interview" ? "specialized" : "general"), ct);
+        session.SetRequiredCapability(InterviewTypeService.Capability(type));
+        session.SetPricingInterviewType(type.Code);
         session.SetInteractionLimit(template.MaxFollowUpQuestionsPerQuestion);
         var job = await db.JobPositions.AsNoTracking().SingleAsync(x => x.Id == jobId && x.OrganizationId == user.OrganizationId, ct);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);

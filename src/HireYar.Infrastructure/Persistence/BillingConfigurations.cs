@@ -19,12 +19,23 @@ internal static class BillingConfigurations
         TeamSeatConfigurations.Configure(m);
         var p = m.Entity<PricingPackage>(); p.HasKey(x => x.Id); p.HasIndex(x => x.Code).IsUnique();
         p.Property(x => x.Code).HasMaxLength(64); p.Property(x => x.Name).HasMaxLength(200); p.Property(x => x.Description).HasMaxLength(4000);
-        p.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever(); Money(p, nameof(PricingPackage.AiPricePerMinuteUsd));
-        p.Property(x => x.SpecializedAiPricePerMinuteUsd).HasPrecision(18, 6);
-        p.ToTable(t => t.HasCheckConstraint("CK_Package_SpecializedPrice", "\"SpecializedAiPricePerMinuteUsd\" IS NULL OR (\"SpecializedAiPricePerMinuteUsd\" > 0 AND \"SpecializedAiPricePerMinuteUsd\" <= 1000)"));
+        p.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
+        p.HasMany(x => x.InterviewTypes).WithOne().HasForeignKey(x => x.PackageId);
+        var it = m.Entity<InterviewTypeDefinition>(); it.HasKey(x => x.Code);
+        it.Property(x => x.Code).HasMaxLength(64); it.Property(x => x.Name).HasMaxLength(200);
+        it.Property(x => x.EngineType).HasMaxLength(20);
+        it.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
+        it.ToTable("InterviewTypes", t => {
+            t.HasCheckConstraint("CK_InterviewType_Code", "\"Code\" ~ '^[a-z][a-z0-9_]{1,63}$'");
+            t.HasCheckConstraint("CK_InterviewType_Engine", "\"EngineType\" IN ('general','specialized')");
+        });
+        var pit = m.Entity<PackageInterviewType>(); pit.HasKey(x => new { x.PackageId, x.InterviewTypeCode });
+        pit.Property(x => x.InterviewTypeCode).HasMaxLength(64); pit.Property(x => x.PricePerMinuteUsd).HasPrecision(18, 6);
+        pit.HasOne(x => x.InterviewType).WithMany().HasForeignKey(x => x.InterviewTypeCode);
+        pit.ToTable("PackageInterviewTypes", t => t.HasCheckConstraint("CK_PackageInterviewType_Price", "\"PricePerMinuteUsd\" > 0 AND \"PricePerMinuteUsd\" <= 1000"));
         p.HasMany(x => x.Periods).WithOne().HasForeignKey(x => x.PackageId);
         p.HasMany(x => x.Features).WithOne().HasForeignKey(x => x.PackageId);
-        p.ToTable(t => t.HasCheckConstraint("CK_Package_Values", "\"AiPricePerMinuteUsd\" > 0 AND \"InterviewRetentionDays\" BETWEEN 1 AND 3650"));
+        p.ToTable(t => t.HasCheckConstraint("CK_Package_Values", "\"InterviewRetentionDays\" BETWEEN 1 AND 3650"));
         var period = m.Entity<PackagePeriod>(); period.HasKey(x => x.Id); period.HasAlternateKey(x => new { x.PackageId, x.Id });
         period.HasIndex(x => new { x.PackageId, x.Months }).IsUnique(); Money(period, nameof(PackagePeriod.PriceAmount), 0); Money(period, nameof(PackagePeriod.DiscountPercent), 2);
         period.Property(x => x.Currency).HasMaxLength(3);
@@ -62,7 +73,7 @@ internal static class BillingConfigurations
         purchase.Property(x => x.DiscountAmountSnapshot).HasPrecision(18, 0);
         purchase.Property(x => x.ProratedCreditAmountSnapshot).HasPrecision(18, 0);
         purchase.HasOne<OrganizationSubscription>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ReplacesSubscriptionId }).HasPrincipalKey(x => new { x.OrganizationId, x.Id });
-        purchase.ToTable(t => t.HasCheckConstraint("CK_Purchase_Values", "\"PeriodMonthsSnapshot\" BETWEEN 1 AND 120 AND \"PriceAmountSnapshot\" > 0 AND \"CurrencySnapshot\" = 'IRT' AND \"AiPricePerMinuteUsdSnapshot\" > 0 AND \"RetentionDaysSnapshot\" > 0"));
+        purchase.ToTable(t => t.HasCheckConstraint("CK_Purchase_Values", "\"PeriodMonthsSnapshot\" BETWEEN 1 AND 120 AND \"PriceAmountSnapshot\" > 0 AND \"CurrencySnapshot\" = 'IRT' AND \"AiPricePerMinuteUsdSnapshot\" >= 0 AND \"RetentionDaysSnapshot\" > 0"));
         purchase.ToTable(t => t.HasCheckConstraint("CK_Purchase_Operation", "\"Operation\" IN ('purchase','renewal','upgrade') AND \"ProratedCreditAmountSnapshot\" BETWEEN 0 AND (\"PriceAmountSnapshot\" + \"TeamSeatAmountIrtSnapshot\") AND ((\"Operation\" = 'upgrade' AND \"ReplacesSubscriptionId\" IS NOT NULL) OR (\"Operation\" <> 'upgrade' AND \"ReplacesSubscriptionId\" IS NULL AND \"ProratedCreditAmountSnapshot\" = 0))"));
         var e = m.Entity<SubscriptionEntitlement>(); e.HasKey(x => new { x.PurchaseId, x.Code }); e.Property(x => x.Code).HasMaxLength(64); e.Property(x => x.Name).HasMaxLength(200); e.Property(x => x.Value).HasMaxLength(1000); e.Property(x => x.DataType).HasConversion<string>().HasMaxLength(20);
         var sub = m.Entity<OrganizationSubscription>(); Tenant(sub); sub.HasIndex(x => x.PaymentId).IsUnique();
@@ -77,7 +88,7 @@ internal static class BillingConfigurations
         var trial = m.Entity<RegistrationTrial>(); Tenant(trial); trial.HasIndex(x => x.OrganizationId).IsUnique();
         trial.HasOne<OrganizationSubscription>().WithOne().HasForeignKey<RegistrationTrial>(x => new { x.OrganizationId, x.Id }).HasPrincipalKey<OrganizationSubscription>(x => new { x.OrganizationId, x.Id });
         trial.Property(x => x.CreditAmountRial).HasPrecision(24, 6); Money(trial, nameof(RegistrationTrial.AiPricePerMinuteUsd));
-        trial.ToTable(t => t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountRial\" > 0 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650"));
+        trial.ToTable(t => t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountRial\" > 0 AND \"AiPricePerMinuteUsd\" >= 0 AND \"RetentionDays\" BETWEEN 1 AND 3650"));
         trial.HasMany(x => x.Entitlements).WithOne().HasForeignKey(x => x.TrialId);
         var te = m.Entity<RegistrationTrialEntitlement>(); te.HasKey(x => new { x.TrialId, x.Code });
         te.Property(x => x.Code).HasMaxLength(64); te.Property(x => x.Name).HasMaxLength(200); te.Property(x => x.Value).HasMaxLength(1000); te.Property(x => x.DataType).HasConversion<string>().HasMaxLength(20);
