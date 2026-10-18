@@ -38,7 +38,7 @@ public sealed class RialBillingApiTests : IAsyncLifetime
         Assert.Empty(usage.Items);
         var catalog = await Read<RialPackageCatalogDto>(f.Browser(), "/api/pricing/packages");
         var basic = catalog.Packages.Single(x => x.Code == "basic");
-        Assert.Equal(195001.5m, basic.AiPricePerMinuteRial);
+        Assert.Equal(19500.15m, basic.AiPricePerMinuteRial);
         Assert.Equal(30000000m, basic.Periods.Single(x => x.Months == 1).Price);
         var admin = await f.RegisterAdmin();
         Guid org = default;

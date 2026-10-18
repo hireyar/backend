@@ -303,38 +303,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("HireYar.Domain.Billing.InterviewTariff", b =>
-                {
-                    b.Property<string>("InterviewType")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal>("RatePerMinuteUsd")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.HasKey("InterviewType");
-
-                    b.ToTable("InterviewTariffs", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_InterviewTariffs_Rate", "\"RatePerMinuteUsd\" > 0 AND \"RatePerMinuteUsd\" <= 1000");
-
-                            t.HasCheckConstraint("CK_InterviewTariffs_Type", "\"InterviewType\" IN ('general', 'specialized')");
-                        });
-
-                    b.HasData(
-                        new
-                        {
-                            InterviewType = "general",
-                            RatePerMinuteUsd = 0.3m
-                        },
-                        new
-                        {
-                            InterviewType = "specialized",
-                            RatePerMinuteUsd = 0.8m
-                        });
-                });
-
             modelBuilder.Entity("HireYar.Domain.Billing.OrganizationAiWallet", b =>
                 {
                     b.Property<Guid>("Id")

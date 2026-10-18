@@ -21,6 +21,7 @@ public sealed class InvitationPricingService(IApplicationDbContext db, ISubscrip
         string[] required = template.UseTopicQuestions
             ? [capability, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
             : [capability, "ai_interview"];
+        decimal ratePerMinuteUsd;
         if (packageId is { } selectedId)
         {
             // Preview only: a selectable catalog package grants no subscription or capabilities.
@@ -29,12 +30,13 @@ public sealed class InvitationPricingService(IApplicationDbContext db, ISubscrip
                 ?? throw AppException.NotFound();
             if (required.Any(code => package.Features.All(x => !x.IsEnabled || x.Feature.Code != code)))
                 throw new AppException(403, "package_feature_required", "The selected package does not include the required capability.");
+            ratePerMinuteUsd = package.AiPricePerMinuteUsd;
         }
         else
         {
-            await entitlements.RequireAsync(org, required, ct);
+            var subscription = await entitlements.RequireAsync(org, required, ct);
+            ratePerMinuteUsd = await PricingService.ActivePackageRateAsync(db, org, subscription.Id, ct);
         }
-        var ratePerMinuteUsd = await InterviewTariffReader.GetAsync(db, selectedType, ct);
         var quote = await rates.GetAsync(ct);
         var balance = await wallet.GetAsync(org, ct);
         var perMinute = decimal.Round(ratePerMinuteUsd * quote.RialPerUsdt, 6, MidpointRounding.ToEven);

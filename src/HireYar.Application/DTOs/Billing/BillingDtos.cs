@@ -30,7 +30,7 @@ public sealed record FeatureDto(Guid Id, string Code, string Name, string Descri
 public sealed record PeriodDto(Guid Id, int Months, decimal Price, string Currency, decimal DiscountPercent, bool IsActive, int SortOrder);
 public sealed record PackageDto(Guid Id, string Code, string Name, string Description, bool IsActive, bool IsPublic, int SortOrder,
     decimal AiPricePerMinuteUsd, int RetentionDays, byte[] RowVersion, IReadOnlyList<FeatureDto> Features, IReadOnlyList<PeriodDto> Periods,
-    int IncludedTeamUsers = 3, int PaidTeamUserLimit = 30, decimal TeamUserMonthlyPriceIrt = 200_000m, decimal? GeneralAiPricePerMinuteUsd = null, decimal? SpecializedAiPricePerMinuteUsd = null);
+    int IncludedTeamUsers = 3, int PaidTeamUserLimit = 30, decimal TeamUserMonthlyPriceIrt = 200_000m);
 public sealed record CreditPackageDto(Guid Id, string Name, decimal CreditAmountRial, decimal SellPriceAmount, string SellPriceCurrency,
     bool IsActive, bool IsPublic, int SortOrder, byte[] RowVersion);
 public sealed record EntitlementDto(string Code, string Name, FeatureDataType DataType, string? Value);
