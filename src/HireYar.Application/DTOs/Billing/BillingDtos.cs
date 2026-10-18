@@ -5,7 +5,7 @@ namespace HireYar.Application.Billing;
 public sealed record PackageRequest([Required, RegularExpression("^[a-z][a-z0-9_]{1,63}$")] string Code,
     [Required, StringLength(200, MinimumLength = 1)] string Name, [StringLength(4000)] string Description,
     bool IsActive, bool IsPublic, [Range(0, 10000)] int SortOrder,
-    [Range(typeof(decimal), "0.000001", "1000")] decimal AiPricePerMinuteUsd, [Range(1, 3650)] int InterviewRetentionDays,
+    [Range(typeof(decimal), "0.000001", "1000")] decimal? AiPricePerMinuteUsd = null, [Range(1, 3650)] int InterviewRetentionDays = 30,
     [Range(1, 10000)] int IncludedTeamUsers = 3, [Range(1, 10000)] int PaidTeamUserLimit = 30,
     [Range(typeof(decimal), "0", "1000000000000")] decimal TeamUserMonthlyPriceIrt = 200_000m, decimal? SpecializedAiPricePerMinuteUsd = null);
 public sealed record PackageUpdateRequest(PackageRequest Package, [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
@@ -30,7 +30,7 @@ public sealed record FeatureDto(Guid Id, string Code, string Name, string Descri
 public sealed record PeriodDto(Guid Id, int Months, decimal Price, string Currency, decimal DiscountPercent, bool IsActive, int SortOrder);
 public sealed record PackageDto(Guid Id, string Code, string Name, string Description, bool IsActive, bool IsPublic, int SortOrder,
     decimal AiPricePerMinuteUsd, int RetentionDays, byte[] RowVersion, IReadOnlyList<FeatureDto> Features, IReadOnlyList<PeriodDto> Periods,
-    int IncludedTeamUsers = 3, int PaidTeamUserLimit = 30, decimal TeamUserMonthlyPriceIrt = 200_000m, decimal? SpecializedAiPricePerMinuteUsd = null)
+    int IncludedTeamUsers = 3, int PaidTeamUserLimit = 30, decimal TeamUserMonthlyPriceIrt = 200_000m, decimal? SpecializedAiPricePerMinuteUsd = null, IReadOnlyList<PackageInterviewTypeDto>? InterviewTypes = null)
 {
     public decimal GeneralAiPricePerMinuteUsd => AiPricePerMinuteUsd;
 }

@@ -16,14 +16,14 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
             throw AppException.Conflict();
         var subscription = await entitlements.RequireAsync(session.OrganizationId,
             session.AskOneQuestionPerTopic || session.ProgressiveTopicQuestions
-                ? [session.RequiredCapabilityCode, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
-                : [session.RequiredCapabilityCode, "ai_interview"], ct);
+                ? ["ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
+                : ["ai_interview"], ct);
         var now = time.GetUtcNow();
         // ExpiresAtUtc is the next refresh deadline; a last-known provider quote remains
         // usable during an outage, with its original fetched timestamp kept for audit.
         if (quote.Currency != "IRR" || quote.RialPerUsdt <= 0)
             throw new AppException(503, "ai_display_rate_unavailable", "Refresh the current exchange rate.");
-        var usdRate = await PricingService.ActivePackageRateAsync(db, session.OrganizationId, subscription.Id, session.RequiredCapabilityCode == "technical_interview" ? "specialized" : "general", ct);
+        var usdRate = await PricingService.ActivePackageRateAsync(db, session.OrganizationId, subscription.Id, session.PricingInterviewTypeCode ?? (session.RequiredCapabilityCode == "technical_interview" ? "specialized" : "general"), ct);
         var rialRate = decimal.Round(usdRate * quote.RialPerUsdt, 6, MidpointRounding.ToEven);
         if (rialRate <= 0) throw AppException.Invalid("invalid_ai_rate");
         var maximum = BillingMath.Cost(session.MaxDurationSeconds, rialRate);
@@ -44,8 +44,8 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
             await db.ReloadInterviewAsync(session, ct);
             if (session.Status == InterviewStatus.Created)
                 await entitlements.RequireAsync(session.OrganizationId, session.AskOneQuestionPerTopic || session.ProgressiveTopicQuestions
-                    ? [session.RequiredCapabilityCode, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
-                    : [session.RequiredCapabilityCode, "ai_interview"], ct);
+                    ? ["ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
+                    : ["ai_interview"], ct);
             await EnsureProcessingAllowedAsync(session, ct);
             // No live exchange lookup and no second reservation at candidate start.
             return await start();

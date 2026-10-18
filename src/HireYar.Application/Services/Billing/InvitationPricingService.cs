@@ -14,13 +14,11 @@ public sealed class InvitationPricingService(IApplicationDbContext db, ISubscrip
     {
         var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == org &&
             x.Id == templateId && x.DeletedAtUtc == null && !x.IsArchived, ct) ?? throw AppException.NotFound();
-        if (interviewType is not null && interviewType is not ("general" or "specialized"))
-            throw AppException.Invalid("invalid_interview_type");
         var selectedType = interviewType ?? template.InterviewType;
-        var capability = selectedType == "specialized" ? "technical_interview" : "hr_interview";
+        await InterviewTypeService.RequireTypeAsync(db, selectedType, ct);
         string[] required = template.UseTopicQuestions
-            ? [capability, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
-            : [capability, "ai_interview"];
+            ? ["ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
+            : ["ai_interview"];
         decimal ratePerMinuteUsd;
         if (packageId is { } selectedId)
         {
@@ -30,7 +28,7 @@ public sealed class InvitationPricingService(IApplicationDbContext db, ISubscrip
                 ?? throw AppException.NotFound();
             if (required.Any(code => package.Features.All(x => !x.IsEnabled || x.Feature.Code != code)))
                 throw new AppException(403, "package_feature_required", "The selected package does not include the required capability.");
-            ratePerMinuteUsd = PricingService.RateForType(package.AiPricePerMinuteUsd, package.SpecializedAiPricePerMinuteUsd, selectedType);
+            ratePerMinuteUsd = await PricingService.PackageRateAsync(db, package.Id, selectedType, ct);
         }
         else
         {

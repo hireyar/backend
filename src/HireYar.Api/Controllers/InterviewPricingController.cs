@@ -14,6 +14,6 @@ public sealed class InterviewPricingController(ICurrentUser user, InvitationPric
 {
     [HttpGet("quote")]
     public Task<InvitationPriceDto> Quote([FromQuery] Guid templateId, [FromQuery] Guid? packageId,
-        [FromQuery, RegularExpression("^(general|specialized)$")] string? interviewType, CancellationToken ct)
+        [FromQuery, RegularExpression("^[a-z][a-z0-9_]{1,63}$")] string? interviewType, CancellationToken ct)
         => pricing.QuoteAsync(user.OrganizationId, templateId, ct, packageId, interviewType);
 }

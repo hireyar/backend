@@ -9,9 +9,26 @@ public sealed class PricingPackage
     public bool IsActive { get; set; }
     public bool IsPublic { get; set; }
     public int SortOrder { get; set; }
-    // Existing price is the HR/general rate; retain its column and integration name.
-    public decimal AiPricePerMinuteUsd { get; set; }
-    public decimal? SpecializedAiPricePerMinuteUsd { get; set; }
+    public List<PackageInterviewType> InterviewTypes { get; set; } = [];
+    // Compatibility aliases only; these are not columns on PricingPackages.
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal AiPricePerMinuteUsd
+    {
+        get => InterviewTypes.FirstOrDefault(x => x.InterviewTypeCode == "general")?.PricePerMinuteUsd ?? 0m;
+        set => SetLegacyPrice("general", value);
+    }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal? SpecializedAiPricePerMinuteUsd
+    {
+        get => InterviewTypes.FirstOrDefault(x => x.InterviewTypeCode == "specialized")?.PricePerMinuteUsd;
+        set { if (value is { } price) SetLegacyPrice("specialized", price); }
+    }
+    private void SetLegacyPrice(string code, decimal price)
+    {
+        var row = InterviewTypes.SingleOrDefault(x => x.InterviewTypeCode == code);
+        if (row is null) { row = new() { PackageId = Id, InterviewTypeCode = code, IsActive = true }; InterviewTypes.Add(row); }
+        row.PricePerMinuteUsd = price;
+    }
     public int InterviewRetentionDays { get; set; }
     public int IncludedTeamUsers { get; set; } = 3;
     public int PaidTeamUserLimit { get; set; } = 30;

@@ -19,8 +19,9 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             .SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == r.TemplateId && !x.IsArchived, ct)
             ?? throw AppException.NotFound();
         if (template.Questions.Count is < 5 or > 30) throw AppException.Invalid("template_requires_five_questions");
-        var capability = r.InterviewType == "specialized" ? "technical_interview" : "hr_interview";
-        await entitlements.RequireAsync(user.OrganizationId, template.UseTopicQuestions ? [capability, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"] : [capability, "ai_interview"], ct);
+        var type = await InterviewTypeService.RequireTypeAsync(db, r.InterviewType, ct);
+        var capability = InterviewTypeService.Capability(type);
+        await entitlements.RequireAsync(user.OrganizationId, template.UseTopicQuestions ? ["ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"] : ["ai_interview"], ct);
         var sourceTemplateId = template.Id;
         var file = await ResumeUploadValidator.ReadAsync(resume, filename, ct);
         var extracted = string.IsNullOrWhiteSpace(r.ResumeText) ? await resumeText.ExtractAsync(file.Bytes, file.Extension, ct) : r.ResumeText.Trim();
@@ -55,7 +56,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             template.UseTopicQuestions ? topicSkills.Count * 2 : questions.Length,
             template.DurationMinutes * 60, now, now.AddDays(r.DeadlineDays));
         if (template.UseTopicQuestions) session.EnableProgressiveTopicQuestions(mediumFirst: true);
-        session.SetRequiredCapability(capability);
+        session.SetRequiredCapability(capability); session.SetPricingInterviewType(type.Code);
         session.SetInteractionLimit(2);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
         session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, extracted, template.Language,
@@ -121,8 +122,8 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             var job = await db.JobPositions.AsNoTracking().SingleOrDefaultAsync(j => j.Id == session.JobPositionId && j.OrganizationId == user.OrganizationId && j.DeletedAtUtc == null && j.Status != HireYar.Domain.JobPositions.JobStatus.Archived, ct) ?? throw AppException.NotFound();
             var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(t => t.Id == session.InterviewTemplateId && t.OrganizationId == user.OrganizationId && t.DeletedAtUtc == null && !t.IsArchived, ct) ?? throw AppException.NotFound();
             await entitlements.RequireAsync(user.OrganizationId, session.AskOneQuestionPerTopic || session.ProgressiveTopicQuestions
-                ? [session.RequiredCapabilityCode, "ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
-                : [session.RequiredCapabilityCode, "ai_interview"], ct);
+                ? ["ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
+                : ["ai_interview"], ct);
             await db.InterviewAnswers.Where(a => a.InterviewSessionId == session.Id).ToListAsync(ct);
             var now = time.GetUtcNow();
             var fresh = new InterviewSession(session.OrganizationId, session.JobPositionId, session.CandidateApplicationId, session.InterviewTemplateId,
@@ -130,7 +131,9 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                 session.Skills, session.MaxQuestionCount, session.MaxDurationSeconds, now, now.AddDays(r.DeadlineDays));
             if (session.AskOneQuestionPerTopic) fresh.EnableTopicQuestions();
             if (session.ProgressiveTopicQuestions) fresh.EnableProgressiveTopicQuestions(session.MediumFirstTopicQuestions);
-            fresh.SetRequiredCapability(session.RequiredCapabilityCode); fresh.SetInteractionLimit(session.MaxInteractionsPerQuestion);
+            fresh.SetRequiredCapability(session.RequiredCapabilityCode);
+            if (session.PricingInterviewTypeCode is { } typeCode) fresh.SetPricingInterviewType(typeCode);
+            fresh.SetInteractionLimit(session.MaxInteractionsPerQuestion);
             fresh.SetPanelSnapshot(session.PositionTitleSnapshot ?? job.Title, session.PositionDescriptionSnapshot ?? job.Description,
                 session.TemplateTitleSnapshot ?? template.Title, session.WelcomeMessage ?? template.WelcomeMessage, session.GoodbyeMessage ?? template.GoodbyeMessage);
             fresh.SetAiSnapshot(session.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, session.MasterPromptVersion ?? InterviewDecisionPrompt.Version,
@@ -197,14 +200,14 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         var rows = await query.OrderByDescending(x => x.s.CreatedAtUtc).ThenBy(x => x.s.Id).Skip(r.Skip).Take(r.PageSize)
             .Select(x => new { x.s.Id, x.a.FirstName, x.a.LastName, x.a.Email, x.a.Phone, x.s.JobPositionId,
                 PositionTitle = x.s.PositionTitleSnapshot ?? x.j.Title, TemplateId = x.s.InterviewTemplateId,
-                TemplateTitle = x.s.TemplateTitleSnapshot ?? x.t.Title, x.s.RequiredCapabilityCode, x.status, x.humanDecision,
+                TemplateTitle = x.s.TemplateTitleSnapshot ?? x.t.Title, x.s.RequiredCapabilityCode, x.s.PricingInterviewTypeCode, x.status, x.humanDecision,
                 x.s.CreatedAtUtc, x.s.ExpiresAtUtc, x.s.StartedAtUtc, x.s.CompletedAtUtc, x.a.ResumeStorageKey,
                 x.s.AccessRevokedAtUtc, x.s.SupersededByInterviewId, x.s.ProtectedAccessCode, InterviewStatus = x.s.Status,
                 CanResend = x.s.SupersededByInterviewId == null && x.j.DeletedAtUtc == null && x.j.Status != HireYar.Domain.JobPositions.JobStatus.Archived && x.t.DeletedAtUtc == null && !x.t.IsArchived,
                 VideoAvailable = x.s.Answers.Any(a => a.VideoStorageKey != null),
                 Score = x.s.SkillStates.Where(y => y.EvidenceCount > 0).Select(y => (decimal?)y.CurrentScore).Average() }).ToListAsync(ct);
         return new(rows.Select(x => new PanelInterviewDto(x.Id, x.FirstName, x.LastName, x.Email, x.Phone, x.JobPositionId,
-            x.PositionTitle, x.TemplateId, x.TemplateTitle, x.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized",
+            x.PositionTitle, x.TemplateId, x.TemplateTitle, x.PricingInterviewTypeCode ?? (x.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized"),
             x.status, x.CreatedAtUtc, x.ExpiresAtUtc, x.StartedAtUtc, x.CompletedAtUtc, (int)(x.ExpiresAtUtc - x.CreatedAtUtc).TotalDays,
             x.status == "completed" && x.Score.HasValue ? decimal.Round(x.Score.Value * 100, 2) : null,
             $"/api/interviews/{x.Id}", x.ResumeStorageKey is null ? null : $"/api/interviews/{x.Id}/resume",

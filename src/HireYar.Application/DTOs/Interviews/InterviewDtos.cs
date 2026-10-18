@@ -13,7 +13,8 @@ public sealed record BankQuestionRequest(Guid SkillId, [Required, StringLength(2
 public sealed record UpdateBankQuestionRequest(BankQuestionRequest Question, [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
 public sealed record BankQuestionDto(Guid Id, Guid SkillId, string Text, string Topic, int Difficulty, bool IsActive, byte[] RowVersion);
 public sealed record CreateInterviewRequest(Guid TemplateId, [Range(1, 30)] int MaxQuestionCount = 12, [Range(1, 168)] int ExpiresInHours = 72,
-    [RegularExpression("^(hr_interview|technical_interview)$")] string RequiredCapabilityCode = "technical_interview", bool SendEmail = false, bool SendSms = false);
+    [RegularExpression("^(hr_interview|technical_interview)$")] string RequiredCapabilityCode = "technical_interview", bool SendEmail = false, bool SendSms = false,
+    [RegularExpression("^[a-z][a-z0-9_]{1,63}$")] string? InterviewType = null);
 public sealed record InterviewInvitation(Guid InterviewId, string Token, DateTimeOffset ExpiresAtUtc, string CandidateRoute,
     string? AccessCode = null, string? InterviewUrl = null, string? EmailDelivery = null, string? SmsDelivery = null);
 public sealed record InterviewAccessDetails(Guid InterviewId, string InterviewUrl, string? AccessCode,

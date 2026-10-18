@@ -12,7 +12,7 @@ public sealed class RegistrationTrialService(IApplicationDbContext db, IOptions<
     public async Task CreateForNewOrganizationAsync(Guid org, DateTimeOffset registeredAtUtc, CancellationToken ct)
     {
         var settings = options.Value;
-        var packages = await db.PricingCatalog.AsNoTracking().Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature)
+        var packages = await db.PricingCatalog.AsNoTracking().Include(x => x.InterviewTypes).Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature)
             .Where(x => x.IsActive && x.IsPublic).OrderByDescending(x => x.InterviewRetentionDays).ThenBy(x => x.Code).ToListAsync(ct);
         var anchor = packages.FirstOrDefault(x => x.Periods.Any())
             ?? throw new AppException(503, "trial_catalog_unavailable", "The trial catalog is unavailable.");

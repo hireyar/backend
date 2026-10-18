@@ -57,7 +57,7 @@ public static class DependencyInjection
         services.AddHttpClient("WallexDisplayRate", h => { h.BaseAddress = new Uri("https://api.wallex.ir/"); h.Timeout = TimeSpan.FromSeconds(5); });
         services.AddSingleton<IAiDisplayRateProvider, WallexAiDisplayRateProvider>();
         services.AddHostedService<AiDisplayRateRefreshWorker>();
-        services.AddScoped<PricingService>(); services.AddScoped<WalletService>(); services.AddScoped<PaymentService>();
+        services.AddScoped<InterviewTypeService>(); services.AddScoped<PricingService>(); services.AddScoped<WalletService>(); services.AddScoped<PaymentService>();
         services.AddOptions<BillingPanelOptions>().Bind(config.GetSection("BillingPanel"))
             .Validate(x => x.SubscriptionTaxPercent is >= 0 and <= 100 && BillingMath.HasPrecision(x.SubscriptionTaxPercent, 2), "BillingPanel tax percent must be between 0 and 100 with at most two decimals.").ValidateOnStart();
         services.AddScoped<BillingPanelService>();

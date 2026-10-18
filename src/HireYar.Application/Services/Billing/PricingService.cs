@@ -6,7 +6,7 @@ namespace HireYar.Application.Billing;
 
 public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
 {
-    private IQueryable<PricingPackage> Packages => db.PricingCatalog.Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature);
+    private IQueryable<PricingPackage> Packages => db.PricingCatalog.Include(x => x.InterviewTypes).ThenInclude(x => x.InterviewType).Include(x => x.Periods).Include(x => x.Features).ThenInclude(x => x.Feature);
     public async Task<IReadOnlyList<PackageDto>> ListAsync(bool publicOnly, CancellationToken ct)
     {
         var query = Packages.AsNoTracking();
@@ -19,21 +19,21 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
     // Hidden/archived catalog rows remain available to their existing subscribers.
     internal static async Task<decimal> ActivePackageRateAsync(IApplicationDbContext db, Guid org, Guid subscriptionId, string interviewType, CancellationToken ct)
     {
-        var prices = await (from subscription in db.OrganizationSubscriptions.AsNoTracking()
-                            join package in db.PricingPackages.AsNoTracking() on subscription.PackageId equals package.Id
-                            where subscription.OrganizationId == org && subscription.Id == subscriptionId
-                            select new { package.AiPricePerMinuteUsd, package.SpecializedAiPricePerMinuteUsd }).SingleOrDefaultAsync(ct)
+        var packageId = await db.OrganizationSubscriptions.AsNoTracking()
+            .Where(x => x.OrganizationId == org && x.Id == subscriptionId).Select(x => (Guid?)x.PackageId).SingleOrDefaultAsync(ct)
             ?? throw AppException.NotFound();
-        return RateForType(prices.AiPricePerMinuteUsd, prices.SpecializedAiPricePerMinuteUsd, interviewType);
+        return await PackageRateAsync(db, packageId, interviewType, ct);
     }
 
-    internal static decimal RateForType(decimal general, decimal? specialized, string interviewType)
-        => interviewType switch
-        {
-            "general" => general,
-            "specialized" => specialized ?? throw new AppException(409, "package_interview_price_not_configured", "The specialized interview price is not configured for this package."),
-            _ => throw AppException.Invalid("invalid_interview_type")
-        };
+    internal static async Task<decimal> PackageRateAsync(IApplicationDbContext db, Guid packageId, string code, CancellationToken ct)
+    {
+        var row = await db.PackageInterviewTypes.AsNoTracking().Include(x => x.InterviewType)
+            .SingleOrDefaultAsync(x => x.PackageId == packageId && x.InterviewTypeCode == code, ct);
+        if (row is null) throw new AppException(409, "package_interview_price_not_configured", "The interview type has no price in this package.");
+        if (!row.IsActive || !row.InterviewType.IsActive)
+            throw new AppException(403, "package_interview_type_disabled", "The interview type is disabled for this package.");
+        return row.PricePerMinuteUsd;
+    }
 
     public async Task<PackageDto> GetAsync(Guid id, CancellationToken ct) => Map(await Packages.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound(), false);
     public async Task<Page<PackageDto>> AdminPackagesAsync(PageQuery page, CancellationToken ct, string? search = null)
@@ -70,9 +70,11 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
             : new PricingPackage { CreatedAtUtc = time.GetUtcNow() };
         if (id is null) db.PricingPackages.Add(p); else db.SetOriginalVersion(p, version!);
         p.Code = r.Code; p.Name = r.Name.Trim(); p.Description = r.Description.Trim(); p.IsActive = r.IsActive; p.IsPublic = r.IsPublic;
-        p.SortOrder = r.SortOrder; p.AiPricePerMinuteUsd = r.AiPricePerMinuteUsd; p.InterviewRetentionDays = r.InterviewRetentionDays; p.UpdatedAtUtc = time.GetUtcNow();
+        p.SortOrder = r.SortOrder; if (r.AiPricePerMinuteUsd is { } general) p.AiPricePerMinuteUsd = general; p.InterviewRetentionDays = r.InterviewRetentionDays; p.UpdatedAtUtc = time.GetUtcNow();
         if (r.SpecializedAiPricePerMinuteUsd is { } specialized) p.SpecializedAiPricePerMinuteUsd = specialized;
         p.IncludedTeamUsers = r.IncludedTeamUsers; p.PaidTeamUserLimit = r.PaidTeamUserLimit; p.TeamUserMonthlyPriceIrt = r.TeamUserMonthlyPriceIrt;
+        foreach (var price in p.InterviewTypes.Where(x => x.InterviewType is null))
+            price.InterviewType = await db.InterviewTypes.SingleAsync(x => x.Code == price.InterviewTypeCode, ct);
         await db.SaveChangesAsync(ct); return Map(p, false);
     }
     public async Task<PackageDto> SavePeriodAsync(Guid packageId, Guid? id, PeriodWriteRequest r, CancellationToken ct)
@@ -133,12 +135,16 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
         if (r.IncludedTeamUsers < 1 || r.PaidTeamUserLimit < r.IncludedTeamUsers || r.PaidTeamUserLimit > 10000 ||
             r.TeamUserMonthlyPriceIrt is < 0 or > 1000000000000m || !BillingMath.HasPrecision(r.TeamUserMonthlyPriceIrt, 0)) throw AppException.Invalid("invalid_team_pricing");
         if (string.IsNullOrWhiteSpace(r.Name) || !System.Text.RegularExpressions.Regex.IsMatch(r.Code, "^[a-z][a-z0-9_]{1,63}$") ||
-            r.AiPricePerMinuteUsd is <= 0 or > 1000 || !BillingMath.HasPrecision(r.AiPricePerMinuteUsd, 6) || r.InterviewRetentionDays is < 1 or > 3650) throw AppException.Invalid();
+            (r.AiPricePerMinuteUsd is { } general && (general is <= 0 or > 1000 || !BillingMath.HasPrecision(general, 6))) || r.InterviewRetentionDays is < 1 or > 3650) throw AppException.Invalid();
     }
     public static PackageDto Map(PricingPackage p, bool publicOnly) => new(p.Id, p.Code, p.Name, p.Description, p.IsActive, p.IsPublic, p.SortOrder,
         p.AiPricePerMinuteUsd, p.InterviewRetentionDays, p.RowVersion,
         p.Features.Where(x => !publicOnly || x.IsEnabled).OrderBy(x => x.Feature.Code).Select(x => new FeatureDto(x.FeatureId, x.Feature.Code, x.Feature.Name, x.Feature.Description, x.Feature.DataType, x.IsEnabled, x.Value)).ToArray(),
         p.Periods.Where(x => !publicOnly || x.IsActive).OrderBy(x => x.SortOrder).ThenBy(x => x.Months).Select(x => new PeriodDto(x.Id, x.Months, x.PriceAmount, x.Currency, x.DiscountPercent, x.IsActive, x.SortOrder)).ToArray(),
-        p.IncludedTeamUsers, p.PaidTeamUserLimit, p.TeamUserMonthlyPriceIrt, p.SpecializedAiPricePerMinuteUsd);
+        p.IncludedTeamUsers, p.PaidTeamUserLimit, p.TeamUserMonthlyPriceIrt, p.SpecializedAiPricePerMinuteUsd,
+        p.InterviewTypes.Where(x => !publicOnly || (x.IsActive && x.InterviewType.IsActive))
+            .OrderBy(x => x.InterviewType.SortOrder).ThenBy(x => x.InterviewTypeCode)
+            .Select(x => new PackageInterviewTypeDto(x.InterviewTypeCode, x.InterviewType.Name, x.InterviewType.EngineType,
+                x.IsActive, x.InterviewType.IsActive, x.PricePerMinuteUsd)).ToArray());
     private static CreditPackageDto MapCredit(AiCreditPackage p) => new(p.Id, p.Name, p.CreditAmountRial, p.SellPriceAmount, p.SellPriceCurrency, p.IsActive, p.IsPublic, p.SortOrder, p.RowVersion);
 }

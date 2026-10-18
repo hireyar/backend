@@ -303,6 +303,43 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Billing.InterviewTypeDefinition", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("EngineType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Code");
+
+                    b.ToTable("InterviewTypes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InterviewType_Code", "\"Code\" ~ '^[a-z][a-z0-9_]{1,63}$'");
+
+                            t.HasCheckConstraint("CK_InterviewType_Engine", "\"EngineType\" IN ('general','specialized')");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Domain.Billing.OrganizationAiWallet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -422,6 +459,32 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasIndex("FeatureId");
 
                     b.ToTable("PackageFeatures");
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Billing.PackageInterviewType", b =>
+                {
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InterviewTypeCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("PricePerMinuteUsd")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.HasKey("PackageId", "InterviewTypeCode");
+
+                    b.HasIndex("InterviewTypeCode");
+
+                    b.ToTable("PackageInterviewTypes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PackageInterviewType_Price", "\"PricePerMinuteUsd\" > 0 AND \"PricePerMinuteUsd\" <= 1000");
+                        });
                 });
 
             modelBuilder.Entity("HireYar.Domain.Billing.PackagePeriod", b =>
@@ -580,10 +643,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("AiPricePerMinuteUsd")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -625,10 +684,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
-                    b.Property<decimal?>("SpecializedAiPricePerMinuteUsd")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
                     b.Property<decimal>("TeamUserMonthlyPriceIrt")
                         .HasPrecision(18)
                         .HasColumnType("numeric(18,0)");
@@ -643,11 +698,9 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("PricingPackages", t =>
                         {
-                            t.HasCheckConstraint("CK_Package_SpecializedPrice", "\"SpecializedAiPricePerMinuteUsd\" IS NULL OR (\"SpecializedAiPricePerMinuteUsd\" > 0 AND \"SpecializedAiPricePerMinuteUsd\" <= 1000)");
-
                             t.HasCheckConstraint("CK_Package_Team", "\"IncludedTeamUsers\" >= 1 AND \"PaidTeamUserLimit\" BETWEEN \"IncludedTeamUsers\" AND 10000 AND \"TeamUserMonthlyPriceIrt\" BETWEEN 0 AND 1000000000000");
 
-                            t.HasCheckConstraint("CK_Package_Values", "\"AiPricePerMinuteUsd\" > 0 AND \"InterviewRetentionDays\" BETWEEN 1 AND 3650");
+                            t.HasCheckConstraint("CK_Package_Values", "\"InterviewRetentionDays\" BETWEEN 1 AND 3650");
                         });
                 });
 
@@ -694,7 +747,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("RegistrationTrials", t =>
                         {
-                            t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountRial\" > 0 AND \"AiPricePerMinuteUsd\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650");
+                            t.HasCheckConstraint("CK_RegistrationTrial_Values", "\"CreditAmountRial\" > 0 AND \"AiPricePerMinuteUsd\" >= 0 AND \"RetentionDays\" BETWEEN 1 AND 3650");
 
                             t.HasCheckConstraint("CK_Trial_Team", "\"IncludedTeamUsers\" >= 1 AND \"PaidTeamUserLimit\" BETWEEN \"IncludedTeamUsers\" AND 10000 AND \"TeamUserMonthlyPriceIrt\" BETWEEN 0 AND 1000000000000");
                         });
@@ -868,7 +921,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_Purchase_Team", "\"IncludedTeamUsersSnapshot\" >= 1 AND \"PaidTeamUserLimitSnapshot\" BETWEEN \"IncludedTeamUsersSnapshot\" AND 10000 AND \"TeamUserMonthlyPriceIrtSnapshot\" BETWEEN 0 AND 1000000000000 AND \"TeamCapacitySnapshot\" BETWEEN \"IncludedTeamUsersSnapshot\" AND \"PaidTeamUserLimitSnapshot\" AND \"TeamSeatAmountIrtSnapshot\" >= 0");
 
-                            t.HasCheckConstraint("CK_Purchase_Values", "\"PeriodMonthsSnapshot\" BETWEEN 1 AND 120 AND \"PriceAmountSnapshot\" > 0 AND \"CurrencySnapshot\" = 'IRT' AND \"AiPricePerMinuteUsdSnapshot\" > 0 AND \"RetentionDaysSnapshot\" > 0");
+                            t.HasCheckConstraint("CK_Purchase_Values", "\"PeriodMonthsSnapshot\" BETWEEN 1 AND 120 AND \"PriceAmountSnapshot\" > 0 AND \"CurrencySnapshot\" = 'IRT' AND \"AiPricePerMinuteUsdSnapshot\" >= 0 AND \"RetentionDaysSnapshot\" > 0");
                         });
                 });
 
@@ -1061,8 +1114,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("InterviewType")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
@@ -1104,6 +1157,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("InterviewType");
+
                     b.HasIndex("OrganizationId", "JobPositionId", "CreatedAtUtc", "Id");
 
                     b.ToTable("InterviewTemplates", t =>
@@ -1115,8 +1170,6 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Template_Duration", "\"DurationMinutes\" BETWEEN 5 AND 60");
 
                             t.HasCheckConstraint("CK_Template_FollowUps", "\"MaxFollowUpQuestionsPerQuestion\" BETWEEN 0 AND 3");
-
-                            t.HasCheckConstraint("CK_Template_Type", "\"InterviewType\" IN ('general','specialized')");
                         });
                 });
 
@@ -1933,6 +1986,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("PricingInterviewTypeCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTimeOffset?>("ProcessingLeaseExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -2002,6 +2059,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("CandidateApplicationId");
+
+                    b.HasIndex("PricingInterviewTypeCode");
 
                     b.HasIndex("SupersededByInterviewId")
                         .IsUnique()
@@ -3117,6 +3176,23 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Navigation("Feature");
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Billing.PackageInterviewType", b =>
+                {
+                    b.HasOne("HireYar.Domain.Billing.InterviewTypeDefinition", "InterviewType")
+                        .WithMany()
+                        .HasForeignKey("InterviewTypeCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Billing.PricingPackage", null)
+                        .WithMany("InterviewTypes")
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InterviewType");
+                });
+
             modelBuilder.Entity("HireYar.Domain.Billing.PackagePeriod", b =>
                 {
                     b.HasOne("HireYar.Domain.Billing.PricingPackage", null)
@@ -3260,6 +3336,12 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HireYar.Domain.InterviewTemplates.InterviewTemplate", b =>
                 {
+                    b.HasOne("HireYar.Domain.Billing.InterviewTypeDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("InterviewType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HireYar.Domain.JobPositions.JobPosition", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId", "JobPositionId")
@@ -3396,6 +3478,11 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HireYar.Domain.Interviews.InterviewSession", b =>
                 {
+                    b.HasOne("HireYar.Domain.Billing.InterviewTypeDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("PricingInterviewTypeCode")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId", "SupersededByInterviewId")
@@ -3664,6 +3751,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HireYar.Domain.Billing.PricingPackage", b =>
                 {
                     b.Navigation("Features");
+
+                    b.Navigation("InterviewTypes");
 
                     b.Navigation("Periods");
                 });

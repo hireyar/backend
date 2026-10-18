@@ -133,9 +133,12 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         parsed.Database = database; connection = parsed.ConnectionString;
         await using var scope = Services.CreateAsyncScope(); var testDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await testDb.Database.MigrateAsync();
-        // Synthetic fixture configuration only. Production migration leaves the new price unset.
-        await testDb.PricingPackages.Where(x => x.Features.Any(f => f.IsEnabled && f.Feature.Code == "technical_interview"))
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.SpecializedAiPricePerMinuteUsd, (decimal?).05m));
+        // Historical tests use an intentionally different general tariff from the approved product default.
+        // New migration tests verify the real $0.03/$0.05 defaults independently.
+        var packages = await testDb.PricingPackages.Include(x => x.InterviewTypes)
+            .Where(x => x.Features.Any(f => f.IsEnabled && f.Feature.Code == "technical_interview")).ToListAsync();
+        foreach (var package in packages) { package.AiPricePerMinuteUsd = .05m; package.SpecializedAiPricePerMinuteUsd = .05m; }
+        await testDb.SaveChangesAsync();
     }
     async Task IAsyncLifetime.DisposeAsync()
     {

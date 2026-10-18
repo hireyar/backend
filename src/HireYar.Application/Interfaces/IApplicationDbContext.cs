@@ -11,6 +11,8 @@ public interface IApplicationDbContext
     DbSet<HireYar.Domain.Billing.PricingPackage> PricingPackages { get; }
     // Infrastructure supplies one SQL statement for contract reads, overriding its split-query default.
     IQueryable<HireYar.Domain.Billing.PricingPackage> PricingCatalog { get; }
+    DbSet<HireYar.Domain.Billing.InterviewTypeDefinition> InterviewTypes { get; }
+    DbSet<HireYar.Domain.Billing.PackageInterviewType> PackageInterviewTypes { get; }
     DbSet<HireYar.Domain.Billing.PackagePeriod> PackagePeriods { get; }
     DbSet<HireYar.Domain.Billing.FeatureDefinition> FeatureDefinitions { get; }
     DbSet<HireYar.Domain.Billing.PackageFeature> PackageFeatures { get; }
