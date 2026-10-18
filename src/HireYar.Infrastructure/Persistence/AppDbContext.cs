@@ -57,6 +57,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<OrganizationAiWallet> OrganizationAiWallets => Set<OrganizationAiWallet>();
     public DbSet<AiCreditTransaction> AiCreditTransactions => Set<AiCreditTransaction>();
     public DbSet<AiCreditReservation> AiCreditReservations => Set<AiCreditReservation>();
+    public DbSet<InterviewTariff> InterviewTariffs => Set<InterviewTariff>();
     public DbSet<InterviewBilling> InterviewBillings => Set<InterviewBilling>();
     protected override void OnModelCreating(ModelBuilder b)
     {

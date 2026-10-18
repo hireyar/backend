@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using HireYar.Application.Billing;
 using HireYar.Application.Common;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -12,6 +13,7 @@ namespace HireYar.Api.Controllers;
 public sealed class InterviewPricingController(ICurrentUser user, InvitationPricingService pricing) : ControllerBase
 {
     [HttpGet("quote")]
-    public Task<InvitationPriceDto> Quote([FromQuery] Guid templateId, [FromQuery] Guid? packageId, CancellationToken ct)
-        => pricing.QuoteAsync(user.OrganizationId, templateId, ct, packageId);
+    public Task<InvitationPriceDto> Quote([FromQuery] Guid templateId, [FromQuery] Guid? packageId,
+        [FromQuery, RegularExpression("^(general|specialized)$")] string? interviewType, CancellationToken ct)
+        => pricing.QuoteAsync(user.OrganizationId, templateId, ct, packageId, interviewType);
 }

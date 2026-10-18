@@ -23,7 +23,8 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
         // usable during an outage, with its original fetched timestamp kept for audit.
         if (quote.Currency != "IRR" || quote.RialPerUsdt <= 0)
             throw new AppException(503, "ai_display_rate_unavailable", "Refresh the current exchange rate.");
-        var rialRate = decimal.Round(subscription.AiRatePerMinuteUsd * quote.RialPerUsdt, 6, MidpointRounding.ToEven);
+        var usdRate = await InterviewTariffReader.GetAsync(db, session.RequiredCapabilityCode == "technical_interview" ? "specialized" : "general", ct);
+        var rialRate = decimal.Round(usdRate * quote.RialPerUsdt, 6, MidpointRounding.ToEven);
         if (rialRate <= 0) throw AppException.Invalid("invalid_ai_rate");
         var maximum = BillingMath.Cost(session.MaxDurationSeconds, rialRate);
         var w = await wallet.WalletLockedAsync(session.OrganizationId, ct);
@@ -32,7 +33,7 @@ public sealed class InterviewBillingService(IApplicationDbContext db, ISubscript
         db.AiCreditReservations.Add(new() { OrganizationId = session.OrganizationId, WalletId = w.Id, InterviewSessionId = session.Id,
             ReservedAmountRial = maximum, CreatedAtUtc = now, ExpiresAtUtc = session.ExpiresAtUtc });
         db.InterviewBillings.Add(new() { OrganizationId = session.OrganizationId, InterviewSessionId = session.Id, SubscriptionId = subscription.Id,
-            RatePerMinuteUsd = subscription.AiRatePerMinuteUsd, RatePerMinuteRial = rialRate,
+            RatePerMinuteUsd = usdRate, RatePerMinuteRial = rialRate,
             RialPerUsdt = quote.RialPerUsdt, RateQuotedAtUtc = quote.FetchedAtUtc,
             RetentionDays = subscription.RetentionDays, CreatedAtUtc = now });
     }

@@ -77,7 +77,8 @@ public sealed class BillingTests(ApiFixture f)
         var basic = await SeedPackage("basic"); var advanced = await SeedPackage("advanced");
         Assert.Equal(new decimal[] { 3000000, 8550000, 16200000, 28800000 }, basic.Periods.Select(x => x.Price / 10m));
         Assert.Equal(new decimal[] { 4500000, 12825000, 24300000, 43200000 }, advanced.Periods.Select(x => x.Price / 10m));
-        Assert.Equal(0.03m, basic.AiPricePerMinuteUsd); Assert.Equal(0.05m, advanced.AiPricePerMinuteUsd);
+        Assert.Equal(0.3m, basic.AiPricePerMinuteUsd); Assert.Equal(0.3m, advanced.AiPricePerMinuteUsd);
+        Assert.Equal(0.8m, advanced.SpecializedAiPricePerMinuteUsd);
         Assert.Equal(30, basic.RetentionDays); Assert.Equal(60, advanced.RetentionDays);
         Assert.DoesNotContain(basic.Features, x => x.Code == "technical_interview"); Assert.Contains(advanced.Features, x => x.Code == "technical_interview");
     }
@@ -186,13 +187,13 @@ public sealed class BillingTests(ApiFixture f)
     public async Task Concurrent_reservations_cannot_overspend_and_cancel_releases_full_maximum()
     {
         var a = await f.RegisterOwner(); var package = await SeedPackage("advanced"); var purchase = await Buy(a, package.Periods[0].Id); await Verify(a, purchase.Payment.Id);
-        var org = await Org(a); await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 5m, "Synthetic credit"), default);
+        var org = await Org(a); await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 80m, "Synthetic credit"), default);
         var winning = await Invite(a); await Invite(a, insufficient: true);
         using var candidate = Candidate(winning);
         Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{winning.InterviewId}/start", null)).StatusCode);
-        var balance = await Wallet(a); Assert.Equal(3m, balance.ReservedCredit); Assert.Equal(2m, balance.AvailableCredit); Assert.Equal(5m, balance.Balance);
+        var balance = await Wallet(a); Assert.Equal(48m, balance.ReservedCredit); Assert.Equal(32m, balance.AvailableCredit); Assert.Equal(80m, balance.Balance);
         Assert.Equal(HttpStatusCode.NoContent, (await a.Client.Send(HttpMethod.Post, $"/api/interviews/{winning.InterviewId}/revoke")).StatusCode);
-        balance = await Wallet(a); Assert.Equal(0m, balance.ReservedCredit); Assert.Equal(5m, balance.AvailableCredit);
+        balance = await Wallet(a); Assert.Equal(0m, balance.ReservedCredit); Assert.Equal(80m, balance.AvailableCredit);
     }
     [PostgresFact]
     public async Task Completion_bills_server_window_once_and_releases_unused_reservation()
@@ -209,7 +210,7 @@ public sealed class BillingTests(ApiFixture f)
             Assert.Equal(HttpStatusCode.Gone, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
             Assert.Equal(HttpStatusCode.Gone, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
             await f.Db(async db => { var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId);
-                Assert.InRange(bill.BillableSeconds, 42, 45); Assert.Equal(BillingMath.Cost(bill.BillableSeconds, 0.05m), bill.BilledAmountRial);
+                Assert.InRange(bill.BillableSeconds, 42, 45); Assert.Equal(BillingMath.Cost(bill.BillableSeconds, 0.8m), bill.BilledAmountRial);
                 Assert.Equal(1, await db.AiCreditTransactions.CountAsync(x => x.ReferenceId == invite.InterviewId)); });
             Assert.Equal(0m, (await Wallet(a)).ReservedCredit);
         }
@@ -227,8 +228,8 @@ public sealed class BillingTests(ApiFixture f)
             var failed = (await (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/answers", form)).Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
             f.InterviewAi.FailStt = false; f.Clock.Offset = TimeSpan.FromSeconds(250);
             Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/answers/{failed.Answer!.Id}/retry", null)).StatusCode);
-            await f.Db(async db => { var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId); Assert.Equal(120, bill.BillableSeconds); Assert.Equal(0.1m, bill.BilledAmountRial); });
-            Assert.Equal(99.9m, (await Wallet(a)).Balance);
+            await f.Db(async db => { var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId); Assert.Equal(120, bill.BillableSeconds); Assert.Equal(1.6m, bill.BilledAmountRial); });
+            Assert.Equal(98.4m, (await Wallet(a)).Balance);
         }
         finally { f.Clock.Offset = TimeSpan.Zero; f.InterviewAi.Reset(); }
     }
@@ -245,7 +246,7 @@ public sealed class BillingTests(ApiFixture f)
             f.Clock.Offset += TimeSpan.FromSeconds(45);
             Assert.Equal(HttpStatusCode.Forbidden, (await c2.PostAsync($"/api/candidate/interviews/{second.InterviewId}/start", null)).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{first.InterviewId}/complete", null)).StatusCode);
-            await f.Db(async db => Assert.Equal(0.05m, (await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == first.InterviewId)).RatePerMinuteUsd));
+            await f.Db(async db => Assert.Equal(0.8m, (await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == first.InterviewId)).RatePerMinuteUsd));
         }
         finally { f.Clock.Offset = TimeSpan.Zero; }
     }
@@ -268,7 +269,7 @@ public sealed class BillingTests(ApiFixture f)
             await e.RequireAsync(org, ["hr_interview"], default); var error = await Assert.ThrowsAsync<AppException>(() => e.RequireAsync(org, ["technical_interview"], default)); Assert.Equal("subscription_feature_required", error.Code);
         }
         await Invite(a, "hr_interview", insufficient: true);
-        await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(await Org(a), new(Guid.NewGuid(), 3m, "Synthetic credit"), default);
+        await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(await Org(a), new(Guid.NewGuid(), 30m, "Synthetic credit"), default);
         var invite = await Invite(a, "hr_interview"); using var c = Candidate(invite);
         foreach (var route in new[] { "/api/billing/ai-credit", "/api/billing/subscription", "/api/billing/payments", "/api/admin/pricing/packages" }) Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync(route)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.PostAsJsonAsync("/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(p.Periods[0].Id))).StatusCode);
@@ -319,7 +320,7 @@ public sealed class BillingTests(ApiFixture f)
         var responses = await Task.WhenAll(first.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null), second.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null));
         Assert.Contains(responses, x => x.StatusCode == HttpStatusCode.OK); Assert.All(responses, x => Assert.Contains(x.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
         await f.Db(async db => { Assert.Equal(1, await db.AiCreditReservations.CountAsync(x => x.InterviewSessionId == invite.InterviewId)); Assert.Equal(1, await db.InterviewBillings.CountAsync(x => x.InterviewSessionId == invite.InterviewId)); });
-        Assert.Equal(3m, (await Wallet(a)).ReservedCredit);
+        Assert.Equal(48m, (await Wallet(a)).ReservedCredit);
     }
     [PostgresFact]
     public async Task Bill_rate_is_preserved_after_package_edit_and_ledger_equals_wallet()
@@ -331,7 +332,7 @@ public sealed class BillingTests(ApiFixture f)
         var changed = (await (await admin.Client.Send(HttpMethod.Put, $"/api/admin/pricing/packages/{package.Id}", new PackageUpdateRequest(Request(package, 0.9m), package.RowVersion))).Content.ReadFromJsonAsync<RialPackageDto>(BillingJson.Options))!;
         try
         {
-            await f.Db(async db => Assert.Equal(0.05m, (await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId)).RatePerMinuteUsd));
+            await f.Db(async db => Assert.Equal(0.8m, (await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId)).RatePerMinuteUsd));
             Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
             var org = await Org(a); await f.Db(async db => { var w = await db.OrganizationAiWallets.SingleAsync(x => x.OrganizationId == org); Assert.Equal(w.Balance, await db.AiCreditTransactions.Where(x => x.OrganizationId == org).SumAsync(x => x.Amount)); });
         }
@@ -341,7 +342,7 @@ public sealed class BillingTests(ApiFixture f)
     public async Task Basic_hr_interview_does_not_use_advanced_analysis_or_adaptive_llm()
     {
         var a = await f.RegisterOwner(); var p = await SeedPackage("basic"); var purchase = await Buy(a, p.Periods[0].Id); await Verify(a, purchase.Payment.Id);
-        await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(await Org(a), new(Guid.NewGuid(), 5m, "Synthetic HR credit"), default);
+        await using (var scope = f.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(await Org(a), new(Guid.NewGuid(), 30m, "Synthetic HR credit"), default);
         var invite = await Invite(a, "hr_interview"); using var c = Candidate(invite); var calls = f.InterviewAi.LlmCalls;
         var started = (await (await c.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null)).Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
         using var form = new MultipartFormDataContent(); var audio = new ByteArrayContent("ID3-synthetic-hr-answer"u8.ToArray()); audio.Headers.ContentType = new("audio/mpeg");

@@ -30,7 +30,7 @@ public sealed class RateFallbackFlowTests : IAsyncLifetime
         var owner=await f.RegisterOwner(); await f.FundInterviewsAsync(owner); Guid org=default;
         await f.Db(async db=>org=(await db.Users.SingleAsync(x=>x.Id==owner.Id)).OrganizationId);
         await using(var scope=f.Services.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(org,new(Guid.NewGuid(),999900m,"Synthetic fallback test credit"),default);
+            await scope.ServiceProvider.GetRequiredService<WalletService>().AdjustAsync(org,new(Guid.NewGuid(),5999900m,"Synthetic fallback test credit"),default);
         var job=await Read<JobDto>(await owner.Client.Send(HttpMethod.Post,"/api/panel-wizard/positions",new WizardPositionRequest("Synthetic","Synthetic role")));
         var template=await Read<TemplateDto>(await owner.Client.Send(HttpMethod.Post,"/api/panel-wizard/templates",
             new WizardTemplateRequest(job.Id,"Synthetic","general",Enumerable.Range(1,5).Select(x=>"Synthetic question "+x).ToList(),"Welcome","Goodbye",5)));
@@ -43,7 +43,7 @@ public sealed class RateFallbackFlowTests : IAsyncLifetime
         Assert.DoesNotContain("Wallex",await catalog.Content.ReadAsStringAsync());
         var quote=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,$"/api/interview-pricing/quote?templateId={template.Id}"));
         Assert.True(quote.Rate.IsStale);Assert.Equal(stale.ExpiresAtUtc,quote.Rate.ExpiresAtUtc);Assert.Equal(300,quote.Rate.RefreshAfterSeconds);
-        Assert.Equal(50000m,quote.RatePerMinuteRial);Assert.Equal(250000m,quote.MaximumReservedRial);
+        Assert.Equal(300000m,quote.RatePerMinuteRial);Assert.Equal(1500000m,quote.MaximumReservedRial);
         using var client=f.CreateClient();client.DefaultRequestHeaders.Authorization=new("Bearer",owner.Client.AccessToken);
         using var form=new MultipartFormDataContent();
         foreach(var field in new Dictionary<string,string>{["jobPositionId"]=job.Id.ToString(),["templateId"]=template.Id.ToString(),
@@ -53,15 +53,15 @@ public sealed class RateFallbackFlowTests : IAsyncLifetime
         var invitation=(await Read<PanelInvitationResult>(await client.PostAsync("/api/panel-wizard/invitations",form))).Invitation;
         await f.Db(async db=> {
             var bill=await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId);
-            Assert.Equal(first.RialPerUsdt,bill.RialPerUsdt);Assert.Equal(50000m,bill.RatePerMinuteRial);
+            Assert.Equal(first.RialPerUsdt,bill.RialPerUsdt);Assert.Equal(300000m,bill.RatePerMinuteRial);
             Assert.InRange(bill.RateQuotedAtUtc,first.FetchedAtUtc.AddTicks(-10),first.FetchedAtUtc.AddTicks(10));
-            Assert.Equal(250000m,(await db.AiCreditReservations.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId)).ReservedAmountRial);
+            Assert.Equal(1500000m,(await db.AiCreditReservations.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId)).ReservedAmountRial);
         });
         Assert.Equal(2,market.Calls);
         market.Fail=false;market.Price="110000";f.Clock.Offset=TimeSpan.FromMinutes(12);
         var recovered=await Read<AiDisplayRateDto>(await owner.Client.Send(HttpMethod.Get,"/api/pricing/ai-display-rate"));
         Assert.False(recovered.IsStale);Assert.Equal(1100000m,recovered.RialPerUsdt);Assert.Equal(3,market.Calls);
-        await f.Db(async db=>Assert.Equal(50000m,(await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId)).RatePerMinuteRial));
+        await f.Db(async db=>Assert.Equal(300000m,(await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId)).RatePerMinuteRial));
     }
 
     private sealed class Factory(Market market):IHttpClientFactory

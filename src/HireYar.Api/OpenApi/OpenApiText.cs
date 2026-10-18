@@ -122,7 +122,7 @@ internal static class OpenApiText
         ("CandidateInterviews", "Retry") => "پردازش دوباره همان پاسخ",
         ("CandidateInterviews", "Complete") => "پایان مصاحبه به درخواست داوطلب",
         ("CandidateInterviews", "Audio") => "دریافت خصوصی صوت سؤال",
-        ("InterviewPricing", "Quote") => "پیش‌نمایش هزینه دعوت با پکیج فعال یا packageId اختیاری و نرخ پنج‌دقیقه‌ای",
+        ("InterviewPricing", "Quote") => "پیش‌نمایش هزینه با interviewType عمومی/تخصصی، پکیج فعال یا packageId اختیاری و نرخ پنج‌دقیقه‌ای",
         ("Pricing", _) => "مشاهده قیمت‌ها و پکیج‌های عمومی",
         ("Billing", "Panel") => "وضعیت اشتراک، اعتبار و زمان قابل استفاده سازمان",
         ("Billing", "Quote") => "خلاصه خرید، تخفیف، مالیات و اعتبار روزشمار ارتقا",

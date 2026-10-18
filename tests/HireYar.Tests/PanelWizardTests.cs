@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using HireYar.Api.Billing;
 using System.Net;
 using HireYar.Domain.Interviews;
@@ -151,6 +152,11 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         var period = packages.Packages.Single(x => x.Code == "basic").Periods.Single(x => x.Months == 1);
         var purchase = (await (await hr.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<HireYar.Api.Billing.RialPurchaseResult>(BillingJson.Options))!;
         Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Post, $"/api/billing/payments/{purchase.Payment.Id}/verify")).StatusCode);
+        await f.Db(async db=> {
+            var org=await db.Users.Where(x=>x.Id==hr.Id).Select(x=>x.OrganizationId).SingleAsync();
+            await using var scope=f.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.WalletService>().AdjustAsync(org,new(Guid.NewGuid(),100m,"Synthetic type tariff credit"),default);
+        });
         var general = await Invite(hr, job.Id, template.Id); Assert.Equal(HttpStatusCode.OK, general.StatusCode);
         var issued = (await general.Content.ReadFromJsonAsync<PanelInvitationResult>())!;
         await f.Db(async db => Assert.Equal("hr_interview", (await db.InterviewSessions.SingleAsync(x => x.Id == issued.Invitation.InterviewId)).RequiredCapabilityCode));
