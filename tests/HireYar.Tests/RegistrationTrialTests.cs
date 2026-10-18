@@ -183,7 +183,7 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
     [PostgresFact]
     public async Task Trial_can_start_paid_processing_and_preserves_its_contract()
     {
-        var test = new ApiFixture(); await test.InitializeAsync();
+        var test = new ApiFixture { TrialCreditAmountRial = 5m }; await test.InitializeAsync();
         try
         {
             var hr = await test.RegisterOwner(signupTrial: true);
@@ -204,10 +204,10 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
             await test.Db(async db => {
                 var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == invite.InterviewId);
                 Assert.True((await db.OrganizationSubscriptions.SingleAsync(x => x.Id == bill.SubscriptionId)).IsTrial);
-                Assert.Equal(0.05m, bill.RatePerMinuteUsd);
+                Assert.Equal(0.8m, bill.RatePerMinuteUsd);
                 var reserve = await db.AiCreditReservations.SingleAsync(x => x.InterviewSessionId == invite.InterviewId);
-                Assert.Equal(0.25m, reserve.ReservedAmountRial);
-                Assert.Equal(1m, (await db.OrganizationAiWallets.SingleAsync(x => x.OrganizationId == bill.OrganizationId)).Balance);
+                Assert.Equal(4m, reserve.ReservedAmountRial);
+                Assert.Equal(5m, (await db.OrganizationAiWallets.SingleAsync(x => x.OrganizationId == bill.OrganizationId)).Balance);
                 await db.PackageFeatures.ExecuteUpdateAsync(s => s.SetProperty(x => x.IsEnabled, false));
             });
             test.Clock.Offset = TimeSpan.FromDays(4);

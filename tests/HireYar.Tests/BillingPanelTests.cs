@@ -138,7 +138,7 @@ public sealed class BillingPanelTests(ApiFixture f)
         var invitation = (await (await hr.PostAsync("/api/panel-wizard/invitations", form)).Content.ReadFromJsonAsync<PanelInvitationResult>(BillingJson.Options))!;
         using var candidate = f.CreateClient(); candidate.DefaultRequestHeaders.Authorization = new("Bearer", invitation.Invitation.Token);
         var current = (await (await candidate.PostAsync($"/api/candidate/interviews/{invitation.Invitation.InterviewId}/start", null)).Content.ReadFromJsonAsync<CandidateInterviewDto>(BillingJson.Options))!;
-        var reserved = await Overview(a); Assert.Equal(3m, reserved.Wallet.ReservedCredit); Assert.Null(reserved.EstimatedAvailableMinutes);
+        var reserved = await Overview(a); Assert.Equal(18m, reserved.Wallet.ReservedCredit); Assert.Null(reserved.EstimatedAvailableMinutes);
         f.Clock.Offset = TimeSpan.FromSeconds(20);
         try
         {
@@ -148,7 +148,7 @@ public sealed class BillingPanelTests(ApiFixture f)
             Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{invitation.Invitation.InterviewId}/complete", null)).StatusCode);
             var history = await History(a, "?transactionType=usage"); var item = Assert.Single(history.Transactions.Items);
             Assert.Equal("Synthetic Candidate", item.CandidateName); Assert.Equal(invitation.Invitation.InterviewId, item.InterviewId); Assert.True(item.BillableSeconds >= 20);
-            Assert.Equal(BillingMath.Cost(item.BillableSeconds!.Value, 0.05m), -item.Amount); Assert.Equal(-item.Amount, history.Totals.CreditConsumedRial);
+            Assert.Equal(BillingMath.Cost(item.BillableSeconds!.Value, 0.3m), -item.Amount); Assert.Equal(-item.Amount, history.Totals.CreditConsumedRial);
             Assert.Equal((long)item.BillableSeconds!.Value, history.Totals.BillableSeconds);
         }
         finally { f.Clock.Offset = TimeSpan.Zero; }

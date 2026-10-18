@@ -24,7 +24,7 @@ public sealed class TrialPackageAccessTests
 
     private static async Task VerifyAsync(string type, bool advanced)
     {
-        var f = new ApiFixture { TrialCreditAmountRial = 0.5m, TrialDurationDays = 2 };
+        var f = new ApiFixture { TrialCreditAmountRial = 5m, TrialDurationDays = 2 };
         await f.InitializeAsync();
         try
         {
@@ -82,7 +82,7 @@ public sealed class TrialPackageAccessTests
                 Assert.Equal(grant.Id, bill.SubscriptionId);
                 Assert.True(bill.BilledAmountRial > 0);
                 Assert.Equal(BillingMath.Cost(bill.BillableSeconds, bill.RatePerMinuteUsd), bill.BilledAmountRial);
-                Assert.Equal(0.5m - bill.BilledAmountRial, (await db.OrganizationAiWallets.SingleAsync()).Balance);
+                Assert.Equal(5m - bill.BilledAmountRial, (await db.OrganizationAiWallets.SingleAsync()).Balance);
                 Assert.False(await db.Payments.AnyAsync());
                 Assert.False(await db.SubscriptionPurchases.AnyAsync());
             });
