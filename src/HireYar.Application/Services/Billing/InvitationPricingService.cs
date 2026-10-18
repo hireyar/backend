@@ -30,12 +30,12 @@ public sealed class InvitationPricingService(IApplicationDbContext db, ISubscrip
                 ?? throw AppException.NotFound();
             if (required.Any(code => package.Features.All(x => !x.IsEnabled || x.Feature.Code != code)))
                 throw new AppException(403, "package_feature_required", "The selected package does not include the required capability.");
-            ratePerMinuteUsd = package.AiPricePerMinuteUsd;
+            ratePerMinuteUsd = PricingService.RateForType(package.AiPricePerMinuteUsd, package.SpecializedAiPricePerMinuteUsd, selectedType);
         }
         else
         {
             var subscription = await entitlements.RequireAsync(org, required, ct);
-            ratePerMinuteUsd = await PricingService.ActivePackageRateAsync(db, org, subscription.Id, ct);
+            ratePerMinuteUsd = await PricingService.ActivePackageRateAsync(db, org, subscription.Id, selectedType, ct);
         }
         var quote = await rates.GetAsync(ct);
         var balance = await wallet.GetAsync(org, ct);

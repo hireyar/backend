@@ -131,7 +131,11 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         var parsed = new NpgsqlConnectionStringBuilder(raw);
         if (!new[] { "localhost", "127.0.0.1", "::1" }.Contains(parsed.Host, StringComparer.OrdinalIgnoreCase)) throw new InvalidOperationException("Tests only accept a local PostgreSQL.");
         parsed.Database = database; connection = parsed.ConnectionString;
-        await using var scope = Services.CreateAsyncScope(); await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+        await using var scope = Services.CreateAsyncScope(); var testDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await testDb.Database.MigrateAsync();
+        // Synthetic fixture configuration only. Production migration leaves the new price unset.
+        await testDb.PricingPackages.Where(x => x.Features.Any(f => f.IsEnabled && f.Feature.Code == "technical_interview"))
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.SpecializedAiPricePerMinuteUsd, (decimal?).05m));
     }
     async Task IAsyncLifetime.DisposeAsync()
     {

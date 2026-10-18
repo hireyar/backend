@@ -625,6 +625,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("SpecializedAiPricePerMinuteUsd")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
                     b.Property<decimal>("TeamUserMonthlyPriceIrt")
                         .HasPrecision(18)
                         .HasColumnType("numeric(18,0)");
@@ -639,6 +643,8 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
                     b.ToTable("PricingPackages", t =>
                         {
+                            t.HasCheckConstraint("CK_Package_SpecializedPrice", "\"SpecializedAiPricePerMinuteUsd\" IS NULL OR (\"SpecializedAiPricePerMinuteUsd\" > 0 AND \"SpecializedAiPricePerMinuteUsd\" <= 1000)");
+
                             t.HasCheckConstraint("CK_Package_Team", "\"IncludedTeamUsers\" >= 1 AND \"PaidTeamUserLimit\" BETWEEN \"IncludedTeamUsers\" AND 10000 AND \"TeamUserMonthlyPriceIrt\" BETWEEN 0 AND 1000000000000");
 
                             t.HasCheckConstraint("CK_Package_Values", "\"AiPricePerMinuteUsd\" > 0 AND \"InterviewRetentionDays\" BETWEEN 1 AND 3650");

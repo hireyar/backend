@@ -1,4 +1,14 @@
+## ADR-069 — دو قیمت مستقل نوع مصاحبه داخل خود پکیج (2026-10-18)
+
+پس از توضیح روشن کاربر و تأیید طرح، advanced هم HR و هم تخصصی دارد و هرکدام قیمت جدا داخل همان پکیج دارند؛ basic فقط HR است. این تصمیم برداشت «نوع فقط برای دسترسی» ADR-068 را جایگزین می‌کند. قیمت HR موجود با همان نام AiPricePerMinuteUsd حفظ و SpecializedAiPricePerMinuteUsd nullable به PricingPackages اضافه شد. هیچ جدول تعرفه یا نرخ ثابت runtime وجود ندارد. user برای قیمت اولیه تخصصی عددی نداده و دوباره منبع دیتابیس را خواسته؛ migration مقدار را null می‌گذارد تا در پکیج تنظیم شود، نه اینکه از HR یا عدد حدسی پر شود.
+
+quote با packageId/interviewType، ابتدا قابلیت و سپس قیمت نوع را از ردیف پکیج انتخابی می‌گیرد. پیش‌فرض پکیج اشتراک فعال scoped است و trial anchor خودش را دارد. رزرو واقعی همان helper انتخاب نوع و همان پکیج فعال را استفاده می‌کند. تخصصی بدون قیمت409/package_interview_price_not_configured و rollback دارد؛ HR همچنان از قیمت موجود استفاده می‌کند. پکیج فاقد قابلیت403 است، حتی اگر قیمت آن نوع تنظیم شده باشد. قیمت تاریخی billing/رزرو ثابت و snapshot خرید/trial بازنویسی نشده‌اند.
+
+DTO کاتالوگ/ادمین دو قیمت نوعی USD/IRR دارد؛ General alias قیمت موجود و Specialized فیلد مستقل است. API تنظیم پکیج AiPricePerMinuteUsd را به‌عنوان HR و SpecializedAiPricePerMinuteUsd را به‌عنوان تخصصی ذخیره می‌کند. null/حذف فیلد جدید در update مقدار قبلی را حفظ می‌کند؛ در create null یعنی تنظیم نشده. قیمت تخصصی مثبت تا۱۰۰۰ و۶رقم است؛ EF decimal(18,6) و CHECK. capabilityها، scope، RowVersion، پنج‌دقیقه‌ای‌بودن FX و fallback آخرین نرخ محفوظ‌اند. migration افزایشی AddPackageSpecializedInterviewPrice بدون backfill حدسی لازم است؛ [قرارداد و پرامپت فرانت](RIAL_AI_WALLET_API.md).
+
 ## ADR-068 — قیمت اصلی پکیج، نوع فقط برای دسترسی (2026-10-18)
+
+تاریخی؛ با تأیید مدل دو قیمت مستقل در ADR-069 جایگزین شده است.
 
 کاربر منبع تعرفه جدا را صریحاً رد و تأیید کرد: همان AiPricePerMinuteUsd موجود پکیج برای هر نوع مجاز استفاده شود؛ نوع صرفاً برای دسترسی است. این تصمیم ADR-067 و بخش قیمت snapshot در پیش‌فرض ADR-066 را جایگزین می‌کند. Domain/DbContext/configuration/reader تعرفه مستقل حذف شدند؛ migration افزایشی UseOriginalPackageAiPrice جدول InterviewTariffs را حذف می‌کند و زنجیره migration قبلی را بازنویسی نمی‌کند. نرخ ثابت/نرخ مجزای نوع و تغییر seed یا قیمت‌های اصلی پکیج اضافه نشده است.
 

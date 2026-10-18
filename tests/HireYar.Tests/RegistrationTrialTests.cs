@@ -253,6 +253,8 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
             await test.Db(async db => {
                 var blocked = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261010085424_AddMediumFirstTopicQuestions"));
                 Assert.Contains("currency cutover cannot be downgraded", blocked.MessageText);
+                // Later migrations can commit their Down before the historical cutover guard blocks.
+                await db.Database.MigrateAsync();
                 Assert.False(db.Database.HasPendingModelChanges());
             });
             var a = await test.RegisterOwner(signupTrial: true); var b = await test.RegisterOwner();
@@ -269,6 +271,7 @@ public sealed class RegistrationTrialTests : IAsyncLifetime
                 await Reject($"INSERT INTO \"OrganizationSubscriptions\" (\"Id\",\"OrganizationId\",\"PaymentId\",\"IsTrial\",\"PackageId\",\"PackagePeriodId\",\"Status\",\"StartedAtUtc\",\"ExpiresAtUtc\",\"CreatedAtUtc\") VALUES ({fresh},{other},NULL,true,{sub.PackageId},{sub.PackagePeriodId},'Active',{sub.StartedAtUtc},{sub.ExpiresAtUtc},{sub.CreatedAtUtc})", "23514");
                 var error = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261010085424_AddMediumFirstTopicQuestions"));
                 Assert.Equal("P0001", error.SqlState); Assert.Contains("currency cutover cannot be downgraded", error.MessageText);
+                await db.Database.MigrateAsync();
                 Assert.Single(await db.RegistrationTrials.ToListAsync()); Assert.False(db.Database.HasPendingModelChanges());
             });
         }

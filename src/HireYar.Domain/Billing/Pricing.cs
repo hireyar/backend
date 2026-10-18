@@ -9,7 +9,9 @@ public sealed class PricingPackage
     public bool IsActive { get; set; }
     public bool IsPublic { get; set; }
     public int SortOrder { get; set; }
+    // Existing price is the HR/general rate; retain its column and integration name.
     public decimal AiPricePerMinuteUsd { get; set; }
+    public decimal? SpecializedAiPricePerMinuteUsd { get; set; }
     public int InterviewRetentionDays { get; set; }
     public int IncludedTeamUsers { get; set; } = 3;
     public int PaidTeamUserLimit { get; set; } = 30;

@@ -244,9 +244,10 @@ public sealed class RialReservationTests : IAsyncLifetime
     }
 
     [PostgresFact]
-    public async Task Both_allowed_types_use_the_package_price_and_match_actual_reservation()
+    public async Task Advanced_package_types_have_distinct_prices_and_match_actual_reservation()
     {
         var (owner,job,template,org)=await Setup();
+        await f.Db(db=>db.PricingPackages.Where(x=>x.Code=="advanced").ExecuteUpdateAsync(s=>s.SetProperty(x=>x.SpecializedAiPricePerMinuteUsd,(decimal?).11m)));
         foreach(var type in new[]{"general","specialized"})
         {
             var quote=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,$"/api/interview-pricing/quote?templateId={template}&interviewType={type}"));
@@ -255,11 +256,11 @@ public sealed class RialReservationTests : IAsyncLifetime
                 var bill=await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId);
                 var session=await db.InterviewSessions.SingleAsync(x=>x.Id==invitation.InterviewId);
                 Assert.Equal(type=="general"?"hr_interview":"technical_interview",session.RequiredCapabilityCode);
-                Assert.Equal(.05m,bill.RatePerMinuteUsd);Assert.Equal(quote.RatePerMinuteUsd,bill.RatePerMinuteUsd);Assert.Equal(quote.RatePerMinuteRial,bill.RatePerMinuteRial);
+                Assert.Equal(type=="general"?.05m:.11m,bill.RatePerMinuteUsd);Assert.Equal(quote.RatePerMinuteUsd,bill.RatePerMinuteUsd);Assert.Equal(quote.RatePerMinuteRial,bill.RatePerMinuteRial);
                 Assert.Equal(quote.MaximumReservedRial,(await db.AiCreditReservations.SingleAsync(x=>x.InterviewSessionId==invitation.InterviewId)).ReservedAmountRial);
             });
         }
-        Assert.Equal(500000m,(await Wallet(owner)).ReservedCredit);
+        Assert.Equal(800000m,(await Wallet(owner)).ReservedCredit);
     }
 
     [PostgresFact]
@@ -273,6 +274,8 @@ public sealed class RialReservationTests : IAsyncLifetime
             await db.GetService<IMigrator>().MigrateAsync("20261018103501_AddInterviewTypeTariffs");
             await db.Database.ExecuteSqlRawAsync("UPDATE \"InterviewTariffs\" SET \"RatePerMinuteUsd\" = 7");
             await db.Database.MigrateAsync();
+            Assert.Null(await db.PricingPackages.Where(x=>x.Code=="advanced").Select(x=>x.SpecializedAiPricePerMinuteUsd).SingleAsync());
+            await db.PricingPackages.Where(x=>x.Code=="advanced").ExecuteUpdateAsync(s=>s.SetProperty(x=>x.SpecializedAiPricePerMinuteUsd,(decimal?).19m));
             await db.Database.MigrateAsync();
             Assert.False(db.Database.HasPendingModelChanges());
             await Assert.ThrowsAsync<Npgsql.PostgresException>(()=>db.Database.ExecuteSqlRawAsync("UPDATE \"PricingPackages\" SET \"AiPricePerMinuteUsd\" = 0 WHERE \"Code\" = 'advanced'"));
@@ -281,12 +284,12 @@ public sealed class RialReservationTests : IAsyncLifetime
         var catalog=await Read<PricingResponse>(await owner.Client.Send(HttpMethod.Get,"/api/pricing/packages"));
         Assert.All(catalog.Packages.Where(x=>x.Code=="advanced"),p=> {
             Assert.Equal(.12m,p.AiPricePerMinuteUsd);
-            Assert.Equal(120000m,p.AiPricePerMinuteRial);
+            Assert.Equal(120000m,p.AiPricePerMinuteRial);Assert.Equal(.19m,p.SpecializedAiPricePerMinuteUsd);Assert.Equal(190000m,p.SpecializedAiPricePerMinuteRial);
         });
         foreach(var type in new[]{"general","specialized"})
         {
             var quote=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,$"/api/interview-pricing/quote?templateId={template}&interviewType={type}"));
-            Assert.Equal(.12m,quote.RatePerMinuteUsd);
+            Assert.Equal(type=="general"?.12m:.19m,quote.RatePerMinuteUsd);
             var invite=(await Read<PanelInvitationResult>(await Invite(owner,job,template,type))).Invitation;
             await f.Db(async db=> {
                 var bill=await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==invite.InterviewId);
@@ -312,6 +315,57 @@ public sealed class RialReservationTests : IAsyncLifetime
             Assert.Single(await db.AiCreditReservations.Where(x=>x.OrganizationId==org).ToListAsync());
             Assert.Single(await db.InterviewSessions.Where(x=>x.OrganizationId==org).ToListAsync());
         });
+    }
+
+    [PostgresFact]
+    public async Task Missing_specialized_price_has_no_general_fallback_or_partial_invitation()
+    {
+        var (owner,job,template,org)=await Setup();
+        await f.Db(db=>db.PricingPackages.Where(x=>x.Code=="advanced").ExecuteUpdateAsync(s=>s.SetProperty(x=>x.SpecializedAiPricePerMinuteUsd,(decimal?)null)));
+        var response=await owner.Client.Send(HttpMethod.Get,$"/api/interview-pricing/quote?templateId={template}&interviewType=specialized");
+        Assert.Equal(HttpStatusCode.Conflict,response.StatusCode);Assert.Contains("package_interview_price_not_configured",await response.Content.ReadAsStringAsync());
+        var invitation=await Invite(owner,job,template,"specialized");
+        Assert.Equal(HttpStatusCode.Conflict,invitation.StatusCode);Assert.Contains("package_interview_price_not_configured",await invitation.Content.ReadAsStringAsync());
+        var general=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,$"/api/interview-pricing/quote?templateId={template}&interviewType=general"));
+        Assert.Equal(.05m,general.RatePerMinuteUsd);
+        await f.Db(async db=> {
+            Assert.Empty(await db.InterviewSessions.Where(x=>x.OrganizationId==org).ToListAsync());
+            Assert.Empty(await db.AiCreditReservations.Where(x=>x.OrganizationId==org).ToListAsync());
+            Assert.Empty(await db.InterviewBillings.Where(x=>x.OrganizationId==org).ToListAsync());
+            await Assert.ThrowsAsync<Npgsql.PostgresException>(()=>db.Database.ExecuteSqlRawAsync("UPDATE \"PricingPackages\" SET \"SpecializedAiPricePerMinuteUsd\" = 0 WHERE \"Code\" = 'advanced'"));
+        });
+    }
+
+    [PostgresFact]
+    public async Task Admin_configures_independent_prices_and_legacy_updates_preserve_specialized_price()
+    {
+        var (owner,job,template,_)=await Setup(2000000m);var admin=await f.RegisterAdmin();
+        var catalog=await Read<PricingResponse>(await owner.Client.Send(HttpMethod.Get,"/api/pricing/packages"));
+        var package=catalog.Packages.Single(x=>x.Code=="advanced");
+        var request=new PackageRequest(package.Code,package.Name,package.Description,package.IsActive,package.IsPublic,package.SortOrder,.04m,package.RetentionDays,
+            SpecializedAiPricePerMinuteUsd:.17m);
+        var saved=await Read<RialPackageDto>(await admin.Client.Send(HttpMethod.Put,$"/api/admin/pricing/packages/{package.Id}",new PackageUpdateRequest(request,package.RowVersion)));
+        Assert.Equal(.04m,saved.GeneralAiPricePerMinuteUsd);Assert.Equal(.17m,saved.SpecializedAiPricePerMinuteUsd);
+        foreach(var invalid in new[]{0m,-1m,1001m,.1234567m})
+            Assert.Equal(HttpStatusCode.BadRequest,(await admin.Client.Send(HttpMethod.Put,$"/api/admin/pricing/packages/{package.Id}",
+                new PackageUpdateRequest(request with { SpecializedAiPricePerMinuteUsd=invalid },saved.RowVersion))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,(await admin.Client.Send(HttpMethod.Put,$"/api/admin/pricing/packages/{package.Id}",new PackageUpdateRequest(request,package.RowVersion))).StatusCode);
+        var legacy=await Read<RialPackageDto>(await admin.Client.Send(HttpMethod.Put,$"/api/admin/pricing/packages/{package.Id}",
+            new PackageUpdateRequest(request with { SpecializedAiPricePerMinuteUsd=null },saved.RowVersion)));
+        Assert.Equal(.17m,legacy.SpecializedAiPricePerMinuteUsd);
+        var refreshed=await Read<PricingResponse>(await owner.Client.Send(HttpMethod.Get,"/api/pricing/packages"));
+        var publicPackage=refreshed.Packages.Single(x=>x.Id==package.Id);
+        Assert.Equal(40000m,publicPackage.GeneralAiPricePerMinuteRial);Assert.Equal(170000m,publicPackage.SpecializedAiPricePerMinuteRial);
+        foreach(var type in new[]{"general","specialized"})
+        {
+            var quote=await Read<InvitationPriceDto>(await owner.Client.Send(HttpMethod.Get,$"/api/interview-pricing/quote?templateId={template}&packageId={package.Id}&interviewType={type}"));
+            Assert.Equal(type=="general"?.04m:.17m,quote.RatePerMinuteUsd);
+            var invited=(await Read<PanelInvitationResult>(await Invite(owner,job,template,type))).Invitation;
+            await f.Db(async db=> {
+                var bill=await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==invited.InterviewId);
+                Assert.Equal(quote.RatePerMinuteUsd,bill.RatePerMinuteUsd);Assert.Equal(quote.RatePerMinuteRial,bill.RatePerMinuteRial);
+            });
+        }
     }
 
 }
