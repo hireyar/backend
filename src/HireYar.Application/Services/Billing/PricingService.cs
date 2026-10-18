@@ -11,11 +11,19 @@ public sealed class PricingService(IApplicationDbContext db, TimeProvider time)
     {
         var query = Packages.AsNoTracking();
         if (publicOnly) query = query.Where(x => x.IsActive && x.IsPublic && x.Periods.Any(p => p.IsActive));
-        var general = await InterviewTariffReader.GetAsync(db, "general", ct);
-        var specialized = await InterviewTariffReader.GetAsync(db, "specialized", ct);
         return (await query.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).Take(100).ToListAsync(ct))
-            .Select(x => Map(x, publicOnly) with { GeneralAiPricePerMinuteUsd = general, SpecializedAiPricePerMinuteUsd = specialized }).ToArray();
+            .Select(x => Map(x, publicOnly)).ToArray();
     }
+
+    // Entitlement validation happens first; pricing always comes from the subscribed package row.
+    // Hidden/archived catalog rows remain available to their existing subscribers.
+    internal static async Task<decimal> ActivePackageRateAsync(IApplicationDbContext db, Guid org, Guid subscriptionId, CancellationToken ct)
+        => await (from subscription in db.OrganizationSubscriptions.AsNoTracking()
+                  join package in db.PricingPackages.AsNoTracking() on subscription.PackageId equals package.Id
+                  where subscription.OrganizationId == org && subscription.Id == subscriptionId
+                  select (decimal?)package.AiPricePerMinuteUsd).SingleOrDefaultAsync(ct)
+            ?? throw AppException.NotFound();
+
     public async Task<PackageDto> GetAsync(Guid id, CancellationToken ct) => Map(await Packages.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound(), false);
     public async Task<Page<PackageDto>> AdminPackagesAsync(PageQuery page, CancellationToken ct, string? search = null)
     {

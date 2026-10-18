@@ -50,12 +50,10 @@ public sealed class RialBillingOutputTests
     [Fact]
     public void Catalog_converts_both_cash_and_credit_and_keeps_small_dollar_reference()
     {
-        var source = Sample<PackageDto>() with { GeneralAiPricePerMinuteUsd = .3m, SpecializedAiPricePerMinuteUsd = .8m };
+        var source = Sample<PackageDto>();
         var result = RialBillingOutput.Map(source, Rate());
-        Assert.Equal(195001.5m, result.AiPricePerMinuteRial);
-        Assert.Equal(.3m, result.AiPricePerMinuteUsd);
-        Assert.Equal(.3m,result.GeneralAiPricePerMinuteUsd);Assert.Equal(.8m,result.SpecializedAiPricePerMinuteUsd);
-        Assert.Equal(195001.5m,result.GeneralAiPricePerMinuteRial);Assert.Equal(520004m,result.SpecializedAiPricePerMinuteRial);
+        Assert.Equal(1300010m, result.AiPricePerMinuteRial);
+        Assert.Equal(2m, result.AiPricePerMinuteUsd);
         Assert.Equal(20, result.TeamUserMonthlyPriceRial);
         var period = RialBillingOutput.Map(new PeriodDto(Guid.NewGuid(), 3, 100000, "IRT", 5, true, 0), Rate());
         Assert.Equal(1000000, period.Price);
@@ -69,12 +67,11 @@ public sealed class RialBillingOutputTests
     }
 
     [Fact]
-    public void Catalog_general_and_compatibility_prices_share_six_decimal_precision()
+    public void Catalog_package_price_uses_six_decimal_precision()
     {
-        var source = Sample<PackageDto>() with { GeneralAiPricePerMinuteUsd = .333333m, SpecializedAiPricePerMinuteUsd = .888888m };
+        var source = Sample<PackageDto>() with { AiPricePerMinuteUsd = .333333m };
         var result = RialBillingOutput.Map(source, Rate(1234567.123456m));
         Assert.Equal(411521.962963m, result.AiPricePerMinuteRial);
-        Assert.Equal(result.GeneralAiPricePerMinuteRial, result.AiPricePerMinuteRial);
     }
 
     [Fact]

@@ -1,4 +1,14 @@
-## تحویل تعرفه دیتابیسی نوع مصاحبه — 2026-10-18
+## تحویل اصلاح قیمت اصلی پکیج — 2026-10-18 / ADR-068
+
+تأیید نهایی کاربر: همان قیمت موجود پکیج، نوع فقط برای دسترسی. قیمت نوعی و جدول جدا ADR-067 کنار گذاشته شد. Runtime اکنون فقط PricingPackages.AiPricePerMinuteUsd را می‌خواند؛ انتخاب packageId قیمت/قابلیت پکیج قابل‌عرضه را می‌گیرد و حذف آن پس از entitlement check، شناسه پکیج اشتراک فعال scoped به سازمان را join می‌کند. trial از anchor ثبت‌شده خودش استفاده می‌کند. رزرو واقعی هم از همان helper در PricingService استفاده می‌کند؛ داده تاریخی قرارداد/رزرو/billing ثابت است و قیمت پکیج فقط برای دعوت‌های جدید خوانده می‌شود. قیمت اصلی/seed/هدیه تغییر نکرده است.
+
+نوع general/specialized در quote و multipart دعوت باقی است و فقط برای مجوز است؛ نوع صریح بر قالب اولویت دارد. کاتالوگ به فیلدهای اصلی aiPricePerMinuteUsd/Rial برمی‌گردد و چهار فیلد نوعی افزوده‌شده قبلی حذف‌اند. سیاست ارز۵دقیقه‌ای/last-known fallback محفوظ است. قرارداد و پرامپت یکپارچه جاری در RIAL_AI_WALLET_API آمده و ADR-068 تصمیم جاری است. مقایسه پکیج، خرید/فعال‌سازی یا اختیار رزرو واقعی ایجاد نمی‌کند.
+
+migration افزایشی20261018113051_UseOriginalPackageAiPrice فقط InterviewTariffs را drop می‌کند؛ زنجیره migration قبلی برای نصب‌های موجود حفظ شده است. روی مقصد اجرا نشده. SQL idempotent artifacts/package-source-migrations.sql و build artifacts/package-source-final-build.log آماده‌اند؛ build صفر warning/error و مدل بدون drift است. تست‌های مرتبط روی نسخه نهایی۱۲۵/۱۲۵ Passed با صفر Failed/Skipped شدند؛ tests/HireYar.Tests/TestResults/package-source-final.trx و artifacts/package-source-final-tests.log. قیمت اصلی پکیج‌های مختلف، هر دو نوع مجاز، عدم دسترسی، scope، تغییر قیمت جاری و حفظ billing/قرارداد قبلی، ارتقای schema قبلی با مقدار متفاوت در جدول منسوخ، حذف جدول و migration مجدد همگی پوشش و تأیید شدند. پس از اجرا صفر دیتابیس fixture باقی بود؛ کلاستر اختصاصی پس از تأیید مسیر داخل artifacts متوقف/حذف شد. git diff --check موفق است. سناریوها از جمله نوع مستقل از قالب، پکیج‌های متفاوت، تغییر قیمت اصلی، ثبات billing/قرارداد قبلی، نبود جدول جدا، قیود PostgreSQL و upgrade از schema قبلی با مقدار مصنوعی متفاوت در جدول کنارگذاشته‌شده هستند.
+
+محیط تست PostgreSQL18 اختصاصی loopback55534 و FFmpeg محلی با provider/AI/OTP/درگاه مصنوعی است. SQL InMemory/SQLite استفاده نشده. suite گسترده قبلی۸تست downgrade قدیمی دارد که به محافظ cutover ریالی برخورد می‌کنند؛ آن محافظ و تست‌های تاریخی در این درخواست بازطراحی نشده‌اند. روی dev کار شده؛ مقصد، تنظیمات واقعی، Angular، commit/push/deploy/production تغییر نکرده‌اند.
+
+## تاریخی؛ جایگزین‌شده با ADR-068 — تحویل تعرفه دیتابیسی نوع مصاحبه — 2026-10-18
 
 پاسخ کاربر ابهام یادداشت قبلی را رفع کرد: تعرفه عمومی۰٫۳ و تخصصی۰٫۸ دلار در همه پکیج‌ها مشترک، پکیج تعیین‌کننده دسترسی و منبع تعرفه دیتابیس است. ADR-067 و RIAL_AI_WALLET_API قرارداد و پرامپت جاری‌اند. migration20261018103501_AddInterviewTypeTariffs جدول InterviewTariffs را با دو seed و قیود می‌سازد؛ قبل از API جدید لازم است و روی مقصد اعمال نشده است.
 

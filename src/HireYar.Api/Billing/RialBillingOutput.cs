@@ -32,7 +32,7 @@ public static class RialBillingOutput
         x.IsActive,
         x.IsPublic,
         x.SortOrder,
-        rate is null || x.GeneralAiPricePerMinuteUsd is null ? null : decimal.Round(x.GeneralAiPricePerMinuteUsd.Value * rate.RialPerUsdt, 6, MidpointRounding.ToEven),
+        rate is null ? null : decimal.Round(x.AiPricePerMinuteUsd * rate.RialPerUsdt, 6, MidpointRounding.ToEven),
         x.RetentionDays,
         x.RowVersion,
         x.Features,
@@ -40,11 +40,9 @@ public static class RialBillingOutput
         x.IncludedTeamUsers,
         x.PaidTeamUserLimit,
         x.TeamUserMonthlyPriceIrt * 10m,
-        x.GeneralAiPricePerMinuteUsd ?? x.AiPricePerMinuteUsd,
+        x.AiPricePerMinuteUsd,
         "IRR",
-        rate,
-        x.GeneralAiPricePerMinuteUsd,
-        x.SpecializedAiPricePerMinuteUsd);
+        rate);
 
     public static RialCreditPackageDto Map(CreditPackageDto x, AiDisplayRateDto? rate) => new(
         x.Id,
