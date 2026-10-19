@@ -7,8 +7,15 @@ namespace HireYar.Infrastructure.Persistence;
 
 public sealed class SubscriptionConfigurations : IEntityTypeConfiguration<SubscriptionPlan>, IEntityTypeConfiguration<InterviewBundle>,
     IEntityTypeConfiguration<SubscriptionOrder>, IEntityTypeConfiguration<OrganizationMembership>,
-    IEntityTypeConfiguration<InterviewQuotaGrant>, IEntityTypeConfiguration<InterviewQuotaReservation>, IEntityTypeConfiguration<SignupTrial>
+    IEntityTypeConfiguration<InterviewQuotaGrant>, IEntityTypeConfiguration<InterviewQuotaReservation>, IEntityTypeConfiguration<SignupTrial>, IEntityTypeConfiguration<ExistingOrganizationGrant>
 {
+    public void Configure(EntityTypeBuilder<ExistingOrganizationGrant> b)
+    {
+        b.HasKey(g => g.OrganizationId);
+        b.HasOne<Organization>().WithOne().HasForeignKey<ExistingOrganizationGrant>(g => g.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        b.ToTable(t => t.HasCheckConstraint("CK_ExistingOrganizationGrant_Values",
+            "\"ExpiresAtUtc\" = ((\"StartedAtUtc\" AT TIME ZONE 'UTC') + interval '1 month') AT TIME ZONE 'UTC' AND \"InterviewQuantity\" = 100 AND \"TeamUsers\" >= 1 AND \"RetentionDays\" BETWEEN 1 AND 3650"));
+    }
     public void Configure(EntityTypeBuilder<SignupTrial> b)
     {
         b.HasKey(t => t.OrganizationId);
@@ -28,6 +35,11 @@ public sealed class SubscriptionConfigurations : IEntityTypeConfiguration<Subscr
             t.HasCheckConstraint("CK_SubscriptionPlan_Singleton", "\"Id\" = 'd1000000-0000-0000-0000-000000000001'::uuid");
             t.HasCheckConstraint("CK_SubscriptionPlan_Values", "\"MonthlyPriceRial\" BETWEEN 1 AND 1000000000000 AND \"BaseInterviewPriceRial\" BETWEEN 1 AND 1000000000000 AND \"ExtraUserMonthlyPriceRial\" BETWEEN 0 AND 1000000000000 AND \"IncludedUsers\" >= 1 AND \"PaidUserCeiling\" > \"IncludedUsers\" AND \"RetentionDays\" BETWEEN 1 AND 3650");
         });
+        b.Property(p => p.ThreeMonthDiscountPercent).HasPrecision(5, 2);
+        b.Property(p => p.SixMonthDiscountPercent).HasPrecision(5, 2);
+        b.Property(p => p.TwelveMonthDiscountPercent).HasPrecision(5, 2);
+        b.ToTable(t => t.HasCheckConstraint("CK_SubscriptionPlan_PeriodDiscounts",
+            "\"ThreeMonthDiscountPercent\" BETWEEN 0 AND 99.99 AND \"SixMonthDiscountPercent\" BETWEEN 0 AND 99.99 AND \"TwelveMonthDiscountPercent\" BETWEEN 0 AND 99.99"));
         b.HasData(new SubscriptionPlan { RowVersion = Guid.Parse("d1000000-0000-0000-0000-000000000002").ToByteArray() });
     }
     public void Configure(EntityTypeBuilder<InterviewBundle> b)

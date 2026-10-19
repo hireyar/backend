@@ -3,14 +3,18 @@ namespace HireYar.Application.Subscriptions;
 
 public sealed record PlanDto(Guid Id, string Name, string Currency, long MonthlyPriceRial, long BaseInterviewPriceRial,
     long ExtraUserMonthlyPriceRial, int IncludedUsers, int PaidUserCeiling, int RetentionDays, int MaximumInterviewMinutes,
-    bool IsActive, byte[] RowVersion, IReadOnlyList<BundleDto> Bundles);
+    bool IsActive, byte[] RowVersion, IReadOnlyList<BundleDto> Bundles, IReadOnlyList<SubscriptionPeriodDto> Periods);
+public sealed record SubscriptionPeriodDto(int Months, decimal DiscountPercent);
 public sealed record BundleDto(Guid Id, string Code, string Name, int MinimumQuantity, int MaximumQuantity, int QuantityStep,
     decimal DiscountPercent, long StartingOriginalAmountRial, long StartingAmountRial, bool IsActive, int SortOrder, byte[] RowVersion);
 public sealed record PlanUpdateRequest([Required, StringLength(200)] string Name,
     [Range(1, 1_000_000_000_000)] long MonthlyPriceRial, [Range(1, 1_000_000_000_000)] long BaseInterviewPriceRial,
     [Range(0, 1_000_000_000_000)] long ExtraUserMonthlyPriceRial,
     [Range(1, 100)] int IncludedUsers, [Range(2, 10000)] int PaidUserCeiling,
-    [Range(1, 3650)] int RetentionDays, bool IsActive, [Required, MinLength(16), MaxLength(16)] byte[] RowVersion);
+    [Range(1, 3650)] int RetentionDays, bool IsActive, [Required, MinLength(16), MaxLength(16)] byte[] RowVersion,
+    [Range(0, 99.99)] decimal? ThreeMonthDiscountPercent = null,
+    [Range(0, 99.99)] decimal? SixMonthDiscountPercent = null,
+    [Range(0, 99.99)] decimal? TwelveMonthDiscountPercent = null);
 public sealed record BundleUpdateRequest([Required, StringLength(200)] string Name,
     [Range(1, 1_000_000)] int MinimumQuantity, [Range(1, 1_000_000)] int MaximumQuantity,
     [Range(1, 1_000_000)] int QuantityStep, [Range(0, 99.99)] decimal DiscountPercent,
