@@ -89,3 +89,14 @@ public sealed class InterviewQuotaReservation
     public DateTimeOffset? ConsumedAtUtc { get; set; }
     public DateTimeOffset? ReleasedAtUtc { get; set; }
 }
+
+// A registration gift is independent of paid orders and immutable after creation.
+public sealed class SignupTrial
+{
+    public Guid OrganizationId { get; set; }
+    public DateTimeOffset StartedAtUtc { get; set; }
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+    public int InterviewQuantity { get; set; } = 2;
+    public int TeamUsers { get; set; } = 5;
+    public int RetentionDays { get; set; } = 60;
+}

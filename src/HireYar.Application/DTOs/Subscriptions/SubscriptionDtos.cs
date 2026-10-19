@@ -29,4 +29,4 @@ public sealed record SubscriptionOrderDto(Guid Id, Guid OrganizationId, string P
     string? BundleCode, int Quantity, DateTimeOffset CreatedAtUtc, DateTimeOffset ExpiresAtUtc, DateTimeOffset? ConfirmedAtUtc);
 public sealed record SubscriptionStateDto(bool HasActiveSubscription, DateTimeOffset? StartedAtUtc, DateTimeOffset? ExpiresAtUtc,
     int RemainingDays, long RemainingInterviews, long AvailableInterviews, int ReservedInterviews, int ConsumedInterviews,
-    int? TeamCapacity, bool UnlimitedTeam, int OccupiedTeamUsers);
+    int? TeamCapacity, bool UnlimitedTeam, int OccupiedTeamUsers, bool IsTrial = false);

@@ -66,8 +66,7 @@ public sealed class SubscriptionOrderService(IApplicationDbContext db, CatalogSe
             if (o.Product == "subscription")
             {
                 if (!o.UnlimitedTeam && await team.OccupiedAsync(org, ct) > o.TeamUsers) throw AppException.Invalid("team_capacity_too_small");
-                var last = await db.OrganizationMemberships.Where(m => m.OrganizationId == org && m.ExpiresAtUtc > now)
-                    .Select(m => (DateTimeOffset?)m.ExpiresAtUtc).MaxAsync(ct);
+                var last = await subscriptions.CoverageEndAsync(org, ct);
                 var start = last ?? now;
                 db.OrganizationMemberships.Add(new() { OrganizationId = org, OrderId = o.Id, StartedAtUtc = start,
                     ExpiresAtUtc = start.AddMonths(o.Months), TeamUsers = o.TeamUsers, UnlimitedTeam = o.UnlimitedTeam, RetentionDays = o.RetentionDays });
