@@ -43,7 +43,7 @@ public sealed class InterviewContextRulesTests
     [Fact]
     public void General_interview_preserves_order_and_does_not_finish_on_sufficient_evidence()
     {
-        var s = Session(); s.SetRequiredCapability("hr_interview"); var policy = new InterviewPolicy();
+        var s = Session(); s.SetInterviewType("general"); var policy = new InterviewPolicy();
         Assert.Equal(s.Questions[0], policy.SelectFallback(s, Now));
         s.Start(s.Questions[0].QuestionId, Now);
         Assert.Equal(s.Questions[1], Assert.Single(policy.GetAllowedQuestions(s, Now)));

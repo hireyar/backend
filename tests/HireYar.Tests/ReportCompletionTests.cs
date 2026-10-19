@@ -144,7 +144,7 @@ public sealed partial class InterviewFlowTests
             var flow=new InterviewFlowTests(isolated);var x=await flow.CompletedForAssessment();var report=await NewReport(x.Hr,x.Session);
             await isolated.Db(async db=> {
                 var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var latest=migrations.Single(m=>m.EndsWith("_CompleteReportEvidenceAndNarrative"));var previous=migrations[Array.IndexOf(migrations,latest)-1];
-                await db.GetService<IMigrator>().MigrateAsync(previous);var script=db.GetService<IMigrator>().GenerateScript(previous,latest,MigrationsSqlGenerationOptions.Idempotent);
+                var script=db.GetService<IMigrator>().GenerateScript(previous,latest,MigrationsSqlGenerationOptions.Idempotent);
                 await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);await db.GetService<IMigrator>().MigrateAsync(migrations[^1]);Assert.False(db.Database.HasPendingModelChanges());
             });
             Assert.Equal(HttpStatusCode.OK,(await x.Hr.Client.Send(HttpMethod.Post,NarrativeUrl(x.Session),new GenerateReportNarrativeRequest(report.Fingerprint))).StatusCode);
@@ -248,7 +248,7 @@ public sealed partial class InterviewFlowTests
             const string experience="من چهار سال سابقه توسعه نرم‌افزار دارم.";
             await f.Db(async db=> {
                 var session=await db.InterviewSessions.SingleAsync(s=>s.Id==invite.InterviewId);
-                if(type=="general") session.SetRequiredCapability("hr_interview");
+                if(type=="general") session.SetInterviewType("general");
                 session.SetAiSnapshot(session.MasterPromptSnapshot??"Synthetic prompt",session.MasterPromptVersion??"synthetic",experience,"fa-IR",false,"",false,"");await db.SaveChangesAsync();
             });
             using var candidate=Candidate(invite);var state=await Start(candidate,invite.InterviewId);await Submit(candidate,invite.InterviewId,state.Question!.Id);await candidate.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete",null);

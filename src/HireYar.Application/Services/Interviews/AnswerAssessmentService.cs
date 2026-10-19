@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using HireYar.Application.Billing;
 using HireYar.Application.Common;
 using HireYar.Domain.Interviews;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace HireYar.Application.Interviews;
 
-public sealed partial class AnswerAssessmentService(IApplicationDbContext db, InterviewBillingService billing,
+public sealed partial class AnswerAssessmentService(IApplicationDbContext db,
     IAnswerAssessmentProvider provider, TimeProvider time, AnswerAssessmentOptions options,
     ILogger<AnswerAssessmentService> logger)
 {
@@ -26,15 +25,12 @@ public sealed partial class AnswerAssessmentService(IApplicationDbContext db, In
         var answer = await db.InterviewAnswers.AsNoTracking().SingleAsync(a => a.Id == answerId && a.InterviewSessionId == session.Id, ct);
         return (session, answer);
     }
-    private async Task<bool> IncludedAsync(InterviewSession session, CancellationToken ct) =>
-        !await db.InterviewBillings.AnyAsync(b => b.OrganizationId == session.OrganizationId && b.InterviewSessionId == session.Id, ct) ||
-        (await billing.CapabilitiesAsync(session, ct)).Contains("interview_report");
     private async Task<AnswerAssessmentInput> InputAsync(InterviewSession s, InterviewAnswer a, CancellationToken ct)
     {
         var q = s.Questions.Single(q => q.QuestionId == a.QuestionId);
         var title = s.PositionTitleSnapshot ?? await db.JobPositions.Where(p => p.OrganizationId == s.OrganizationId && p.Id == s.JobPositionId).Select(p => p.Title).SingleAsync(ct);
-        return new(title, s.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized", q.Text, q.Topic, q.Difficulty,
-            AnswerAssessmentProtocol.Excerpts(a.Transcript!), s.PositionDescriptionSnapshot, AnswerDimensionProtocol.Catalog(s.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized"));
+        return new(title, s.InterviewType, q.Text, q.Topic, q.Difficulty,
+            AnswerAssessmentProtocol.Excerpts(a.Transcript!), s.PositionDescriptionSnapshot, AnswerDimensionProtocol.Catalog(s.InterviewType));
     }
     private static string Hash(AnswerAssessmentInput input) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
         AnswerAssessmentOptions.Version + JsonSerializer.Serialize(input, Json))));
@@ -48,7 +44,7 @@ public sealed partial class AnswerAssessmentService(IApplicationDbContext db, In
     public async Task ProcessAsync(Guid org, Guid answerId, CancellationToken ct)
     {
         // Only short DB operations run under the existing organization lock; no model/network I/O.
-        var claim = await db.WithOrganizationBillingLockAsync<Claim?>(org, async () => {
+        var claim = await db.WithOrganizationLockAsync<Claim?>(org, async () => {
             var source = await LoadAsync(org, answerId, ct);
             if (source is not { } data || data.Session.Status != InterviewStatus.Completed || data.Answer.IsInteraction || string.IsNullOrWhiteSpace(data.Answer.Transcript)) return null;
             var now = time.GetUtcNow(); var row = await RowAsync(org, answerId, ct);
@@ -56,7 +52,6 @@ public sealed partial class AnswerAssessmentService(IApplicationDbContext db, In
                 row = new() { AnswerId = answerId, OrganizationId = org, InterviewSessionId = data.Session.Id, RequestedAtUtc = now };
                 db.AnswerAssessments.Add(row);
             }
-            if (!await IncludedAsync(data.Session, ct)) { row.State = "Unavailable"; row.FailureCode = "feature_unavailable"; return null; }
             if (row.State == "Processing" && row.LeaseExpiresAtUtc <= now) {
                 row.AttemptId = null; row.LeaseExpiresAtUtc = null; row.FailureCode = "assessment_lease_expired";
                 row.State = row.Attempts < AnswerAssessmentOptions.MaxAttempts ? "Queued" : "Failed";
@@ -107,7 +102,7 @@ public sealed partial class AnswerAssessmentService(IApplicationDbContext db, In
             if (task is not null) _ = task.ContinueWith(t => { _ = t.Exception; }, CancellationToken.None,
                 TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         }
-        await db.WithOrganizationBillingLockAsync(org, async () => {
+        await db.WithOrganizationLockAsync(org, async () => {
             var row = await RowAsync(org, answerId, ct); var now = time.GetUtcNow();
             if (row is null || row.State != "Processing" || row.AttemptId != claim.Token || row.LeaseExpiresAtUtc <= now) return false;
             var source = await LoadAsync(org, answerId, ct);
@@ -132,10 +127,9 @@ public sealed partial class AnswerAssessmentService(IApplicationDbContext db, In
     }
 
     public Task<bool> RetryAsync(Guid org, Guid sessionId, Guid answerId, CancellationToken ct) =>
-        db.WithOrganizationBillingLockAsync(org, async () => {
+        db.WithOrganizationLockAsync(org, async () => {
             var source = await LoadAsync(org, answerId, ct);
             if (source is not { } data || data.Session.Id != sessionId) throw AppException.NotFound();
-            if (!await IncludedAsync(data.Session, ct)) throw new AppException(403, "feature_unavailable", "Reports are not included.");
             if (data.Session.Status != InterviewStatus.Completed || data.Answer.IsInteraction || string.IsNullOrWhiteSpace(data.Answer.Transcript))
                 throw new AppException(409, "assessment_not_ready", "This answer is not ready for assessment.");
             var row = await RowAsync(org, answerId, ct);

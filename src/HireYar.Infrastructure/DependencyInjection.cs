@@ -1,6 +1,3 @@
-using HireYar.Application.Billing;
-using HireYar.Domain.Billing;
-using HireYar.Infrastructure.Billing;
 using HireYar.Infrastructure.Interviews;
 using HireYar.Application.Auth;
 using HireYar.Application.Common;
@@ -48,24 +45,6 @@ public static class DependencyInjection
             s.GetRequiredService<Microsoft.Extensions.Options.IOptions<KavenegarOptions>>()));
         services.AddScoped<IAccounts, Accounts>();
         services.AddScoped<HireYar.Application.Organizations.ITeamMembers, HireYar.Infrastructure.Organizations.TeamMembers>();
-        services.AddOptions<RegistrationTrialOptions>().Bind(config.GetSection("RegistrationTrial"))
-            .Validate(x => x.DurationDays is >= 1 and <= 3650, "RegistrationTrial:DurationDays must be between 1 and 3650.")
-            .Validate(x => x.CreditAmountRial > 0 && x.CreditAmountRial < 1_000_000_000_000m && BillingMath.HasPrecision(x.CreditAmountRial, 6),
-                "RegistrationTrial:CreditAmountRial must be positive, below 1000000000000 and have at most six decimals.")
-            .ValidateOnStart();
-        services.AddScoped<RegistrationTrialService>();
-        services.AddHttpClient("WallexDisplayRate", h => { h.BaseAddress = new Uri("https://api.wallex.ir/"); h.Timeout = TimeSpan.FromSeconds(5); });
-        services.AddSingleton<IAiDisplayRateProvider, WallexAiDisplayRateProvider>();
-        services.AddHostedService<AiDisplayRateRefreshWorker>();
-        services.AddScoped<InterviewTypeService>(); services.AddScoped<PricingService>(); services.AddScoped<WalletService>(); services.AddScoped<PaymentService>();
-        services.AddOptions<BillingPanelOptions>().Bind(config.GetSection("BillingPanel"))
-            .Validate(x => x.SubscriptionTaxPercent is >= 0 and <= 100 && BillingMath.HasPrecision(x.SubscriptionTaxPercent, 2), "BillingPanel tax percent must be between 0 and 100 with at most two decimals.").ValidateOnStart();
-        services.AddScoped<BillingPanelService>();
-        services.AddScoped<InvitationPricingService>();
-        services.AddScoped<TeamSeatService>();
-        services.AddScoped<ITeamSeatUsage, HireYar.Infrastructure.Organizations.TeamSeatUsage>();
-        services.AddScoped<ISubscriptionEntitlementService, SubscriptionEntitlementService>(); services.AddScoped<InterviewBillingService>(); services.AddScoped<BillingQueryService>();
-        services.AddSingleton<IPaymentGateway, DisabledPaymentGateway>();
         services.AddOptions<HireYar.Infrastructure.Support.TicketStorageOptions>().Bind(config.GetSection("TicketStorage"))
             .Validate(x => x.IsValid(), "TicketStorage requires a private dedicated ticket bucket, HTTPS service endpoint, region and credentials.");
         services.AddKeyedSingleton<Amazon.S3.IAmazonS3>("ticketing", (sp, _) => {
@@ -78,6 +57,11 @@ public static class DependencyInjection
             });
         });
         services.AddSingleton<HireYar.Application.Support.ITicketAttachmentStorage, HireYar.Infrastructure.Support.TicketS3Storage>();
+        services.AddScoped<HireYar.Application.Subscriptions.CatalogService>();
+        services.AddScoped<HireYar.Application.Subscriptions.SubscriptionService>();
+        services.AddScoped<HireYar.Application.Subscriptions.SubscriptionOrderService>();
+        services.AddScoped<HireYar.Application.Subscriptions.InterviewQuotaService>();
+        services.AddScoped<HireYar.Application.Subscriptions.IOrganizationTeamUsage, HireYar.Infrastructure.Organizations.OrganizationTeamUsage>();
         services.AddSingleton(TimeProvider.System); services.AddInterviews(config); return services;
     }
 }

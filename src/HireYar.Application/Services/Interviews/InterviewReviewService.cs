@@ -1,13 +1,12 @@
 using System.Text.Json;
 using HireYar.Application.Common;
-using HireYar.Application.Billing;
 using HireYar.Domain.Interviews;
 using Microsoft.EntityFrameworkCore;
 
 namespace HireYar.Application.Interviews;
 
 public sealed partial class InterviewReviewService(IApplicationDbContext db, ICurrentUser user, ICurrentInterviewAccess access,
-    TimeProvider time, IInterviewAudioStorage storage, InterviewBillingService billing)
+    TimeProvider time, IInterviewAudioStorage storage, HireYar.Application.Subscriptions.InterviewQuotaService quota)
 {
     public const long MaximumRecordingBytes = 512L * 1024 * 1024;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -30,7 +29,7 @@ public sealed partial class InterviewReviewService(IApplicationDbContext db, ICu
         DateTimeOffset? occurredAt, Guid? actor, CancellationToken ct)
     {
         if (requestId == Guid.Empty) throw AppException.Invalid("request_id_required");
-        return await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+        return await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
             await db.ReloadInterviewAsync(s, ct);
             if (actor is null) CheckCandidate(s);
             else if (s.DeletedAtUtc is not null || s.OrganizationId != user.OrganizationId) throw AppException.NotFound();
@@ -72,14 +71,16 @@ public sealed partial class InterviewReviewService(IApplicationDbContext db, ICu
     public async Task<InterviewReviewDto> GetAsync(Guid id, CancellationToken ct)
     {
         var s = await Owner(id, ct);
+        var mediaAllowed = true;
+        try { await quota.RequireMediaAsync(s, ct); } catch (AppException e) when (e.Status == 404) { mediaAllowed = false; }
         var rows = await db.InterviewReviewEntries.AsNoTracking().Where(e => e.OrganizationId == s.OrganizationId && e.InterviewSessionId == id)
             .OrderBy(e => e.RecordedAtUtc).ThenBy(e => e.Id).ToArrayAsync(ct);
         var consent = rows.Where(e => e.Kind.StartsWith("consent_")).OrderBy(e => e.ClientOccurredAtUtc).ThenBy(e => e.RecordedAtUtc).LastOrDefault()?.Kind;
         var recording = await db.InterviewSessionRecordings.AsNoTracking().SingleOrDefaultAsync(r => r.OrganizationId == s.OrganizationId && r.InterviewSessionId == id, ct);
         var segments = await SegmentRows(s, ct);
         return new(rows.Select(Map).ToArray(), consent switch { "consent_accepted" => "accepted", "consent_revoked" => "revoked", _ => "unknown" },
-            recording is not null ? "uploaded_unverified" : segments.Length > 0 ? "uploaded_segments_unverified" : "unknown",
-            recording is null ? null : Recording(recording), segments.Select(SegmentDto).ToArray());
+            !mediaAllowed ? "expired" : recording is not null ? "uploaded_unverified" : segments.Length > 0 ? "uploaded_segments_unverified" : "unknown",
+            !mediaAllowed || recording is null ? null : Recording(recording), mediaAllowed ? segments.Select(SegmentDto).ToArray() : []);
     }
     private static InterviewRecordingDto Recording(InterviewSessionRecording r) => new($"/api/interviews/{r.InterviewSessionId}/recording/video",
         r.DurationSeconds, JsonSerializer.Deserialize<InterviewRecordingOffset[]>(r.TimelineJson, Json)!);
@@ -101,15 +102,15 @@ public sealed partial class InterviewReviewService(IApplicationDbContext db, ICu
             JsonSerializer.Serialize(JsonSerializer.Deserialize<InterviewRecordingOffset[]>(r.TimelineJson, Json), Json) == serialized;
         if (existing is not null) { if (!Replay(existing)) throw AppException.Conflict(); return Recording(existing); }
         var contentType = await VideoUploadValidator.ValidateAsync(video, fileName, mime, size, new() { MaxVideoUploadBytes = MaximumRecordingBytes }, ct);
-        await billing.RequireMediaRetentionAsync(s, ct);
+
         var saved = await storage.SaveAsync(video, "videos", id, MaximumRecordingBytes, ct);
         bool committed = false, won = false;
         try
         {
             if (saved.SizeBytes != size) throw AppException.Invalid("recording_size_mismatch");
-            var result = await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+            var result = await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
                 await db.ReloadInterviewAsync(s, ct); CheckCandidate(s);
-                await billing.RequireMediaRetentionAsync(s, ct);
+
                 if (await db.InterviewRecordingSegments.AnyAsync(r => r.OrganizationId == s.OrganizationId && r.InterviewSessionId == id, ct))
                     throw new AppException(409, "recording_mode_conflict", "This session uses segmented recording.");
                 var winner = await db.InterviewSessionRecordings.SingleOrDefaultAsync(r => r.OrganizationId == s.OrganizationId && r.InterviewSessionId == id, ct);
@@ -126,7 +127,8 @@ public sealed partial class InterviewReviewService(IApplicationDbContext db, ICu
     }
     public async Task<(Stream Content, string ContentType)> OpenRecordingAsync(Guid id, CancellationToken ct)
     {
-        var s = await Owner(id, ct); await billing.RequireMediaRetentionAsync(s, ct);
+        var s = await Owner(id, ct);
+        await quota.RequireMediaAsync(s, ct);
         var row = await db.InterviewSessionRecordings.AsNoTracking().SingleOrDefaultAsync(r => r.OrganizationId == s.OrganizationId && r.InterviewSessionId == id, ct) ?? throw AppException.NotFound();
         return (await storage.OpenReadAsync(row.StorageKey, ct), row.ContentType);
     }

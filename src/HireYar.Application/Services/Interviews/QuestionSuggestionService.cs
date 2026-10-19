@@ -1,11 +1,10 @@
 using System.Text.Json;
-using HireYar.Application.Billing;
 using HireYar.Application.Common;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 public sealed class QuestionSuggestionService(IApplicationDbContext db, ICurrentUser user,
-    ISubscriptionEntitlementService entitlements, IQuestionSuggestionProvider provider)
+    IQuestionSuggestionProvider provider, HireYar.Application.Subscriptions.SubscriptionService subscriptions)
 {
     public Task<QuestionSuggestionsDto> GenerateAsync(QuestionSuggestionRequest r, CancellationToken ct) => Generate(r.JobPositionId, r.TopicCount, null, ct);
     public Task<QuestionSuggestionsDto> RegenerateTopicAsync(TopicSuggestionRequest r, CancellationToken ct) => Generate(r.JobPositionId, 1, r.TopicName.Trim(), ct);
@@ -14,8 +13,8 @@ public sealed class QuestionSuggestionService(IApplicationDbContext db, ICurrent
         var job = await db.JobPositions.AsNoTracking().SingleOrDefaultAsync(j => j.Id == jobId && j.OrganizationId == user.OrganizationId && j.DeletedAtUtc == null, ct)
             ?? throw AppException.NotFound();
         if (job.Status == HireYar.Domain.JobPositions.JobStatus.Archived) throw AppException.Invalid("position_archived");
-        await entitlements.RequireAsync(user.OrganizationId, ["advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"], ct);
         if (string.IsNullOrWhiteSpace(job.Description)) throw AppException.Invalid("job_description_required");
+        await subscriptions.RequireAsync(user.OrganizationId, ct);
         string json;
         try { json = await provider.SuggestAsync(new(job.Title, job.Description, count, name), ct); }
         catch (InterviewProviderException) { throw new AppException(503, "question_suggestions_unavailable", "تولید پیشنهاد سؤال در دسترس نیست؛ دوباره تلاش کنید."); }

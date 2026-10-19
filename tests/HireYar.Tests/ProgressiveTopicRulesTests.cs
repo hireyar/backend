@@ -91,11 +91,11 @@ public sealed class ProgressiveTopicRulesTests
     }
 
     [Theory]
-    [InlineData("hr_interview", 1)]
-    [InlineData("technical_interview", 4)]
-    public void Medium_first_topic_order_is_fixed_only_for_hr(string capability, int allowedTopicCount)
+    [InlineData("general", 1)]
+    [InlineData("specialized", 4)]
+    public void Medium_first_topic_order_is_fixed_only_for_hr(string interviewType, int allowedTopicCount)
     {
-        var s = Plan(mediumFirst: true); s.SetRequiredCapability(capability);
+        var s = Plan(mediumFirst: true); s.SetInterviewType(interviewType);
         var policy = new InterviewPolicy();
         var first = policy.SelectFallback(s, Now)!;
         Assert.Equal("topic-1", first.Topic); Assert.Equal(3, first.Difficulty);

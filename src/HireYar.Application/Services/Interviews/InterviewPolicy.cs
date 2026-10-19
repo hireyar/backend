@@ -20,7 +20,7 @@ public sealed class InterviewPolicy
                 var allowed = session.GetProgressiveQuestions().OrderBy(q => q.Order).ThenBy(q => q.QuestionId);
                 var pendingMedium = session.CurrentQuestionId is { } medium && session.Questions.Single(q => q.QuestionId == medium).Difficulty == 3 &&
                     !session.Answers.Any(a => a.QuestionId == medium && a.Status == AnswerStatus.Processed && !a.IsInteraction);
-                return allowed.Take(session.RequiredCapabilityCode == "hr_interview" && !pendingMedium ? 1 : shortlistLimit).ToArray();
+                return allowed.Take(session.InterviewType == "general" && !pendingMedium ? 1 : shortlistLimit).ToArray();
             }
             var currentTopic = session.CurrentQuestionId is { } id
                 ? session.Questions.Single(q => q.QuestionId == id).Topic : null;
@@ -30,12 +30,12 @@ public sealed class InterviewPolicy
                 .ThenByDescending(q => session.Skills.Single(s => s.SkillId == q.SkillId).Priority)
                 .ThenBy(q => q.Order).ThenBy(q => q.QuestionId).ToArray();
             // Keep both pass/fail branches during evaluation; HR topic order is fixed.
-            if (session.RequiredCapabilityCode != "hr_interview") return progressive.Take(shortlistLimit).ToArray();
+            if (session.InterviewType != "general") return progressive.Take(shortlistLimit).ToArray();
             var firstTopic = progressive.FirstOrDefault()?.Topic;
             return progressive.Where(q => q.Topic == firstTopic || q.Difficulty == 1)
                 .GroupBy(q => q.Difficulty == 1).Select(g => g.First()).Take(shortlistLimit).ToArray();
         }
-        if (session.RequiredCapabilityCode == "hr_interview")
+        if (session.InterviewType == "general")
             return session.Questions.Where(q => q.IsActive && !asked.Contains(q.QuestionId) &&
                 (!session.AskOneQuestionPerTopic || q.Difficulty == 3 && !session.Questions.Any(a => asked.Contains(a.QuestionId) && a.Topic == q.Topic)))
                 .OrderBy(q => q.Order).ThenBy(q => q.QuestionId).Take(1).ToArray();
@@ -64,7 +64,7 @@ public sealed class InterviewPolicy
         if (session.RemainingSeconds(now) == 0) return InterviewCompletionReason.DurationLimit;
         if (session.AnsweredQuestionCount >= session.MaxQuestionCount) return InterviewCompletionReason.QuestionLimit;
         var required = session.Skills.Where(x => x.IsRequired).ToArray();
-        if (!session.ProgressiveTopicQuestions && session.RequiredCapabilityCode != "hr_interview" && required.Length > 0 && required.All(s => session.SkillStates.Any(x => x.SkillId == s.SkillId &&
+        if (!session.ProgressiveTopicQuestions && session.InterviewType != "general" && required.Length > 0 && required.All(s => session.SkillStates.Any(x => x.SkillId == s.SkillId &&
                 x.EvidenceCount >= minimumEvidenceCount && x.Confidence >= confidenceThreshold)))
             return InterviewCompletionReason.SufficientEvidence;
         return GetAllowedQuestions(session, now).Count == 0 ? InterviewCompletionReason.NoQuestions : null;

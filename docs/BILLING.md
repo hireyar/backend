@@ -1,3 +1,5 @@
+> قرارداد تاریخی و غیرفعال از2026-10-19: این ساختار/API از بک‌اند حذف شده است. مرجع جاری: [PACKAGING_REMOVAL](PACKAGING_REMOVAL.md).
+
 به‌روزرسانی 2026-10-11: مدت و شارژ trial از RegistrationTrial در appsettings (DurationDays/CreditAmountUsd) خوانده می‌شوند؛ ۳ روز و ۱ دلار صرفاً پیش‌فرض‌اند. مبلغ اعشاری مانند 0.5 تا شش اعشار پشتیبانی می‌شود؛ مقدار ثبت‌شده هر grant و زمان انقضا مستقل از تنظیمات بعدی محفوظ‌اند. migration ConfigureRegistrationTrial و ADR-035 الزامات ثابت قبلی دیتابیس را جایگزین می‌کنند؛ قرارداد REGISTRATION_TRIAL_API را ببینید.
 
 # Pricing, Subscription و AI Credit

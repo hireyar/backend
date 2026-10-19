@@ -61,10 +61,10 @@ public sealed class AuthTests(ApiFixture f)
     public async Task Account_settings_save_organization_name_and_preserve_tenant_scope()
     {
         var a = await f.RegisterOwner(); var other = await f.RegisterOwner();
-        var before = (await (await other.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var before = (await (await other.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         var response = await a.Client.Send(HttpMethod.Put, "/api/auth/me", new NameRequest(" نام کاربر ", " شرکت نمونه "));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var saved = (await response.Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var saved = (await response.Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         Assert.Equal("نام کاربر", saved.FullName); Assert.Equal("شرکت نمونه", saved.OrganizationName);
         await f.Db(async db => {
             Assert.Equal("شرکت نمونه", (await db.Organizations.SingleAsync(x => x.Id == saved.OrganizationId)).Name);
@@ -73,9 +73,9 @@ public sealed class AuthTests(ApiFixture f)
         var org = await (await a.Client.Send(HttpMethod.Get, "/api/organization")).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("شرکت نمونه", org.GetProperty("name").GetString());
         Assert.Equal(HttpStatusCode.OK, (await a.Client.Send(HttpMethod.Put, "/api/auth/me", new NameRequest("نام تازه"))).StatusCode);
-        var reloaded = (await (await a.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var reloaded = (await (await a.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         Assert.Equal("نام تازه", reloaded.FullName); Assert.Equal("شرکت نمونه", reloaded.OrganizationName);
-        var unchanged = (await (await other.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var unchanged = (await (await other.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         Assert.Equal(before, unchanged);
         Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Put, "/api/auth/me",
             new { fullName = "Changed", organizationName = "Wrong", organizationId = before.OrganizationId })).StatusCode);
@@ -86,10 +86,10 @@ public sealed class AuthTests(ApiFixture f)
     public async Task Invalid_organization_name_does_not_partially_save_account_settings()
     {
         var a = await f.RegisterOwner();
-        var before = (await (await a.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var before = (await (await a.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         foreach (var invalid in new[] { "", "   ", "\t\n", new string('x', 201) })
             Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Put, "/api/auth/me", new NameRequest("Changed", invalid))).StatusCode);
-        var after = (await (await a.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var after = (await (await a.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         Assert.Equal(before, after);
         Assert.Equal(HttpStatusCode.OK, (await a.Client.Send(HttpMethod.Put, "/api/auth/me", new NameRequest("Name", new string('x', 200)))).StatusCode);
     }

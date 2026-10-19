@@ -1,5 +1,4 @@
 using HireYar.Application.Common;
-using HireYar.Application.Billing;
 using HireYar.Domain.Interviews;
 using HireYar.Domain.InterviewTemplates;
 using Microsoft.EntityFrameworkCore;
@@ -7,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
-    ISubscriptionEntitlementService entitlements, IInterviewAudioStorage storage, IResumeTextExtractor resumeText,
-    IInterviewInvitationSecurity invitationSecurity, InterviewBillingService billing, IInterviewInvitationNotifier notifier)
+    IInterviewAudioStorage storage, IResumeTextExtractor resumeText,
+    IInterviewInvitationSecurity invitationSecurity, IInterviewInvitationNotifier notifier, HireYar.Application.Subscriptions.InterviewQuotaService quota)
 {
     public async Task<PanelInvitationResult> InviteAsync(WizardInvitationRequest r, Stream resume, string filename, CancellationToken ct)
     {
@@ -19,9 +18,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             .SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == r.TemplateId && !x.IsArchived, ct)
             ?? throw AppException.NotFound();
         if (template.Questions.Count is < 5 or > 30) throw AppException.Invalid("template_requires_five_questions");
-        var type = await InterviewTypeService.RequireTypeAsync(db, r.InterviewType, ct);
-        var capability = InterviewTypeService.Capability(type);
-        await entitlements.RequireAsync(user.OrganizationId, template.UseTopicQuestions ? ["ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"] : ["ai_interview"], ct);
+        var type = InterviewTypes.Require(r.InterviewType);
         var sourceTemplateId = template.Id;
         var file = await ResumeUploadValidator.ReadAsync(resume, filename, ct);
         var extracted = string.IsNullOrWhiteSpace(r.ResumeText) ? await resumeText.ExtractAsync(file.Bytes, file.Extension, ct) : r.ResumeText.Trim();
@@ -54,9 +51,9 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         var session = new InterviewSession(user.OrganizationId, job.Id, application.Id, template.Id,
             questions, template.UseTopicQuestions ? topicSkills.Values : [new InterviewSkill(skillId, "ارزیابی شغلی", true, 100, 3)],
             template.UseTopicQuestions ? topicSkills.Count * 2 : questions.Length,
-            template.DurationMinutes * 60, now, now.AddDays(r.DeadlineDays));
+            Math.Min(template.DurationMinutes * 60, 1800), now, now.AddDays(r.DeadlineDays));
         if (template.UseTopicQuestions) session.EnableProgressiveTopicQuestions(mediumFirst: true);
-        session.SetRequiredCapability(capability); session.SetPricingInterviewType(type.Code);
+        session.SetInterviewType(type);
         session.SetInteractionLimit(2);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
         session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, extracted, template.Language,
@@ -66,15 +63,14 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         try
         {
             application.ResumeStorageKey = saved.Key;
-            var quote = await billing.CurrentRateAsync(ct);
-            await db.WithOrganizationBillingLockAsync(user.OrganizationId, async () =>
+            await db.WithOrganizationLockAsync(user.OrganizationId, async () =>
             {
                 // Serialize invitation persistence with position/template removal. File upload stays outside the lock.
                 if (!await db.JobPositions.AnyAsync(x => x.Id == job.Id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Status != HireYar.Domain.JobPositions.JobStatus.Archived, ct) ||
                     !await db.InterviewTemplates.AnyAsync(x => x.Id == sourceTemplateId && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && !x.IsArchived, ct))
                     throw AppException.NotFound();
                 db.CandidateApplications.Add(application); db.InterviewSessions.Add(session);
-                await billing.ReserveInvitationLockedAsync(session, quote, ct);
+                await quota.ReserveLockedAsync(session, ct);
                 return true;
             }, ct);
         }
@@ -114,25 +110,20 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         var session = await db.InterviewSessions.SingleOrDefaultAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)
             ?? throw AppException.NotFound();
         if (r.DeadlineDays is < 1 or > 14) throw AppException.Invalid();
-        var quote = await billing.CurrentRateAsync(ct);
-        var result = await billing.FinishAsync(session, false, async () => {
+        var result = await db.WithOrganizationLockAsync(session.OrganizationId, async () => {
             await db.ReloadInterviewAsync(session, ct);
             if (session.DeletedAtUtc is not null) throw AppException.NotFound();
             if (session.SupersededByInterviewId is not null) throw new AppException(409, "invitation_already_replaced", "برای این مصاحبه دعوت جدیدی ساخته شده است.");
             var job = await db.JobPositions.AsNoTracking().SingleOrDefaultAsync(j => j.Id == session.JobPositionId && j.OrganizationId == user.OrganizationId && j.DeletedAtUtc == null && j.Status != HireYar.Domain.JobPositions.JobStatus.Archived, ct) ?? throw AppException.NotFound();
             var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(t => t.Id == session.InterviewTemplateId && t.OrganizationId == user.OrganizationId && t.DeletedAtUtc == null && !t.IsArchived, ct) ?? throw AppException.NotFound();
-            await entitlements.RequireAsync(user.OrganizationId, session.AskOneQuestionPerTopic || session.ProgressiveTopicQuestions
-                ? ["ai_interview", "advanced_ai_workflow", "adaptive_questions", "adaptive_difficulty"]
-                : ["ai_interview"], ct);
             await db.InterviewAnswers.Where(a => a.InterviewSessionId == session.Id).ToListAsync(ct);
             var now = time.GetUtcNow();
             var fresh = new InterviewSession(session.OrganizationId, session.JobPositionId, session.CandidateApplicationId, session.InterviewTemplateId,
                 session.Questions.Select(q => new InterviewQuestionSnapshot(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty, q.IsActive, q.Order)),
-                session.Skills, session.MaxQuestionCount, session.MaxDurationSeconds, now, now.AddDays(r.DeadlineDays));
+                session.Skills, session.MaxQuestionCount, Math.Min(session.MaxDurationSeconds, 1800), now, now.AddDays(r.DeadlineDays));
             if (session.AskOneQuestionPerTopic) fresh.EnableTopicQuestions();
             if (session.ProgressiveTopicQuestions) fresh.EnableProgressiveTopicQuestions(session.MediumFirstTopicQuestions);
-            fresh.SetRequiredCapability(session.RequiredCapabilityCode);
-            if (session.PricingInterviewTypeCode is { } typeCode) fresh.SetPricingInterviewType(typeCode);
+            fresh.SetInterviewType(session.InterviewType);
             fresh.SetInteractionLimit(session.MaxInteractionsPerQuestion);
             fresh.SetPanelSnapshot(session.PositionTitleSnapshot ?? job.Title, session.PositionDescriptionSnapshot ?? job.Description,
                 session.TemplateTitleSnapshot ?? template.Title, session.WelcomeMessage ?? template.WelcomeMessage, session.GoodbyeMessage ?? template.GoodbyeMessage);
@@ -140,10 +131,9 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                 session.ResumeTextSnapshot, session.Language, session.CandidateIntroductionEnabled, session.CandidateIntroductionMessage ?? "",
                 session.CompanyIntroductionEnabled, session.CompanyIntroductionMessage ?? "");
             var code = IssueCode(fresh, invitationSecurity.Unprotect(session.Id, session.ProtectedAccessCode));
-            // Release/settle the old hold before checking available credit for its replacement.
-            await billing.SettleReplacementLockedAsync(session, ct);
+            await quota.ReleaseLockedAsync(session, ct);
             db.InterviewSessions.Add(fresh);
-            await billing.ReserveInvitationLockedAsync(fresh, quote, ct);
+            await quota.ReserveLockedAsync(fresh, ct);
             // Persist the new principal before the self-reference; this is still the same organization transaction.
             await db.SaveChangesAsync(ct);
             if (session.Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled)) session.Cancel(now);
@@ -200,14 +190,14 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         var rows = await query.OrderByDescending(x => x.s.CreatedAtUtc).ThenBy(x => x.s.Id).Skip(r.Skip).Take(r.PageSize)
             .Select(x => new { x.s.Id, x.a.FirstName, x.a.LastName, x.a.Email, x.a.Phone, x.s.JobPositionId,
                 PositionTitle = x.s.PositionTitleSnapshot ?? x.j.Title, TemplateId = x.s.InterviewTemplateId,
-                TemplateTitle = x.s.TemplateTitleSnapshot ?? x.t.Title, x.s.RequiredCapabilityCode, x.s.PricingInterviewTypeCode, x.status, x.humanDecision,
+                TemplateTitle = x.s.TemplateTitleSnapshot ?? x.t.Title, x.s.InterviewType, x.status, x.humanDecision,
                 x.s.CreatedAtUtc, x.s.ExpiresAtUtc, x.s.StartedAtUtc, x.s.CompletedAtUtc, x.a.ResumeStorageKey,
                 x.s.AccessRevokedAtUtc, x.s.SupersededByInterviewId, x.s.ProtectedAccessCode, InterviewStatus = x.s.Status,
                 CanResend = x.s.SupersededByInterviewId == null && x.j.DeletedAtUtc == null && x.j.Status != HireYar.Domain.JobPositions.JobStatus.Archived && x.t.DeletedAtUtc == null && !x.t.IsArchived,
                 VideoAvailable = x.s.Answers.Any(a => a.VideoStorageKey != null),
                 Score = x.s.SkillStates.Where(y => y.EvidenceCount > 0).Select(y => (decimal?)y.CurrentScore).Average() }).ToListAsync(ct);
         return new(rows.Select(x => new PanelInterviewDto(x.Id, x.FirstName, x.LastName, x.Email, x.Phone, x.JobPositionId,
-            x.PositionTitle, x.TemplateId, x.TemplateTitle, x.PricingInterviewTypeCode ?? (x.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized"),
+            x.PositionTitle, x.TemplateId, x.TemplateTitle, x.InterviewType,
             x.status, x.CreatedAtUtc, x.ExpiresAtUtc, x.StartedAtUtc, x.CompletedAtUtc, (int)(x.ExpiresAtUtc - x.CreatedAtUtc).TotalDays,
             x.status == "completed" && x.Score.HasValue ? decimal.Round(x.Score.Value * 100, 2) : null,
             $"/api/interviews/{x.Id}", x.ResumeStorageKey is null ? null : $"/api/interviews/{x.Id}/resume",

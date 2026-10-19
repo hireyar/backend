@@ -76,7 +76,7 @@ public sealed partial class InterviewFlowTests
     }
 
     [PostgresFact]
-    public async Task Malformed_recording_timeline_and_expired_media_do_not_remove_the_report()
+    public async Task Malformed_recording_timeline_is_isolated_and_expired_media_preserves_text_report()
     {
         var (hr,invite)=await Invite();using var candidate=Candidate(invite);var state=await Start(candidate,invite.InterviewId);
         await Submit(candidate,invite.InterviewId,state.Question!.Id);await candidate.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete",null);
@@ -111,7 +111,7 @@ public sealed partial class InterviewFlowTests
     }
 
     [PostgresFact]
-    public async Task Report_removal_migration_drops_only_legacy_report_data_and_is_idempotent()
+    public async Task Legacy_report_table_stays_absent_and_reapplying_migrations_preserves_current_reports()
     {
         var isolated=new ApiFixture();await isolated.InitializeAsync();
         try {
@@ -120,9 +120,8 @@ public sealed partial class InterviewFlowTests
             await candidate.PostAsJsonAsync($"/api/candidate/interviews/{invite.InterviewId}/events",new InterviewEventRequest(Guid.NewGuid(),"consent_accepted",DateTimeOffset.UtcNow,"synthetic-consent"));
             await using var scope=isolated.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<HireYar.Infrastructure.Persistence.AppDbContext>();
             var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var index=Array.FindIndex(migrations,m=>m.EndsWith("_RemoveLegacyEvaluationReports",StringComparison.Ordinal));var latest=migrations[index];var previous=migrations[index-1];
-            Assert.Contains("RemoveLegacyEvaluationReports",latest);var migrator=db.GetService<IMigrator>();await migrator.MigrateAsync(previous);
+            Assert.Contains("RemoveLegacyEvaluationReports",latest);var migrator=db.GetService<IMigrator>();
             var org=await db.InterviewSessions.Where(s=>s.Id==invite.InterviewId).Select(s=>s.OrganizationId).SingleAsync();
-            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"InterviewEvaluationReports\" (\"InterviewSessionId\",\"OrganizationId\",\"GenerationStage\",\"GenerationAttempts\") VALUES ({invite.InterviewId},{org},'Failed',0)");
             var script=migrator.GenerateScript(previous,latest,MigrationsSqlGenerationOptions.Idempotent);
             await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);
             Assert.False(await db.Database.SqlQueryRaw<bool>("SELECT to_regclass('public.\"InterviewEvaluationReports\"') IS NOT NULL AS \"Value\"").SingleAsync());

@@ -3,7 +3,6 @@ using System.Security.Claims;
 using System.Text;
 using System.Security.Cryptography;
 using HireYar.Application.Auth;
-using HireYar.Application.Billing;
 using HireYar.Application.Common;
 using HireYar.Domain.Organizations;
 using HireYar.Infrastructure.Persistence;
@@ -14,7 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 namespace HireYar.Infrastructure.Auth;
 
-public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger, RegistrationTrialService trials, TeamSeatService seats) : IAccounts
+public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger, HireYar.Application.Subscriptions.SubscriptionService subscriptions) : IAccounts
 {
     private SecurityOptions Settings => options.Value;
     private DateTimeOffset Now => time.GetUtcNow();
@@ -88,7 +87,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 throw new AppException(409, "invitation_unavailable", "Invitation is no longer available.");
             if (u is not null && (u.OrganizationId != org.Id || u.Role != OrganizationRole.Recruiter || u.IsActive))
                 throw new AppException(409, "mobile_unavailable", "This mobile cannot accept the invitation.");
-            await seats.RequireInvitationCapacityLockedAsync(org.Id, true, ct);
+            await subscriptions.RequireTeamCapacityLockedAsync(org.Id, true, ct);
             var invitedName = !string.IsNullOrWhiteSpace(invitation.FirstName) && !string.IsNullOrWhiteSpace(invitation.LastName)
                 ? $"{invitation.FirstName.Trim()} {invitation.LastName.Trim()}" : null;
             if (u is null)
@@ -130,7 +129,6 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 OrganizationId = org.Id, Role = OrganizationRole.Owner,
                 CreatedAtUtc = Now, UpdatedAtUtc = Now };
             Check(await users.CreateAsync(u));
-            await trials.CreateForNewOrganizationAsync(org.Id, org.CreatedAtUtc, ct);
         }
         if (!u.IsActive || u.Role is not (OrganizationRole.Owner or OrganizationRole.Recruiter) || await users.IsLockedOutAsync(u)) throw AppException.Unauthorized();
         u.PhoneNumberConfirmed = true;

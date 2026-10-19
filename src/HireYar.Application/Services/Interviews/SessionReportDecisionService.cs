@@ -13,7 +13,7 @@ public sealed class SessionReportDecisionService(IApplicationDbContext db, ICurr
         if(user.Role!=OrganizationRole.Owner) throw new AppException(403,"forbidden","Only the owner may record a decision.");
         if(request.RequestId==Guid.Empty || request.Decision is not ("advance" or "review" or "reject") || request.Note?.Length>2000 ||
             request.ReportFingerprint is null || request.ReportFingerprint.Length!=64 || !request.ReportFingerprint.All(Uri.IsHexDigit)) throw AppException.Invalid("report_decision_invalid");
-        await db.WithOrganizationBillingLockAsync(user.OrganizationId,async()=> {
+        await db.WithOrganizationLockAsync(user.OrganizationId,async()=> {
             var report=await reports.ReadAsync(id,ct);
             if(report.Identity.InterviewStatus!="Completed") throw new AppException(409,"interview_not_completed","Complete the interview before recording a decision.");
             var existing=await db.InterviewReviewEntries.SingleOrDefaultAsync(e=>e.OrganizationId==user.OrganizationId && e.InterviewSessionId==id && e.RequestId==request.RequestId,ct);

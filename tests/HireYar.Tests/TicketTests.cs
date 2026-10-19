@@ -35,7 +35,7 @@ public sealed class TicketTests : IAsyncLifetime
     private static async Task<TicketDto> Ticket(HttpResponseMessage r, HttpStatusCode status = HttpStatusCode.OK)
     {
         Assert.Equal(status, r.StatusCode);
-        return (await r.Content.ReadFromJsonAsync<TicketDto>(BillingJson.Options))!;
+        return (await r.Content.ReadFromJsonAsync<TicketDto>(TestJson.Options))!;
     }
     [PostgresFact]
     public async Task Conversation_staff_replies_attachments_and_tenant_isolation_work_over_http()
@@ -46,7 +46,7 @@ public sealed class TicketTests : IAsyncLifetime
         var ticket = await Ticket(await Post(client, files: [("آزمایش.txt", "text/plain", bytes)]), HttpStatusCode.Created);
         Assert.Equal(TicketStatus.Open, ticket.Status); Assert.Equal(1, ticket.Revision);
         Assert.Equal(owner.Id, ticket.CreatedByUserId);
-        var messages = (await (await owner.Client.Send(HttpMethod.Get, $"/api/tickets/{ticket.Id}/messages")).Content.ReadFromJsonAsync<TicketPage<TicketMessageDto>>(BillingJson.Options))!;
+        var messages = (await (await owner.Client.Send(HttpMethod.Get, $"/api/tickets/{ticket.Id}/messages")).Content.ReadFromJsonAsync<TicketPage<TicketMessageDto>>(TestJson.Options))!;
         var first = Assert.Single(messages.Items); Assert.False(first.IsStaff);
         var attachment = Assert.Single(first.Attachments);
         var download = $"/api/tickets/{ticket.Id}/attachments/{attachment.Id}";
@@ -64,13 +64,13 @@ public sealed class TicketTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.Browser().Send(HttpMethod.Get, download)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await owner.Client.Send(HttpMethod.Get, "/api/admin/tickets")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await admin.Client.Send(HttpMethod.Get, "/api/tickets")).StatusCode);
-        var page = (await (await admin.Client.Send(HttpMethod.Get, "/api/admin/tickets?status=Open&priority=High&pageSize=1")).Content.ReadFromJsonAsync<TicketPage<TicketDto>>(BillingJson.Options))!;
+        var page = (await (await admin.Client.Send(HttpMethod.Get, "/api/admin/tickets?status=Open&priority=High&pageSize=1")).Content.ReadFromJsonAsync<TicketPage<TicketDto>>(TestJson.Options))!;
         Assert.Contains(page.Items, x => x.Id == ticket.Id);
         ticket = await Ticket(await Post(staff, $"/api/admin/tickets/{ticket.Id}/messages", "پاسخ پشتیبانی", ("reply.txt", "text/plain", bytes)));
         Assert.Equal(TicketStatus.Answered, ticket.Status);
         ticket = await Ticket(await Post(client, $"/api/tickets/{ticket.Id}/messages", "پیگیری کاربر"));
         Assert.Equal(TicketStatus.Open, ticket.Status); Assert.Equal(3, ticket.Revision);
-        var all = (await (await admin.Client.Send(HttpMethod.Get, $"/api/admin/tickets/{ticket.Id}/messages")).Content.ReadFromJsonAsync<TicketPage<TicketMessageDto>>(BillingJson.Options))!;
+        var all = (await (await admin.Client.Send(HttpMethod.Get, $"/api/admin/tickets/{ticket.Id}/messages")).Content.ReadFromJsonAsync<TicketPage<TicketMessageDto>>(TestJson.Options))!;
         Assert.Equal(new[] { false, true, false }, all.Items.Select(x => x.IsStaff));
         Assert.Equal(admin.Id, all.Items[1].AuthorUserId);
         Assert.Equal(bytes, await (await staff.GetAsync($"/api/admin/tickets/{ticket.Id}/attachments/{attachment.Id}")).Content.ReadAsByteArrayAsync());
@@ -82,7 +82,7 @@ public sealed class TicketTests : IAsyncLifetime
             Assert.False(db.Database.HasPendingModelChanges());
         });
         Assert.Equal("hireyar-ticketing", f.TicketS3.LastBucket); Assert.Equal(Amazon.S3.S3CannedACL.Private, f.TicketS3.LastAcl);
-        Assert.DoesNotContain("storageKey", JsonSerializer.Serialize(all, BillingJson.Options), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("storageKey", JsonSerializer.Serialize(all, TestJson.Options), StringComparison.OrdinalIgnoreCase);
     }
     [PostgresFact]
     public async Task Status_changes_are_versioned_closed_tickets_reject_replies_and_admin_token_cannot_be_forged_with_form_fields()
@@ -153,7 +153,7 @@ public sealed class TicketTests : IAsyncLifetime
         await f.Db(async db => Assert.Equal(0, await db.SupportTickets.CountAsync()));
         f.TicketS3.FailPut = false;
         var ticket = await Ticket(await Post(client, files: [("a.txt","text/plain","test"u8.ToArray())]), HttpStatusCode.Created);
-        var messages = (await (await owner.Client.Send(HttpMethod.Get, $"/api/tickets/{ticket.Id}/messages")).Content.ReadFromJsonAsync<TicketPage<TicketMessageDto>>(BillingJson.Options))!;
+        var messages = (await (await owner.Client.Send(HttpMethod.Get, $"/api/tickets/{ticket.Id}/messages")).Content.ReadFromJsonAsync<TicketPage<TicketMessageDto>>(TestJson.Options))!;
         var file = Assert.Single(Assert.Single(messages.Items).Attachments);
         f.TicketS3.PublicAcl = true;
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync($"/api/tickets/{ticket.Id}/attachments/{file.Id}")).StatusCode);
@@ -177,7 +177,7 @@ public sealed class TicketTests : IAsyncLifetime
         var ticket = await Ticket(await Post(client), HttpStatusCode.Created);
         var replies = await Task.WhenAll(Enumerable.Range(0,5).Select(i => Post(client, $"/api/tickets/{ticket.Id}/messages", $"پیام {i}")));
         Assert.All(replies, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
-        ticket = (await (await owner.Client.Send(HttpMethod.Get, $"/api/tickets/{ticket.Id}")).Content.ReadFromJsonAsync<TicketDto>(BillingJson.Options))!;
+        ticket = (await (await owner.Client.Send(HttpMethod.Get, $"/api/tickets/{ticket.Id}")).Content.ReadFromJsonAsync<TicketDto>(TestJson.Options))!;
         Assert.Equal(6, ticket.Revision);
         await f.Db(async db => {
             var otherOrg = await db.Users.Where(x => x.Id == other.Id).Select(x => x.OrganizationId).SingleAsync();
@@ -208,18 +208,18 @@ public sealed class TicketTests : IAsyncLifetime
     [PostgresFact]
     public async Task Recruiter_and_owner_share_only_their_organizations_tickets_without_a_subscription_gate()
     {
-        var owner = await f.RegisterOwner(signupTrial: true);
+        var owner = await f.RegisterOwner(explicitSignup: true);
         var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
         var invitation = await owner.Client.Send(HttpMethod.Post, "/api/team/invitations",
             new HireYar.Application.Organizations.InviteTeamMemberRequest(mobile, "عضو", "آزمایشی"));
         Assert.Equal(HttpStatusCode.Created, invitation.StatusCode);
-        var invite = (await invitation.Content.ReadFromJsonAsync<HireYar.Application.Organizations.TeamInvitationDto>(BillingJson.Options))!;
+        var invite = (await invitation.Content.ReadFromJsonAsync<HireYar.Application.Organizations.TeamInvitationDto>(TestJson.Options))!;
         var member = f.Browser();
         Assert.Equal(HttpStatusCode.OK, (await member.Send(HttpMethod.Post, "/api/auth/otp/request", new HireYar.Application.Auth.RequestOtpRequest(mobile))).StatusCode);
         var accepted = await member.Send(HttpMethod.Post, $"/api/auth/team-invitations/{invite.Id}/accept",
             new HireYar.Application.Auth.VerifyOtpRequest(mobile, f.PhoneOtp.Codes[mobile]));
         Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
-        member.AccessToken = (await accepted.Content.ReadFromJsonAsync<HireYar.Application.Auth.AccessResponse>(BillingJson.Options))!.AccessToken;
+        member.AccessToken = (await accepted.Content.ReadFromJsonAsync<HireYar.Application.Auth.AccessResponse>(TestJson.Options))!.AccessToken;
         using var client = f.CreateClient(); client.DefaultRequestHeaders.Authorization = new("Bearer", member.AccessToken);
         var ticket = await Ticket(await Post(client), HttpStatusCode.Created);
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Get, $"/api/tickets/{ticket.Id}")).StatusCode);

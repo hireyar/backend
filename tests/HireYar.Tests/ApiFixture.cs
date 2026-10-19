@@ -1,4 +1,3 @@
-using HireYar.Api.Billing;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
@@ -48,20 +47,15 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public bool AdminEnabled { get; init; } = true;
     public int AdminRateLimit { get; init; } = 1000;
     public TestAdminCaptcha AdminCaptcha { get; } = new();
+    public string? MigrationTarget { get; init; }
     public bool Production { get; init; }
     public bool UseS3VideoStorage { get; init; }
     public FakeVideoS3 VideoS3 { get; } = new();
     public FakeTicketS3 TicketS3 { get; } = new();
     public bool UseFixedOtp { get; init; }
-    public bool DisabledPayments { get; init; }
     public bool DiagnosticsEnabled { get; init; }
     public bool AssessmentWorkerEnabled { get; init; }
-    public int TrialDurationDays { get; init; } = 3;
-    public decimal TrialCreditAmountRial { get; init; } = 1m;
-    public FakePaymentGateway PaymentGateway { get; } = new();
     public TestClock Clock { get; } = new();
-    public TestAiDisplayRates DisplayRates { get; } = new();
-    public HireYar.Application.Billing.IAiDisplayRateProvider? DisplayRateProviderOverride { get; set; }
     public TestPhoneOtp PhoneOtp { get; } = new();
     public FakeInvitationNotifier Invitations { get; } = new();
     public FakeQuestionSuggestionProvider QuestionAi { get; } = new();
@@ -81,8 +75,6 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("SuperAdmin:Enabled", AdminEnabled.ToString());
         b.UseSetting("SuperAdmin:RandomKey", AdminEntry);
         b.UseSetting("SuperAdmin:AuthRequestsPerMinute", AdminRateLimit.ToString());
-        b.UseSetting("RegistrationTrial:DurationDays", TrialDurationDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        b.UseSetting("RegistrationTrial:CreditAmountRial", TrialCreditAmountRial.ToString(System.Globalization.CultureInfo.InvariantCulture));
         b.UseSetting("InterviewDiagnostics:Enabled", DiagnosticsEnabled.ToString());
         b.UseSetting("InterviewDiagnostics:CapturePrompts", "true");
         b.UseSetting("ConnectionStrings:Default", connection!);
@@ -107,14 +99,10 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("InterviewStorage:RootPath", Path.Combine(Path.GetTempPath(), database, "audio"));
         b.ConfigureServices(s =>
         {
-            DisplayRates.Clock = Clock;
-            s.RemoveAll<HireYar.Application.Billing.IAiDisplayRateProvider>();
-            s.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(DisplayRateProviderOverride ?? DisplayRates);
             s.RemoveAll<IReportNarrativeProvider>(); s.AddSingleton<IReportNarrativeProvider>(NarrativeAi);
             s.RemoveAll<IAnswerAssessmentProvider>(); s.AddSingleton<IAnswerAssessmentProvider>(AssessmentAi);
             s.RemoveAll<IAdminCaptcha>(); s.AddSingleton<IAdminCaptcha>(AdminCaptcha);
             if (UseS3VideoStorage) { s.RemoveAll<Amazon.S3.IAmazonS3>(); s.AddSingleton<Amazon.S3.IAmazonS3>(VideoS3); }
-            if (!DisabledPayments) { s.RemoveAll<HireYar.Application.Billing.IPaymentGateway>(); s.AddSingleton<HireYar.Application.Billing.IPaymentGateway>(PaymentGateway); }
             s.AddKeyedSingleton<Amazon.S3.IAmazonS3>("ticketing", TicketS3);
             s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
             s.RemoveAll<IPhoneOtpSender>(); s.AddSingleton<IPhoneOtpSender>(PhoneOtp);
@@ -132,13 +120,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         if (!new[] { "localhost", "127.0.0.1", "::1" }.Contains(parsed.Host, StringComparer.OrdinalIgnoreCase)) throw new InvalidOperationException("Tests only accept a local PostgreSQL.");
         parsed.Database = database; connection = parsed.ConnectionString;
         await using var scope = Services.CreateAsyncScope(); var testDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await testDb.Database.MigrateAsync();
-        // Historical tests use an intentionally different general tariff from the approved product default.
-        // New migration tests verify the real $0.03/$0.05 defaults independently.
-        var packages = await testDb.PricingPackages.Include(x => x.InterviewTypes)
-            .Where(x => x.Features.Any(f => f.IsEnabled && f.Feature.Code == "technical_interview")).ToListAsync();
-        foreach (var package in packages) { package.AiPricePerMinuteUsd = .05m; package.SpecializedAiPricePerMinuteUsd = .05m; }
-        await testDb.SaveChangesAsync();
+        await Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>(testDb).MigrateAsync(MigrationTarget);
     }
     async Task IAsyncLifetime.DisposeAsync()
     {
@@ -157,12 +139,11 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         return response;
     }
     public static RegisterRequest Registration(string mobile, string code) => new(mobile, code, mobile + "@example.test", "نام", "آزمایشی");
-    public async Task<Account> RegisterOwner(bool signupTrial = false)
+    public async Task<Account> RegisterOwner(bool explicitSignup = false, bool provisionMembership = true)
     {
         var browser = Browser(); var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
-        // Existing-account scenarios keep an empty billing baseline. Signup-specific tests
-        // opt into the real new-account OTP flow and its trial instead.
-        if (!signupTrial)
+        // Exercise either an existing account or the explicit OTP registration flow.
+        if (!explicitSignup)
         {
             await using var scope = Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var now = Clock.GetUtcNow(); var org = new HireYar.Domain.Organizations.Organization { Name = "سازمان من", CreatedAtUtc = now, UpdatedAtUtc = now };
@@ -172,7 +153,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
                     FullName = "کاربر", OrganizationId = org.Id, Role = HireYar.Domain.Organizations.OrganizationRole.Owner, CreatedAtUtc = now, UpdatedAtUtc = now });
             Assert.True(result.Succeeded);
         }
-        if (signupTrial)
+        if (explicitSignup)
         {
             Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile))).StatusCode);
             var response = await browser.Send(HttpMethod.Post, "/api/auth/register", Registration(mobile, UseFixedOtp ? "123456" : PhoneOtp.Codes[mobile]));
@@ -180,7 +161,28 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
             browser.AccessToken = (await response.Content.ReadFromJsonAsync<AccessResponse>())!.AccessToken;
         }
         else await SignInAsync(browser, mobile);
-        var me = (await (await browser.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var me = (await (await browser.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
+        if (provisionMembership)
+        {
+            await using var setupScope = Services.CreateAsyncScope();
+            var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var now = Clock.GetUtcNow(); var request = Guid.NewGuid();
+            var subscriptionOrder = new HireYar.Domain.Subscriptions.SubscriptionOrder { OrganizationId = me.OrganizationId,
+                RequestId = request, RequestFingerprint = new string('a',64), Product = "subscription", ProductName = "Synthetic baseline",
+                Status = "Confirmed", Months = 12, TeamUsers = 30, UnlimitedTeam = true, UnitPriceRial = 90_000_000,
+                OriginalAmountRial = 1_080_000_000, AmountRial = 1_080_000_000, RetentionDays = 60,
+                CreatedAtUtc = now, ExpiresAtUtc = now.AddDays(1), ConfirmedAtUtc = now, ConfirmedByUserId = me.Id, PaymentReference = "synthetic-" + request };
+            var bundleOrder = new HireYar.Domain.Subscriptions.SubscriptionOrder { OrganizationId = me.OrganizationId,
+                RequestId = Guid.NewGuid(), RequestFingerprint = new string('b',64), Product = "interviews", ProductName = "Synthetic quota",
+                BundleCode = "custom", Status = "Confirmed", Quantity = 1000, UnitPriceRial = 4_000_000,
+                OriginalAmountRial = 4_000_000_000, AmountRial = 4_000_000_000, RetentionDays = 60,
+                CreatedAtUtc = now, ExpiresAtUtc = now.AddDays(1), ConfirmedAtUtc = now, ConfirmedByUserId = me.Id, PaymentReference = "synthetic-quota-" + request };
+            setupDb.SubscriptionOrders.AddRange(subscriptionOrder, bundleOrder);
+            setupDb.OrganizationMemberships.Add(new() { OrganizationId = me.OrganizationId, OrderId = subscriptionOrder.Id,
+                StartedAtUtc = now.AddDays(-1), ExpiresAtUtc = now.AddDays(-1).AddMonths(12), TeamUsers = 30, UnlimitedTeam = true, RetentionDays = 60 });
+            setupDb.InterviewQuotaGrants.Add(new() { OrganizationId = me.OrganizationId, OrderId = bundleOrder.Id, Quantity = 1000, CreatedAtUtc = now });
+            await setupDb.SaveChangesAsync();
+        }
         return new(browser, mobile, me.Id);
     }
     public async Task Db(Func<AppDbContext, Task> action) { await using var scope = Services.CreateAsyncScope(); await action(scope.ServiceProvider.GetRequiredService<AppDbContext>()); }
@@ -190,25 +192,13 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         await using (var scope = Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<HireYar.Infrastructure.Auth.AdminAccounts>().ProvisionAsync(a.Mobile, AdminPassword, default);
         a.Client.AdminEntryKey = AdminEntry;
-        var challenge = (await (await a.Client.Send(HttpMethod.Get, "/api/admin/auth/captcha")).Content.ReadFromJsonAsync<AdminCaptchaDto>(BillingJson.Options))!;
+        var challenge = (await (await a.Client.Send(HttpMethod.Get, "/api/admin/auth/captcha")).Content.ReadFromJsonAsync<AdminCaptchaDto>(TestJson.Options))!;
         var login = await a.Client.Send(HttpMethod.Post, "/api/admin/auth/login", new AdminLoginRequest(a.Mobile, AdminPassword, challenge.Id, "123456"));
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        a.Client.AccessToken = (await login.Content.ReadFromJsonAsync<AdminSessionDto>(BillingJson.Options))!.AccessToken;
+        a.Client.AccessToken = (await login.Content.ReadFromJsonAsync<AdminSessionDto>(TestJson.Options))!.AccessToken;
         return a;
     }
-    public async Task FundInterviewsAsync(Account account)
-    {
-        var pricing = await (await account.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options);
-        var package = pricing!.Packages.Single(x => x.Code == "advanced");
-        var pending = await (await account.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(package.Periods.Single(x => x.Months == 1).Id))).Content.ReadFromJsonAsync<HireYar.Api.Billing.RialPurchaseResult>(BillingJson.Options);
-
-        await using var scope = Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var org = await db.Users.Where(x => x.Id == account.Id).Select(x => x.OrganizationId).SingleAsync();
-        await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.PaymentService>().VerifyAsync(org, pending!.Payment.Id, default);
-        await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.WalletService>().AdjustAsync(org, new(Guid.NewGuid(), 100m, "Synthetic interview test credit"), default);
-    }
 }
-public sealed record PricingResponse(IReadOnlyList<HireYar.Api.Billing.RialPackageDto> Packages);
 public sealed record Account(Browser Client, string Mobile, Guid Id);
 public sealed class Browser(HttpClient client)
 {
@@ -221,7 +211,7 @@ public sealed class Browser(HttpClient client)
     { if (response.Headers.TryGetValues("Set-Cookie", out var values)) foreach (var value in values) { var pair = value.Split(';')[0].Split('=', 2); cookies[pair[0]] = pair[1]; } }
     private HttpRequestMessage Request(HttpMethod method, string url, object? body = null)
     {
-        var request = new HttpRequestMessage(method, url); if (body is not null) request.Content = JsonContent.Create(body, options: BillingJson.Options);
+        var request = new HttpRequestMessage(method, url); if (body is not null) request.Content = JsonContent.Create(body, options: TestJson.Options);
         if (AdminEntryKey is not null) request.Headers.Add("X-Admin-Entry", AdminEntryKey);
         if (AccessToken is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
         request.Headers.TryAddWithoutValidation("Cookie", string.Join("; ", cookies.Select(x => $"{x.Key}={x.Value}"))); return request;
@@ -232,7 +222,7 @@ public sealed class Browser(HttpClient client)
         if (csrf && method != HttpMethod.Get && url.StartsWith("/api/auth", StringComparison.Ordinal))
         {
             using var csrfRequest = Request(HttpMethod.Get, "/api/auth/csrf"); using var response = await client.SendAsync(csrfRequest); Capture(response);
-            var doc = await response.Content.ReadFromJsonAsync<JsonElement>(BillingJson.Options); token = doc.GetProperty("token").GetString();
+            var doc = await response.Content.ReadFromJsonAsync<JsonElement>(TestJson.Options); token = doc.GetProperty("token").GetString();
         }
         using var request = Request(method, url, body); if (token is not null) request.Headers.Add("X-CSRF-TOKEN", token); if (origin is not null) request.Headers.Add("Origin", origin);
         var result = await client.SendAsync(request); Capture(result); return result;

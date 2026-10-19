@@ -1,6 +1,5 @@
 using System.Text.Json;
 using HireYar.Application.Common;
-using HireYar.Application.Billing;
 using HireYar.Domain.Interviews;
 using HireYar.Domain.Organizations;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 // Reading persisted facts and assessments never invokes AI or mutates report state.
-public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser user, InterviewBillingService billing, TimeProvider time, AnswerAssessmentOptions assessmentOptions)
+public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser user, TimeProvider time, AnswerAssessmentOptions assessmentOptions, HireYar.Application.Subscriptions.InterviewQuotaService quota)
 {
     public Task<SessionReportDocument> ReadAsync(Guid id, CancellationToken ct) =>
         ReadForOrganizationAsync(user.OrganizationId,id,user.Role==OrganizationRole.Owner,ct);
@@ -19,16 +18,13 @@ public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser 
             .SingleOrDefaultAsync(s => s.Id == id && s.OrganizationId == org && s.DeletedAtUtc == null, ct)
             ?? throw AppException.NotFound();
         var candidate = await db.CandidateApplications.AsNoTracking().SingleAsync(a => a.Id == session.CandidateApplicationId && a.OrganizationId == org, ct);
-        var contract = await db.InterviewBillings.AsNoTracking().SingleOrDefaultAsync(b => b.OrganizationId == org && b.InterviewSessionId == id, ct);
-        var included = contract is null || (await billing.CapabilitiesAsync(session, ct)).Contains("interview_report");
-        if (!included) throw new AppException(403, "feature_unavailable", "The interview contract does not include reports.");
         var mediaAllowed = true;
-        try { await billing.RequireMediaRetentionAsync(session, ct); }
+        try { await quota.RequireMediaAsync(session, ct); }
         catch (AppException e) when (e.Status == 404) { mediaAllowed = false; }
         ReportTurn Turn(InterviewAnswer a) => new(a.Id, a.Status.ToString(), a.Transcript, a.AssistantMessage,
             a.SubmittedAtUtc, a.DurationSeconds, mediaAllowed ? $"/api/interviews/{id}/answers/{a.Id}/audio" : null,
             mediaAllowed && a.VideoStorageKey is not null ? $"/api/interviews/{id}/answers/{a.Id}/video" : null);
-        var type = session.RequiredCapabilityCode == "hr_interview" ? "general" : "specialized";
+        var type = session.InterviewType;
         var assessments = await db.AnswerAssessments.AsNoTracking().Where(a => a.OrganizationId == org && a.InterviewSessionId == id).ToDictionaryAsync(a => a.AnswerId, ct);
         var questions = session.Questions.Where(q => q.AskedAtUtc is not null || session.Answers.Any(a => a.QuestionId == q.QuestionId))
             .OrderBy(q => q.AskedAtUtc).ThenBy(q => q.Order).Select((q, index) => {
@@ -91,7 +87,7 @@ public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser 
             new(questions.Length, session.Questions.Count, questions.Count(q => q.Answer is not null), answered, questions.Count(q => q.Answer is null),
                 questions.Count(q => q.AnswerState == "Failed"), questions.Sum(q => q.Clarifications.Count),
                 durations.Length == 0 ? null : Math.Round(durations.Average(), 2), questions.Select(q => q.Difficulty).Distinct().Order().ToArray()),
-            new(included, mediaAllowed ? "WithinRetention" : "Expired", $"/api/interviews/{id}/report/print"), questions,
+            new(true, mediaAllowed ? "Available" : "Expired", $"/api/interviews/{id}/report/print"), questions,
             new(!mediaAllowed ? "Expired" : recording is not null || segments.Length > 0 ? "UploadedUnverified" : "Missing",
                 recording is null ? null : Recording(recording.TimelineJson, recording.DurationSeconds, null),
                 segments.Select(r => Recording(r.TimelineJson, r.DurationSeconds, r.SegmentNumber)).ToArray()),

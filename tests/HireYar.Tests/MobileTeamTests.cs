@@ -1,4 +1,3 @@
-using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -26,7 +25,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
     {
         var r = await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, firstName, lastName));
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);
-        return (await r.Content.ReadFromJsonAsync<TeamInvitationDto>(BillingJson.Options))!;
+        return (await r.Content.ReadFromJsonAsync<TeamInvitationDto>(TestJson.Options))!;
     }
     private async Task<Browser> Accept(TeamInvitationDto invite)
     {
@@ -37,17 +36,17 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         b.AccessToken = (await r.Content.ReadFromJsonAsync<AccessResponse>())!.AccessToken;
         return b;
     }
-    private static async Task<CurrentUserDto> Me(Browser b) => (await (await b.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+    private static async Task<CurrentUserDto> Me(Browser b) => (await (await b.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
 
     [PostgresFact]
-    public async Task Acceptance_creates_scoped_recruiter_without_new_organization_or_trial_and_enforces_permissions()
+    public async Task Acceptance_creates_scoped_recruiter_without_new_organization_and_enforces_permissions()
     {
         var owner = await f.RegisterOwner(); var other = await f.RegisterOwner(); var mobile = Mobile();
         var invitation = await Invite(owner, mobile); var member = await Accept(invitation);
         var me = await Me(member); var hr = await Me(owner.Client);
         Assert.Equal(OrganizationRole.Recruiter, me.Role); Assert.Equal(hr.OrganizationId, me.OrganizationId);
         await f.Db(async db => {
-            Assert.Equal(2, await db.Organizations.CountAsync()); Assert.Equal(0, await db.RegistrationTrials.CountAsync());
+            Assert.Equal(2, await db.Organizations.CountAsync());
             Assert.NotNull((await db.MobileTeamInvitations.SingleAsync(x => x.Id == invitation.Id)).AcceptedAtUtc);
             Assert.Equal(2, await db.Users.CountAsync(x => x.OrganizationId == me.OrganizationId && x.IsActive));
         });
@@ -57,11 +56,11 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Put, "/api/auth/me", new NameRequest("Should not save", "Forbidden org"))).StatusCode);
         Assert.Equal("Member name", (await Me(member)).FullName);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Put, "/api/organization", new OrganizationRequest("Forbidden"))).StatusCode);
-        foreach (var path in new[] { "/api/team/members", "/api/team/invitations", "/api/billing/panel", "/api/billing/subscription", "/api/billing/financial-history", "/api/billing/ai-credit" })
+        foreach (var path in new[] { "/api/team/members", "/api/team/invitations" })
             Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Get, path)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(Mobile(), "نام", "آزمایشی"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, $"/api/team/members/{owner.Id}/deactivate")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new { packagePeriodId = Guid.NewGuid() })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await member.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new { packagePeriodId = Guid.NewGuid() })).StatusCode);
         var randomId = Guid.NewGuid();
         foreach (var path in new[] { $"/api/interviews/{randomId}/report", $"/api/interviews/{randomId}/review", $"/api/interviews/{randomId}/report/print" })
             Assert.Equal(HttpStatusCode.NotFound, (await member.Send(HttpMethod.Get, path)).StatusCode);
@@ -71,13 +70,12 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden,(await member.Send(HttpMethod.Post,$"/api/interviews/{randomId}/report/review",new {requestId=Guid.NewGuid(),decision="review",reportFingerprint=new string('A',64)})).StatusCode);
         var jobResponse = await member.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("Member job", "Synthetic job"));
         Assert.Equal(HttpStatusCode.OK, jobResponse.StatusCode);
-        var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
+        var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(TestJson.Options))!;
         var templateResponse = await member.Send(HttpMethod.Post, "/api/panel-wizard/templates", new WizardTemplateRequest(job.Id, "Member template", "general", Enumerable.Range(1, 5).Select(x => "Synthetic question " + x).ToList(), "Welcome", "Goodbye"));
         Assert.Equal(HttpStatusCode.OK, templateResponse.StatusCode);
-        var template = (await templateResponse.Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!;
+        var template = (await templateResponse.Content.ReadFromJsonAsync<TemplateDto>(TestJson.Options))!;
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/job-positions/{job.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Get, $"/api/interview-templates/{template.Id}")).StatusCode);
-        await f.FundInterviewsAsync(owner);
         using var client = f.CreateClient(); client.DefaultRequestHeaders.Authorization = new("Bearer", member.AccessToken);
         using var form = new MultipartFormDataContent();
         foreach (var field in new Dictionary<string, string> { ["jobPositionId"] = job.Id.ToString(), ["templateId"] = template.Id.ToString(), ["firstName"] = "Synthetic", ["lastName"] = "Candidate", ["email"] = "candidate@example.test", ["phone"] = Mobile() })
@@ -87,7 +85,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         var sent = await client.PostAsync("/api/panel-wizard/invitations", form);
         if (!sent.IsSuccessStatusCode) Assert.Fail(await sent.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, sent.StatusCode);
-        var interview = (await sent.Content.ReadFromJsonAsync<PanelInvitationResult>(BillingJson.Options))!.Invitation;
+        var interview = (await sent.Content.ReadFromJsonAsync<PanelInvitationResult>(TestJson.Options))!.Invitation;
         Assert.Equal(HttpStatusCode.OK, (await member.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Get, $"/api/interviews/{interview.InterviewId}")).StatusCode);
         using var candidate = f.CreateClient(); candidate.DefaultRequestHeaders.Authorization = new("Bearer", interview.Token);
@@ -147,7 +145,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         var response = await b.Send(HttpMethod.Post, $"/api/auth/team-invitations/{invitation.Id}/accept", request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Post, $"/api/auth/team-invitations/{invitation.Id}/accept", request)).StatusCode);
-        var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(BillingJson.Options))!;
+        var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(TestJson.Options))!;
         Assert.Equal("Accepted", Assert.Single(list.Items).Status);
         Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Delete, $"/api/team/invitations/{invitation.Id}")).StatusCode);
     }
@@ -162,7 +160,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new { mobile = Mobile(), firstName = "نام", lastName = "آزمایشی", role = "Owner" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest("123", "نام", "آزمایشی"))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Delete, $"/api/team/invitations/{invitation.Id}")).StatusCode);
-        var otherInvites = (await (await other.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(BillingJson.Options))!;
+        var otherInvites = (await (await other.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(TestJson.Options))!;
         Assert.Empty(otherInvites.Items);
         Assert.Equal(HttpStatusCode.NoContent, (await owner.Client.Send(HttpMethod.Delete, $"/api/team/invitations/{invitation.Id}")).StatusCode);
         var b = f.Browser(); await b.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(invitation.Mobile));
@@ -181,7 +179,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         var owner = await f.RegisterOwner(); var other = await f.RegisterOwner(); var mobile = Mobile();
         var results = await Task.WhenAll(owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی")), other.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی")));
         var winner = Assert.Single(results, x => x.StatusCode == HttpStatusCode.Created); Assert.Single(results, x => x.StatusCode == HttpStatusCode.Conflict);
-        var invitation = (await winner.Content.ReadFromJsonAsync<TeamInvitationDto>(BillingJson.Options))!;
+        var invitation = (await winner.Content.ReadFromJsonAsync<TeamInvitationDto>(TestJson.Options))!;
         var b = f.Browser(); var c = f.Browser(); await b.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile));
         var request = new VerifyOtpRequest(mobile, f.PhoneOtp.Codes[mobile]);
         var accepted = await Task.WhenAll(b.Send(HttpMethod.Post, $"/api/auth/team-invitations/{invitation.Id}/accept", request), c.Send(HttpMethod.Post, $"/api/auth/team-invitations/{invitation.Id}/accept", request));
@@ -205,49 +203,6 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
             if (account is not null) { Assert.Equal(OrganizationRole.Owner, account.Role); Assert.NotEqual((await Me(owner.Client)).OrganizationId, account.OrganizationId); }
             if (invitation is not null) Assert.Equal((await Me(owner.Client)).OrganizationId, invitation.OrganizationId);
         });
-    }
-    [PostgresFact]
-    public async Task Organization_features_share_current_paid_and_trial_entitlements_without_financial_data()
-    {
-        var owner = await f.RegisterOwner(); var member = await Accept(await Invite(owner, Mobile()));
-        var trialOwner = await f.RegisterOwner(signupTrial: true);
-        var trialMember = await Accept(await Invite(trialOwner, Mobile()));
-        var inactiveResponse = await member.Send(HttpMethod.Get, "/api/organization/features");
-        Assert.Equal(HttpStatusCode.OK, inactiveResponse.StatusCode);
-        var inactive = (await inactiveResponse.Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
-        Assert.False(inactive.HasActiveSubscription); Assert.Empty(inactive.Features); Assert.Null(inactive.ExpiresAtUtc);
-        await f.FundInterviewsAsync(owner);
-        foreach (var pair in new[] { (Owner: owner, Member: member), (Owner: trialOwner, Member: trialMember) })
-        {
-            var response = await pair.Member.Send(HttpMethod.Get, "/api/organization/features?organizationId=" + Guid.NewGuid());
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
-            var features = (await response.Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
-            var subscription = (await (await pair.Owner.Client.Send(HttpMethod.Get, "/api/billing/subscription")).Content.ReadFromJsonAsync<HireYar.Api.Billing.RialSubscriptionOverviewDto>(BillingJson.Options))!.Current!;
-            Assert.True(features.HasActiveSubscription);
-            Assert.Equal(subscription.IsTrial, features.IsTrial); Assert.Equal(subscription.ExpiresAtUtc, features.ExpiresAtUtc);
-            Assert.Equal(subscription.Features.Select(x => (x.Code, x.Name, x.DataType, x.Value)), features.Features.Select(x => (x.Code, x.Name, x.DataType, x.Value)));
-            Assert.Contains(features.Features, x => x.Code == "technical_interview");
-            Assert.Contains(features.Features, x => x.Code == "advanced_ai_workflow");
-            var ownerFeatures = (await (await pair.Owner.Client.Send(HttpMethod.Get, "/api/organization/features")).Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
-            Assert.Equal(features.Features, ownerFeatures.Features);
-            var body = await (await pair.Member.Send(HttpMethod.Get, "/api/organization/features")).Content.ReadFromJsonAsync<JsonElement>();
-            Assert.Equal(new[] { "expiresAtUtc", "features", "hasActiveSubscription", "isTrial", "startedAtUtc" }, body.EnumerateObject().Select(x => x.Name).OrderBy(x => x).ToArray());
-            Assert.Equal(HttpStatusCode.Forbidden, (await pair.Member.Send(HttpMethod.Get, "/api/billing/subscription")).StatusCode);
-        }
-        Assert.False((await (await member.Send(HttpMethod.Get, "/api/organization/features")).Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!.IsTrial);
-        Assert.True((await (await trialMember.Send(HttpMethod.Get, "/api/organization/features")).Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!.IsTrial);
-        f.Clock.Offset = TimeSpan.FromDays(400);
-        try
-        {
-            var expiredResponse = await member.Send(HttpMethod.Get, "/api/organization/features");
-            Assert.Equal(HttpStatusCode.OK, expiredResponse.StatusCode);
-            var expired = (await expiredResponse.Content.ReadFromJsonAsync<OrganizationFeaturesDto>(BillingJson.Options))!;
-            Assert.False(expired.HasActiveSubscription); Assert.Empty(expired.Features); Assert.Null(expired.ExpiresAtUtc);
-        }
-        finally { f.Clock.Offset = TimeSpan.Zero; }
-        Assert.Equal(HttpStatusCode.Unauthorized, (await f.Browser().Send(HttpMethod.Get, "/api/organization/features")).StatusCode);
-
     }
     [PostgresFact]
     public async Task Migration_keeps_one_active_owner_and_refuses_downgrade_with_team_history()

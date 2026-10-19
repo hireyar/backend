@@ -55,7 +55,7 @@ public sealed class TicketService(IApplicationDbContext db, ICurrentUser user, T
         TicketFileRules.Validate(files);
         var organizationId = user.OrganizationId;
         var stored = await UploadAsync(organizationId, files, ct);
-        try { return await db.WithOrganizationBillingLockAsync(organizationId, async () =>
+        try { return await db.WithOrganizationLockAsync(organizationId, async () =>
         {
             if (await db.SupportTickets.CountAsync(x => x.OrganizationId == organizationId, ct) >= 1000 ||
                 await db.SupportTickets.CountAsync(x => x.OrganizationId == organizationId && x.Status != TicketStatus.Closed, ct) >= 20)
@@ -77,7 +77,7 @@ public sealed class TicketService(IApplicationDbContext db, ICurrentUser user, T
         if (visible.Status == TicketStatus.Closed) throw new AppException(409, "ticket_closed", "Reopen the ticket before replying.");
         var stored = await UploadAsync(visible.OrganizationId, files, ct);
         try {
-        return await db.WithOrganizationBillingLockAsync(visible.OrganizationId, async () =>
+        return await db.WithOrganizationLockAsync(visible.OrganizationId, async () =>
         {
             var ticket = await Scope(administrator).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound();
             if (ticket.Status == TicketStatus.Closed) throw new AppException(409, "ticket_closed", "Reopen the ticket before replying.");
@@ -97,7 +97,7 @@ public sealed class TicketService(IApplicationDbContext db, ICurrentUser user, T
         var visible = await GetAsync(id, administrator, ct);
         if (!Enum.IsDefined(request.Status) || request.Revision < 1) throw AppException.Invalid();
         if (!administrator && request.Status == TicketStatus.Answered) throw new AppException(403, "forbidden", "Only support may mark a ticket answered.");
-        return await db.WithOrganizationBillingLockAsync(visible.OrganizationId, async () =>
+        return await db.WithOrganizationLockAsync(visible.OrganizationId, async () =>
         {
             var ticket = await Scope(administrator).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound();
             if (ticket.Revision != request.Revision) throw new AppException(409, "concurrency_conflict", "Reload the ticket before changing its status.");

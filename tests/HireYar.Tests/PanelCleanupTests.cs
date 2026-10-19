@@ -1,15 +1,12 @@
-using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using HireYar.Application.Auth;
-using HireYar.Application.Billing;
 using HireYar.Application.Common;
 using HireYar.Application.InterviewTemplates;
 using HireYar.Application.Interviews;
 using HireYar.Application.JobPositions;
-using HireYar.Domain.Billing;
 using HireYar.Domain.Organizations;
 using HireYar.Infrastructure.Auth;
 using Microsoft.EntityFrameworkCore;
@@ -23,14 +20,13 @@ public sealed class PanelCleanupTests(ApiFixture f)
     private async Task<(Account Owner, JobDto Job, TemplateDto Template)> Setup(bool funded = false)
     {
         var owner = await f.RegisterOwner();
-        if (funded) await f.FundInterviewsAsync(owner);
         var jobResponse = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("Synthetic cleanup", "Synthetic job"));
         Assert.Equal(HttpStatusCode.OK, jobResponse.StatusCode);
-        var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
+        var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(TestJson.Options))!;
         var templateResponse = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", new WizardTemplateRequest(job.Id, "Synthetic template", "general",
             Enumerable.Range(1, 5).Select(x => "Synthetic question " + x).ToList(), "Welcome", "Goodbye", 5));
         Assert.Equal(HttpStatusCode.OK, templateResponse.StatusCode);
-        var template = (await templateResponse.Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!;
+        var template = (await templateResponse.Content.ReadFromJsonAsync<TemplateDto>(TestJson.Options))!;
         Assert.All(template.Questions, question => Assert.Equal("ارزیابی شغلی", question.Competency));
         return (owner, job, template);
     }
@@ -48,7 +44,7 @@ public sealed class PanelCleanupTests(ApiFixture f)
     private async Task<PanelInvitationResult> Invitation(Account owner, Guid job, Guid template)
     {
         var response = await Invite(owner, job, template); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return (await response.Content.ReadFromJsonAsync<PanelInvitationResult>(BillingJson.Options))!;
+        return (await response.Content.ReadFromJsonAsync<PanelInvitationResult>(TestJson.Options))!;
     }
     private HttpClient Candidate(PanelInvitationResult invitation)
     {
@@ -161,7 +157,7 @@ public sealed class PanelCleanupTests(ApiFixture f)
         await f.Db(async db => { var session = await db.InterviewSessions.SingleAsync(x => x.Id == id); Assert.NotNull(session.DeletedAtUtc); Assert.NotNull(session.AccessRevokedAtUtc); Assert.True(await db.CandidateApplications.AnyAsync(x => x.Id == session.CandidateApplicationId)); });
     }
 
-    private async Task TestBilledDeletion(bool completeFirst)
+    private async Task TestDeletion(bool completeFirst)
     {
         f.InterviewAi.Reset(); var (owner, job, template) = await Setup(true); var invitation = await Invitation(owner, job.Id, template.Id); var id = invitation.Invitation.InterviewId;
         using var candidate = Candidate(invitation);
@@ -177,22 +173,15 @@ public sealed class PanelCleanupTests(ApiFixture f)
             Assert.Equal(HttpStatusCode.NoContent, (await owner.Client.Send(HttpMethod.Delete, $"/api/interviews/{id}")).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.Send(HttpMethod.Delete, $"/api/interviews/{id}")).StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, (await candidate.GetAsync($"/api/candidate/interviews/{id}/current")).StatusCode);
-            var panel = (await (await owner.Client.Send(HttpMethod.Get, "/api/billing/panel")).Content.ReadFromJsonAsync<RialBillingPanelDto>(BillingJson.Options))!; Assert.Equal(0, panel.Wallet.ReservedCredit);
-            var history = (await (await owner.Client.Send(HttpMethod.Get, "/api/billing/financial-history?transactionType=usage")).Content.ReadFromJsonAsync<RialFinancialHistoryDto>(BillingJson.Options))!;
-            var usage = Assert.Single(history.Transactions.Items); Assert.Equal(id, usage.InterviewId); Assert.True(usage.BillableSeconds >= 20); Assert.Equal("Synthetic Candidate", usage.CandidateName);
             await f.Db(async db =>
             {
-                var bill = await db.InterviewBillings.SingleAsync(x => x.InterviewSessionId == id);
-                Assert.Equal(BillingMath.Cost(bill.BillableSeconds, bill.RatePerMinuteUsd), bill.BilledAmountRial);
-                Assert.Equal(InterviewBillingStatus.Settled, bill.Status);
-                Assert.Equal(1, await db.AiCreditTransactions.CountAsync(x => x.ReferenceType == "Interview" && x.ReferenceId == id));
                 Assert.True(await db.InterviewAnswers.AnyAsync(x => x.InterviewSessionId == id));
             });
         }
         finally { f.Clock.Offset = TimeSpan.Zero; }
     }
-    [PostgresFact] public Task Active_interview_deletion_releases_reservation_and_bills_persisted_answers_once() => TestBilledDeletion(false);
-    [PostgresFact] public Task Completed_interview_deletion_preserves_immutable_settlement() => TestBilledDeletion(true);
+    [PostgresFact] public Task Active_interview_deletion_keeps_answers_and_revokes_access() => TestDeletion(false);
+    [PostgresFact] public Task Completed_interview_deletion_keeps_answers() => TestDeletion(true);
 
     [PostgresFact]
     public async Task Deletion_during_ai_processing_revokes_the_worker_lease_and_prevents_late_evidence()
@@ -215,7 +204,6 @@ public sealed class PanelCleanupTests(ApiFixture f)
             {
                 var session = await db.InterviewSessions.SingleAsync(x => x.Id == id);
                 Assert.Null(session.ProcessingLeaseId); Assert.NotNull(session.DeletedAtUtc); Assert.Empty(session.Evidence);
-                Assert.False(await db.AiCreditReservations.AnyAsync(x => x.InterviewSessionId == id && x.Status == ReservationStatus.Active));
             });
         }
         finally { release.TrySetResult(); f.InterviewAi.Reset(); await pending; }

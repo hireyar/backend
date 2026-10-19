@@ -4,7 +4,7 @@ using HireYar.Domain.JobPositions;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.JobPositions;
 
-public sealed class JobService(IApplicationDbContext db, ICurrentUser user, TimeProvider time)
+public sealed class JobService(IApplicationDbContext db, ICurrentUser user, TimeProvider time, HireYar.Application.Subscriptions.SubscriptionService subscriptions)
 {
     private IQueryable<JobPosition> Scoped => db.JobPositions.Where(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null);
     private static JobDto Map(JobPosition x) => new(x.Id, x.Title, x.Description, x.Seniority, x.Status, x.CreatedAtUtc, x.UpdatedAtUtc, x.RowVersion);
@@ -20,9 +20,10 @@ public sealed class JobService(IApplicationDbContext db, ICurrentUser user, Time
     }
     public async Task<JobDto> GetAsync(Guid id, CancellationToken ct) => Map(await Scoped.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound());
     public Task<JobDto> CreateAsync(JobRequest request, CancellationToken ct) =>
-        db.WithOrganizationBillingLockAsync(user.OrganizationId, () => CreateLockedAsync(request, ct), ct);
+        db.WithOrganizationLockAsync(user.OrganizationId, () => CreateLockedAsync(request, ct), ct);
     private async Task<JobDto> CreateLockedAsync(JobRequest request, CancellationToken ct)
     {
+        await subscriptions.RequireAsync(user.OrganizationId, ct);
         var row = new JobPosition
         {
             OrganizationId = user.OrganizationId,
@@ -35,7 +36,7 @@ public sealed class JobService(IApplicationDbContext db, ICurrentUser user, Time
         return Map(row);
     }
     public Task<JobDto> UpdateAsync(Guid id, UpdateJobRequest request, CancellationToken ct) =>
-        db.WithOrganizationBillingLockAsync(user.OrganizationId, () => UpdateLockedAsync(id, request, ct), ct);
+        db.WithOrganizationLockAsync(user.OrganizationId, () => UpdateLockedAsync(id, request, ct), ct);
     private async Task<JobDto> UpdateLockedAsync(Guid id, UpdateJobRequest request, CancellationToken ct)
     {
         var row = await Scoped.SingleOrDefaultAsync(x => x.Id == id, ct) ??
@@ -45,7 +46,7 @@ public sealed class JobService(IApplicationDbContext db, ICurrentUser user, Time
         await db.SaveChangesAsync(ct);
         return Map(row);
     }
-    public Task DeleteAsync(Guid id, CancellationToken ct) => db.WithOrganizationBillingLockAsync(user.OrganizationId, async () =>
+    public Task DeleteAsync(Guid id, CancellationToken ct) => db.WithOrganizationLockAsync(user.OrganizationId, async () =>
     {
         var row = await Scoped.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound();
         var now = time.GetUtcNow();

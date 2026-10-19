@@ -11,12 +11,20 @@ internal static class OpenApiText
 
         برای درخواست‌های غیر GET در `/api/auth`، مقدار `token` از `GET /api/auth/csrf` را در هدر `X-CSRF-TOKEN` بفرستید و کوکی همان درخواست را نگه دارید. پس از ورود، CSRF را با Bearer جدید دوباره بگیرید. برای تمدید نشست، Bearer را حذف کنید و با کوکی refresh، ابتدا CSRF و سپس `POST /api/auth/refresh` را بزنید.
 
-        پس از ورود: موقعیت شغلی بسازید، سپس قالب مصاحبهٔ مربوط به آن را ثبت کنید.
+        پس از ورود، اشتراک را از /api/subscriptions/catalog انتخاب و سفارش را در /api/subscriptions/orders ثبت کنید؛ فعال‌سازی فعلاً با تأیید سوپرادمین است. برای دعوت، بسته مصاحبه بخرید. سهمیه هنگام دعوت رزرو و هنگام شروع یک‌بار مصرف می‌شود؛ سقف هر مصاحبه۳۰دقیقه است. سپس موقعیت و قالب بسازید.
         **ویزارد پنل:** انتخاب موقعیت با `GET /api/job-positions` یا ساخت با `POST /api/panel-wizard/positions`؛ انتخاب قالب با `GET /api/interview-templates` یا ساخت با `POST /api/panel-wizard/templates`؛ ثبت کارجو و رزومه با `POST /api/panel-wizard/invitations` (multipart). توکن دعوت محرمانه است. ارسال ایمیل و پیامک فعلاً `NotConfigured` است؛ صدور توکن را ارسال پیام نمایش ندهید.
         """;
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("SubscriptionCatalog", "Get") => "یک اشتراک و بسته‌های مصاحبه؛ تمام مبالغ ریالی",
+        ("SubscriptionCatalog", "Quote") => "محاسبه سرورِ قیمت اشتراک/بسته با نسخه کاتالوگ",
+        ("Subscriptions", "Current") => "اشتراک و روزهای باقی‌مانده و سهمیه مصرف/رزرو/قابل دعوت سازمان",
+        ("Subscriptions", "Create") => "ثبت سفارش در انتظار تأیید سوپرادمین؛ فقط مالک",
+        ("Subscriptions", "Cancel") => "لغو سفارش تأییدنشده؛ فقط مالک",
+        ("Subscriptions", _) => "سوابق سفارش‌های سازمان جاری؛ فقط مالک",
+        ("AdminSubscriptions", "Confirm") => "تأیید دستی سفارش و اعمال یک‌باره اشتراک یا سهمیه",
+        ("AdminSubscriptions", _) => "مدیریت اشتراک واحد و بسته‌ها و سفارش‌ها؛ فقط سوپرادمین",
         ("Tickets" or "AdminTickets", "List") => "فهرست صفحه‌بندی‌شده تیکت‌ها با فیلتر وضعیت و اولویت",
         ("Tickets" or "AdminTickets", "Get") => "جزئیات تیکت با کنترل دسترسی",
         ("Tickets" or "AdminTickets", "Messages") => "گفت‌وگوی تیکت و مشخصات پیوست‌ها",
@@ -122,21 +130,6 @@ internal static class OpenApiText
         ("CandidateInterviews", "Retry") => "پردازش دوباره همان پاسخ",
         ("CandidateInterviews", "Complete") => "پایان مصاحبه به درخواست داوطلب",
         ("CandidateInterviews", "Audio") => "دریافت خصوصی صوت سؤال",
-        ("InterviewPricing", "Quote") => "پیش‌نمایش تعرفه داینامیک نوع مصاحبه در پکیج با خروجی ریالی و نرخ پنج‌دقیقه‌ای",
-        ("Pricing", "Types") => "فهرست داینامیک انواع مصاحبه فعال",
-        ("Pricing", _) => "مشاهده قیمت‌ها و پکیج‌های عمومی",
-        ("Billing", "Panel") => "وضعیت اشتراک، اعتبار و زمان قابل استفاده سازمان",
-        ("Billing", "Quote") => "خلاصه خرید، تخفیف، مالیات و اعتبار روزشمار ارتقا",
-        ("Billing", "Checkout") => "ایجاد پرداخت خرید، تمدید یا ارتقای اشتراک؛ فقط مالک",
-        ("Billing", "FinancialHistory") => "سوابق مالی با فیلتر و جمع بازه",
-        ("Billing", "Invoice") => "جزئیات فاکتور پرداخت موفق سازمان",
-        ("Billing", _) => "اشتراک، اعتبار و پرداخت سازمان جاری",
-        ("AdminPricing", _) => "مدیریت قیمت‌گذاری؛ فقط مدیر پلتفرم",
-        ("AdminInterviewTypes", "Types") => "فهرست تمام انواع مصاحبه؛ فقط سوپرادمین",
-        ("AdminInterviewTypes", "Create") => "ایجاد نوع مصاحبه با راهبرد اجرایی عمومی یا تخصصی؛ فقط سوپرادمین",
-        ("AdminInterviewTypes", "Update") => "ویرایش نام، ترتیب و وضعیت نوع مصاحبه با کنترل نسخه؛ فقط سوپرادمین",
-        ("AdminInterviewTypes", "SetPackage") => "تنظیم قیمت دلاری و وضعیت نوع مصاحبه در پکیج با کنترل نسخه؛ فقط سوپرادمین",
-        ("PaymentCallbacks", _) => "تأیید پرداخت از درگاه؛ بدون پذیرش قیمت یا موفقیت از درخواست",
         _ => null
     };
 }
