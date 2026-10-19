@@ -79,7 +79,7 @@ public sealed class RegistrationTests : IAsyncLifetime
         var response = await b.Send(HttpMethod.Post, "/api/auth/register", r with { Email = owner.Mobile + "@EXAMPLE.TEST" });
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode); Assert.Equal("email_unavailable", await Code(response));
         await f.Db(async db => {
-            Assert.Single(await db.Users.ToListAsync()); Assert.Single(await db.Organizations.ToListAsync()); Assert.Null((await db.OtpChallenges.SingleAsync(x => x.Mobile == r.Mobile)).ConsumedAtUtc);
+            Assert.Single(await db.Users.ToListAsync()); Assert.Single(await db.Organizations.ToListAsync()); Assert.Single(await db.SignupTrials.ToListAsync()); Assert.Null((await db.OtpChallenges.SingleAsync(x => x.Mobile == r.Mobile)).ConsumedAtUtc);
         });
         Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Post, "/api/auth/register", r with { ReferralCode = "  " })).StatusCode);
         await f.Db(async db => Assert.Null((await db.Users.SingleAsync(x => x.PhoneNumber == r.Mobile)).ReferralCode));
@@ -135,6 +135,7 @@ public sealed class RegistrationTests : IAsyncLifetime
         await f.Db(async db=> {
             Assert.Single(await db.Users.ToListAsync()); Assert.Single(await db.Organizations.ToListAsync());
             Assert.Single(await db.RefreshTokens.ToListAsync());
+            Assert.Single(await db.SignupTrials.ToListAsync());
             Assert.Single(await db.OtpChallenges.Where(x=>x.ConsumedAtUtc!=null).ToListAsync());
         });
         var loser = results[0].StatusCode == HttpStatusCode.Conflict ? a : b;

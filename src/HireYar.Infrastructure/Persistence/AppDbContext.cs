@@ -12,6 +12,7 @@ namespace HireYar.Infrastructure.Persistence;
 
 public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options), IApplicationDbContext
 {
+    public DbSet<HireYar.Domain.Subscriptions.SignupTrial> SignupTrials => Set<HireYar.Domain.Subscriptions.SignupTrial>();
     public DbSet<HireYar.Domain.Subscriptions.SubscriptionPlan> SubscriptionPlans => Set<HireYar.Domain.Subscriptions.SubscriptionPlan>();
     public DbSet<HireYar.Domain.Subscriptions.InterviewBundle> InterviewBundles => Set<HireYar.Domain.Subscriptions.InterviewBundle>();
     public DbSet<HireYar.Domain.Subscriptions.SubscriptionOrder> SubscriptionOrders => Set<HireYar.Domain.Subscriptions.SubscriptionOrder>();

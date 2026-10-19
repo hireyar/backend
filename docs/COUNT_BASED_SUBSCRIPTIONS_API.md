@@ -20,7 +20,7 @@
 
 ## چرخه خرید و اشتراک
 
-ثبت‌نام هدیه/اشتراک/سهمیه خودکار نمی‌دهد. ثبت سفارش فقط Owner است؛ وضعیت Pending هیچ دسترسی یا سهمیه نمی‌دهد. فعلاً پرداخت درگاه وجود ندارد: سوپرادمین پس از بررسی پرداخت با مرجع پرداخت غیرخالی و یکتا سفارش را تأیید می‌کند. تأیید با توکن سازمان یا client-side پرداخت موفق قابل جعل نیست. سفارش۲۴ساعت اعتبار دارد؛ لغوشده/منقضی قابل تأیید نیست. مرجع پرداخت اطلاعات کارت/secret/لینک پرداخت نیست و نباید داده حساس در آن فرستاد.
+ثبت‌نام موفق Owner و سازمان جدید، در همان تراکنش یک هدیهٔ یک‌باره شامل اشتراک۴۸ساعته از زمان ثبت‌نام و۲مصاحبه می‌دهد؛ سفارش/پرداخت/تأیید ادمین ندارد. ورود، refresh، ثبت‌نام ناموفق و پذیرش دعوت عضو تیم هدیه نمی‌سازند. ظرفیت تیم و نگهداری رسانه از includedUsers و retentionDays فعلی کاتالوگ snapshot می‌شوند. هدیه برای سازمان‌های قبلی backfill نمی‌شود. سهمیه هدیه هم مانند خرید انقضا ندارد؛ پس از۴۸ساعت استفاده نیازمند اشتراک فعال است. خرید زودهنگام اشتراک به پایان دوره رایگان افزوده می‌شود. ثبت سفارش فقط Owner است؛ وضعیت Pending هیچ دسترسی یا سهمیه نمی‌دهد. فعلاً پرداخت درگاه وجود ندارد: سوپرادمین پس از بررسی پرداخت با مرجع پرداخت غیرخالی و یکتا سفارش را تأیید می‌کند. تأیید با توکن سازمان یا client-side پرداخت موفق قابل جعل نیست. سفارش۲۴ساعت اعتبار دارد؛ لغوشده/منقضی قابل تأیید نیست. مرجع پرداخت اطلاعات کارت/secret/لینک پرداخت نیست و نباید داده حساس در آن فرستاد.
 
 تأیید تکراری همان سفارش با همان مرجع، نتیجه قبلی را برمی‌گرداند؛ مرجع متفاوت برای سفارش تأییدشده409 و مرجع تکراری برای سفارش دیگر409 است. RequestId سمت Owner برای replay ثبت سفارش است؛ همان UUID فقط با همان Selection قابل استفاده است. تغییر انتخاب با UUID قبلی409 دارد. کل مبلغ/تخفیف/تعداد/ظرفیت/retention در سفارش snapshot است. هیچ مقدار مبلغی از فرانت پذیرفته نمی‌شود. تغییر کاتالوگ پس از quote و پیش از ایجاد سفارش409/pricing_changed دارد؛ سفارش موجود تا انقضایش همان قیمت ثبت‌شده را دارد.
 
@@ -60,7 +60,7 @@
 
 Quote شامل product/productName/currency/months/teamUsers/unlimitedTeam/retentionDays/bundleCode/quantity/unitPriceRial/teamMonthlyPriceRial/discountPercent/originalAmountRial/discountAmountRial/amountRial/planVersion/bundleVersion است. ثبت سفارش: `{ "requestId":"UUID تازه برای این انتخاب", "selection":{...همان انتخاب...}, "planVersion":"از quote", "bundleVersion":"از quote برای بسته؛ برای اشتراک حذف شود" }`.
 
-State: hasActiveSubscription، startedAtUtc، expiresAtUtc، remainingDays (ceil و صفر پس از انقضا)، remainingInterviews (کل خرید منهای مصرف؛ شامل رزروها)، availableInterviews (مانده منهای رزرو فعال)، reservedInterviews، consumedInterviews، teamCapacity (null برای نامحدود/بدون اشتراک)، unlimitedTeam و occupiedTeamUsers (عضو فعال + دعوت باز، شامل Owner). برای اجازه دعوت از availableInterviews استفاده شود؛ وجود سهمیه به معنی اشتراک فعال نیست. نبود/انقضای اشتراک Current با200 و hasActiveSubscription=false می‌دهد.
+State: hasActiveSubscription، startedAtUtc، expiresAtUtc، remainingDays (ceil و صفر پس از انقضا)، remainingInterviews (مجموع هدیه و خرید منهای مصرف؛ شامل رزروها)، availableInterviews (مانده منهای رزرو فعال)، reservedInterviews، consumedInterviews، teamCapacity (null برای نامحدود/بدون اشتراک)، unlimitedTeam، occupiedTeamUsers (عضو فعال + دعوت باز، شامل Owner) و isTrial (دسترسی فعلی از هدیه ثبت‌نام). برای اجازه دعوت از availableInterviews استفاده شود؛ وجود سهمیه به معنی اشتراک فعال نیست. نبود/انقضای اشتراک Current با200 و hasActiveSubscription=false می‌دهد.
 
 BundleDto: id/code/name/minimumQuantity/maximumQuantity/quantityStep/discountPercent/startingOriginalAmountRial/startingAmountRial/isActive/sortOrder/rowVersion. تعداد ثابت وقتی min=max است؛ دلخواه را از حدود/گام DB بسازید. PlanUpdateRequest: name/monthlyPriceRial/baseInterviewPriceRial/extraUserMonthlyPriceRial/includedUsers/paidUserCeiling/retentionDays/isActive/rowVersion. BundleUpdateRequest: name/minimumQuantity/maximumQuantity/quantityStep/discountPercent/sortOrder/isActive/rowVersion. حداکثر زمان مصاحبه۳۰دقیقه است و ادمین آن را بالا نمی‌برد.
 
@@ -84,3 +84,11 @@ dotnet ef database update --project src/HireYar.Infrastructure --startup-project
 ## نتیجه اعتبارسنجی
 
 Build بدون خطا/هشدار؛ کل436تست با0Fail/0Skip روی PostgreSQL18 و FFmpeg محلی واقعی موفق‌اند. UTC ماه تقویمی در session غیرUTC، قیمت/تأیید/رقابت سهمیه و expiry/retention واقعاً آزموده شدند. EF بدون drift و diff بدون whitespace error است. TRX نهایی: `tests/HireYar.Tests/TestResults/count-subscriptions-final.trx`. migration مقصد و فرانت اجرا نشده‌اند.
+
+## هدیه ثبت‌نام — 2026-10-19 / ADR-073
+
+Migration افزایشی `20261019085750_AddSignupTrial` جدول `SignupTrials` را با کلید یکتای سازمان، FK سازمان، قید۴۸ساعت/۲مصاحبه و trigger منع ویرایش/حذف ایجاد می‌کند. تراکنش ثبت‌نام، حساب/سازمان/هدیه/OTP/session را یکجا commit می‌کند؛ خریدها و fulfillment قبلی مستقل و دست‌نخورده‌اند. Down با هدیه موجود متوقف می‌شود. migration روی مقصد اجرا نشده است.
+
+`isTrial` در current و dashboard فقط وقتی دسترسی فعلی از هدیه است true می‌شود؛ پایان/remainingDays کل پوشش پیوسته شامل تمدید خریداری‌شده را نشان می‌دهند. باقی شمارنده‌ها مجموع هدیه و خرید منهای مصرف/رزرو هستند. اشتراک پولی همچنان به‌خودی‌خود مصاحبه ندارد. با پایان trial، isTrial=false و hasActiveSubscription=false می‌شود مگر دوره پولی شروع شده باشد. گزارش متنی و رسانه با قواعد قبلی حفظ می‌شوند.
+
+اعتبارسنجی ADR-073: build کل solution صفر warning/error؛۳۴تست مرتبط متمایز آخرین نتیجه Passed و صفر Skipped دارند، روی PostgreSQL18 مستقل loopback55544 و FFmpeg واقعی محلی با OTP/AI/storage مصنوعی. اجرای signup-trial-final دارای۳۲Passed و۲Fail تست زمان بود؛ پس از اصلاح fixture زمان/JWT (بدون تغییر کد محصول)، هر۲تست در signup-trial-expiry-final با۰Fail پاس شدند. سه regression جدید هدیه یک‌باره۴۸ساعت/۲مصاحبه، مصرف/رزرو/لغو، انقضا و تمدید را پوشش می‌دهند؛ ثبت‌نام rollback و رقابت، پذیرش تیم، dashboard و migration regression نیز اجرا شدند. کل suite تکرار نشده است. EF بدون drift و git diff --check موفق؛ SQL در artifacts/signup-trial-migrations.sql، TRXها در tests/HireYar.Tests/TestResults هستند. migration مقصد، Angular، commit/push/deploy انجام نشده‌اند.

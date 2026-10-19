@@ -129,6 +129,10 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 OrganizationId = org.Id, Role = OrganizationRole.Owner,
                 CreatedAtUtc = Now, UpdatedAtUtc = Now };
             Check(await users.CreateAsync(u));
+            var plan = await db.SubscriptionPlans.AsNoTracking().SingleAsync(ct);
+            var trialStart = Now;
+            db.SignupTrials.Add(new() { OrganizationId = org.Id, StartedAtUtc = trialStart,
+                ExpiresAtUtc = trialStart.AddDays(2), TeamUsers = plan.IncludedUsers, RetentionDays = plan.RetentionDays });
         }
         if (!u.IsActive || u.Role is not (OrganizationRole.Owner or OrganizationRole.Recruiter) || await users.IsLockedOutAsync(u)) throw AppException.Unauthorized();
         u.PhoneNumberConfirmed = true;

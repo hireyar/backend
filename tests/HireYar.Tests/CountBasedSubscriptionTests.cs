@@ -18,7 +18,8 @@ public sealed class CountBasedSubscriptionTests : IAsyncLifetime
     private Account? admin;
     public Task InitializeAsync() => f.InitializeAsync();
     public Task DisposeAsync() => ((IAsyncLifetime)f).DisposeAsync();
-    private Task<Account> Owner() => f.RegisterOwner(explicitSignup: true, provisionMembership: false);
+    // Paid-order tests start with an existing synthetic account; signup gifts are tested separately.
+    private Task<Account> Owner() => f.RegisterOwner(provisionMembership: false);
     private async Task<Account> Admin() => admin ??= await f.RegisterAdmin();
     private async Task<T> Read<T>(HttpResponseMessage response)
     { Assert.Equal(HttpStatusCode.OK, response.StatusCode); return (await response.Content.ReadFromJsonAsync<T>(TestJson.Options))!; }
@@ -229,6 +230,79 @@ public sealed class CountBasedSubscriptionTests : IAsyncLifetime
             Assert.Equal(m.StartedAtUtc.AddMonths(1),m.ExpiresAtUtc);Assert.Equal(28,m.ExpiresAtUtc.Day);Assert.Equal(2,m.ExpiresAtUtc.Month);
         }
         finally {await db.Database.CloseConnectionAsync();}
+    }
+
+    [PostgresFact]
+    public async Task Signup_grants_exactly_48_hours_and_two_interviews_once_without_payment()
+    {
+        var o = await f.RegisterOwner(explicitSignup: true, provisionMembership: false);
+        var state = await State(o);
+        Assert.True(state.HasActiveSubscription); Assert.True(state.IsTrial);
+        Assert.Equal(2, state.RemainingDays); Assert.Equal(2, state.AvailableInterviews);
+        Assert.Equal(TimeSpan.FromHours(48), state.ExpiresAtUtc - state.StartedAtUtc);
+        Assert.Equal(5, state.TeamCapacity); Assert.False(state.UnlimitedTeam);
+        await f.SignInAsync(o.Client, o.Mobile);
+        Assert.Equal(2, (await State(o)).AvailableInterviews);
+        await f.Db(async db => {
+            Assert.Single(await db.SignupTrials.ToListAsync());
+            Assert.Empty(await db.SubscriptionOrders.ToListAsync());
+            Assert.Empty(await db.OrganizationMemberships.ToListAsync());
+            Assert.Empty(await db.InterviewQuotaGrants.ToListAsync());
+        });
+        var (job, template) = await Setup(o);
+        var first = await Issue(o, job.Id, template.Id);
+        var second = await Issue(o, job.Id, template.Id);
+        Assert.Equal(HttpStatusCode.Conflict, (await Invite(o, job.Id, template.Id)).StatusCode);
+        Assert.Equal(2, (await State(o)).ReservedInterviews);
+        using var candidate = Candidate(first);
+        Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{first.InterviewId}/start", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{first.InterviewId}/start", null)).StatusCode);
+        Assert.Equal(1, (await State(o)).ConsumedInterviews);
+        Assert.Equal(HttpStatusCode.NoContent, (await o.Client.Send(HttpMethod.Post, $"/api/interviews/{second.InterviewId}/cancel")).StatusCode);
+        Assert.Equal(1, (await State(o)).AvailableInterviews);
+        await f.Db(async db => {
+            var trial = await db.SignupTrials.AsNoTracking().SingleAsync();
+            await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"SignupTrials\" SET \"ExpiresAtUtc\" = \"ExpiresAtUtc\" + interval '1 day' WHERE \"OrganizationId\" = {trial.OrganizationId}"));
+            await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO \"SignupTrials\" SELECT * FROM \"SignupTrials\" WHERE \"OrganizationId\" = {trial.OrganizationId}"));
+        });
+    }
+
+    [PostgresFact]
+    public async Task Trial_expiry_blocks_new_activity_preserves_gift_and_paid_renewal_restores_access()
+    {
+        var o = await f.RegisterOwner(explicitSignup: true, provisionMembership: false);
+        var original = await State(o);
+        await Admin(); // Issue admin credentials before advancing the business clock.
+        // Business clock advances; retain the existing JWT, whose lifetime validation uses wall time.
+        f.Clock.Offset = original.ExpiresAtUtc!.Value - DateTimeOffset.UtcNow;
+        var expired = await State(o);
+        Assert.False(expired.HasActiveSubscription); Assert.False(expired.IsTrial);
+        Assert.Equal(0, expired.RemainingDays); Assert.Equal(2, expired.RemainingInterviews);
+        Assert.Equal(HttpStatusCode.Forbidden, (await o.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions",
+            new WizardPositionRequest("Blocked", "Expired trial"))).StatusCode);
+        Assert.False((await State(o)).HasActiveSubscription);
+        await Subscribe(o);
+        Assert.False((await State(o)).IsTrial); Assert.True((await State(o)).HasActiveSubscription);
+        Assert.Equal(2, (await State(o)).AvailableInterviews);
+        await f.Db(async db => Assert.Single(await db.SignupTrials.ToListAsync()));
+    }
+
+    [PostgresFact]
+    public async Task Paid_subscription_bought_during_trial_starts_after_the_free_period()
+    {
+        var o = await f.RegisterOwner(explicitSignup: true, provisionMembership: false);
+        var trial = await State(o);
+        var order = await Order(o, new("subscription")); await Confirm(order);
+        var state = await State(o);
+        Assert.True(state.IsTrial); Assert.Equal(trial.StartedAtUtc, state.StartedAtUtc);
+        Assert.Equal(trial.ExpiresAtUtc!.Value.AddMonths(1), state.ExpiresAtUtc);
+        await f.Db(async db => Assert.Equal(trial.ExpiresAtUtc,
+            (await db.OrganizationMemberships.SingleAsync(m => m.OrderId == order.Id)).StartedAtUtc));
+        f.Clock.Offset = trial.ExpiresAtUtc.Value - DateTimeOffset.UtcNow;
+        Assert.True((await State(o)).HasActiveSubscription); Assert.False((await State(o)).IsTrial);
+        Assert.Equal(2, (await State(o)).AvailableInterviews);
     }
 
 }

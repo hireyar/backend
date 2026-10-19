@@ -7,8 +7,15 @@ namespace HireYar.Infrastructure.Persistence;
 
 public sealed class SubscriptionConfigurations : IEntityTypeConfiguration<SubscriptionPlan>, IEntityTypeConfiguration<InterviewBundle>,
     IEntityTypeConfiguration<SubscriptionOrder>, IEntityTypeConfiguration<OrganizationMembership>,
-    IEntityTypeConfiguration<InterviewQuotaGrant>, IEntityTypeConfiguration<InterviewQuotaReservation>
+    IEntityTypeConfiguration<InterviewQuotaGrant>, IEntityTypeConfiguration<InterviewQuotaReservation>, IEntityTypeConfiguration<SignupTrial>
 {
+    public void Configure(EntityTypeBuilder<SignupTrial> b)
+    {
+        b.HasKey(t => t.OrganizationId);
+        b.HasOne<Organization>().WithOne().HasForeignKey<SignupTrial>(t => t.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        b.ToTable(t => t.HasCheckConstraint("CK_SignupTrial_Values",
+            "\"ExpiresAtUtc\" = \"StartedAtUtc\" + interval '48 hours' AND \"InterviewQuantity\" = 2 AND \"TeamUsers\" >= 1 AND \"RetentionDays\" BETWEEN 1 AND 3650"));
+    }
     private static void Tenant<T>(EntityTypeBuilder<T> b) where T : class
     {
         b.HasKey("Id"); b.HasAlternateKey("OrganizationId", "Id");

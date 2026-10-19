@@ -41,12 +41,13 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
     [PostgresFact]
     public async Task Acceptance_creates_scoped_recruiter_without_new_organization_and_enforces_permissions()
     {
-        var owner = await f.RegisterOwner(); var other = await f.RegisterOwner(); var mobile = Mobile();
+        var owner = await f.RegisterOwner(explicitSignup: true); var other = await f.RegisterOwner(); var mobile = Mobile();
         var invitation = await Invite(owner, mobile); var member = await Accept(invitation);
         var me = await Me(member); var hr = await Me(owner.Client);
         Assert.Equal(OrganizationRole.Recruiter, me.Role); Assert.Equal(hr.OrganizationId, me.OrganizationId);
         await f.Db(async db => {
             Assert.Equal(2, await db.Organizations.CountAsync());
+            Assert.Single(await db.SignupTrials.ToListAsync());
             Assert.NotNull((await db.MobileTeamInvitations.SingleAsync(x => x.Id == invitation.Id)).AcceptedAtUtc);
             Assert.Equal(2, await db.Users.CountAsync(x => x.OrganizationId == me.OrganizationId && x.IsActive));
         });
