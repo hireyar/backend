@@ -27,14 +27,14 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.OK, templateResponse.StatusCode);
         return (hr, job, (await templateResponse.Content.ReadFromJsonAsync<TemplateDto>(TestJson.Options))!);
     }
-    private async Task<HttpResponseMessage> Invite(Account hr, Guid job, Guid template, string phone = "09123456789", string filename = "resume.pdf", byte[]? bytes = null, string interviewType = "general", bool sendEmail = false, bool sendSms = false)
+    private async Task<HttpResponseMessage> Invite(Account hr, Guid job, Guid template, string phone = "09123456789", string filename = "resume.pdf", byte[]? bytes = null, string interviewType = "general", bool sendEmail = false, bool sendSms = false, string? resumeText = "Synthetic candidate work history and projects", string firstName = "Synthetic")
     {
         using var client = f.CreateClient(); client.DefaultRequestHeaders.Authorization = new("Bearer", hr.Client.AccessToken);
         using var form = new MultipartFormDataContent();
         foreach (var field in new Dictionary<string, string> { ["jobPositionId"] = job.ToString(), ["templateId"] = template.ToString(),
-            ["firstName"] = "Synthetic", ["lastName"] = "Candidate", ["email"] = "candidate@example.test", ["phone"] = phone, ["deadlineDays"] = "3", ["interviewType"] = interviewType })
+            ["firstName"] = firstName, ["lastName"] = "Candidate", ["email"] = "candidate@example.test", ["phone"] = phone, ["deadlineDays"] = "3", ["interviewType"] = interviewType })
             form.Add(new StringContent(field.Value), field.Key);
-        form.Add(new StringContent("Synthetic candidate work history and projects"), "resumeText");
+        if (resumeText is not null) form.Add(new StringContent(resumeText), "resumeText");
         form.Add(new StringContent(sendEmail.ToString()), "sendEmail");
         form.Add(new StringContent(sendSms.ToString()), "sendSms");
         form.Add(new ByteArrayContent(bytes ?? "%PDF-1.7\nSynthetic test document"u8.ToArray()), "resume", filename);

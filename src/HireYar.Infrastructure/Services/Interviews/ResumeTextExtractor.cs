@@ -45,6 +45,6 @@ public sealed class ResumeTextExtractor : IResumeTextExtractor
         catch (OperationCanceledException) { throw; }
         // Malformed/encrypted/scanned files require an explicit text transcription, never a fabricated resume.
         catch (Exception) { return Task.FromResult<string?>(null); }
-        return Task.FromResult<string?>(string.IsNullOrWhiteSpace(text.ToString()) ? null : text.ToString().Trim());
+        return Task.FromResult(ResumeTextNormalizer.Normalize(text.ToString()));
     }
 }

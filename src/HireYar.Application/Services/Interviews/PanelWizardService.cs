@@ -20,9 +20,13 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         if (template.Questions.Count is < 5 or > 30) throw AppException.Invalid("template_requires_five_questions");
         var type = InterviewTypes.Require(r.InterviewType);
         var sourceTemplateId = template.Id;
+        if (r.FirstName.Contains('\0') || r.LastName.Contains('\0') || r.Email.Contains('\0') || r.Phone?.Contains('\0') == true)
+            throw AppException.Invalid();
         var file = await ResumeUploadValidator.ReadAsync(resume, filename, ct);
         var extracted = string.IsNullOrWhiteSpace(r.ResumeText) ? await resumeText.ExtractAsync(file.Bytes, file.Extension, ct) : r.ResumeText.Trim();
-        if (string.IsNullOrWhiteSpace(extracted)) throw AppException.Invalid("resume_text_required");
+        extracted = ResumeTextNormalizer.Normalize(extracted);
+        if (extracted is null) throw AppException.Invalid("resume_text_required");
+        if (extracted.Length > 32000) throw AppException.Invalid("invalid_resume_text");
         var now = time.GetUtcNow();
         // Keep the agreed position/template FK and reuse an organization's template by copying it to the selected position.
         if (template.JobPositionId != job.Id)
