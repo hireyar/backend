@@ -8,7 +8,7 @@ namespace HireYar.Application.Interviews;
 public sealed partial class CandidateInterviewService(IApplicationDbContext db, ICurrentInterviewAccess access, TimeProvider time,
     InterviewOptions options, InterviewPolicy policy, InterviewDecisionValidator validator, IInterviewAudioStorage storage,
     ISpeechToTextService stt, IInterviewDecisionService decisions, QuestionAudioService audio, ILogger<CandidateInterviewService> logger,
-    IInterviewDiagnostics diagnostics)
+    IInterviewDiagnostics diagnostics, HireYar.Application.Subscriptions.InterviewQuotaService quota)
 {
     private async Task<InterviewSession> Load(Guid id, CancellationToken ct)
     {
@@ -38,6 +38,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
           if (s.Status == InterviewStatus.Created)
           {
             var first = policy.SelectFallback(s, time.GetUtcNow(), options.ShortlistLimit) ?? throw AppException.Invalid("interview_plan_incomplete");
+            await quota.ConsumeLockedAsync(s, ct);
             s.Start(first.QuestionId, time.GetUtcNow());
             var application = await db.CandidateApplications.SingleAsync(x => x.Id == s.CandidateApplicationId && x.OrganizationId == s.OrganizationId, ct);
             application.Status = CandidateApplicationStatus.Interviewing; application.UpdatedAtUtc = time.GetUtcNow();
@@ -285,6 +286,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
     public async Task<Stream> OpenQuestionAudioAsync(Guid id, Guid questionId, CancellationToken ct)
     {
         var s = await Load(id, ct);
+        await quota.RequireMediaAsync(s, ct);
         if (s.CurrentQuestionId != questionId && !s.Answers.Any(x => x.QuestionId == questionId)) throw AppException.NotFound();
         var q = s.Questions.SingleOrDefault(x => x.QuestionId == questionId) ?? throw AppException.NotFound();
         var cached = await audio.ResolveAsync(s.OrganizationId, s.CurrentQuestionId == questionId ? s.CurrentInteractionMessage ?? q.Text : q.Text, false, ct) ?? throw AppException.NotFound();

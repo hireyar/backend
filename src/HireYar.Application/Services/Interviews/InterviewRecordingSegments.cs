@@ -19,6 +19,7 @@ public sealed partial class InterviewReviewService
     public async Task<InterviewRecordingProgressDto> RecordingProgressAsync(Guid id, bool candidate, CancellationToken ct)
     {
         var s = candidate ? await Candidate(id, ct) : await Owner(id, ct);
+        await quota.RequireMediaAsync(s, ct);
 
         var rows = await SegmentRows(s, ct);
         var legacy = await db.InterviewSessionRecordings.AnyAsync(r => r.OrganizationId == s.OrganizationId && r.InterviewSessionId == id, ct);
@@ -76,7 +77,7 @@ public sealed partial class InterviewReviewService
 
     public async Task<(Stream Content, string ContentType, string ContentHash)> OpenSegmentAsync(Guid id, int number, CancellationToken ct)
     {
-        var s = await Owner(id, ct);
+        var s = await Owner(id, ct); await quota.RequireMediaAsync(s, ct);
         var row = await db.InterviewRecordingSegments.AsNoTracking().SingleOrDefaultAsync(r => r.OrganizationId == s.OrganizationId &&
             r.InterviewSessionId == id && r.SegmentNumber == number, ct) ?? throw AppException.NotFound();
         return (await storage.OpenReadAsync(row.StorageKey, ct), row.ContentType, row.ContentHash);

@@ -11,7 +11,7 @@ public sealed record QuestionRequest(Guid? Id,
     [Required, StringLength(4000)] string EvaluationGuidance);
 public sealed record TemplateRequest(Guid JobPositionId,
     [Required, StringLength(200)] string Title,
-    [Range(5, 60)] int DurationMinutes,
+    [Range(5, 30)] int DurationMinutes,
     [Range(0, 3)] int MaxFollowUpQuestionsPerQuestion,
     [Required, MinLength(1), MaxLength(30)] List<QuestionRequest> Questions,
     [Required, StringLength(20)] string Language = "fa-IR", bool IsArchived = false,

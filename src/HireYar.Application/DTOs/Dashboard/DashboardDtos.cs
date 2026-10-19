@@ -5,4 +5,4 @@ namespace HireYar.Application.Dashboard;
 
 public sealed record JobStatusCount(JobStatus Status, int Count);
 public sealed record DashboardDto(IReadOnlyList<JobStatusCount> Jobs, int Templates,
-    int CompletedInterviews = 0, int PendingInterviews = 0, IReadOnlyList<HireYar.Application.Interviews.PanelInterviewDto>? RecentInterviews = null);
+    int CompletedInterviews = 0, int PendingInterviews = 0, IReadOnlyList<HireYar.Application.Interviews.PanelInterviewDto>? RecentInterviews = null, HireYar.Application.Subscriptions.SubscriptionStateDto? Subscription = null);

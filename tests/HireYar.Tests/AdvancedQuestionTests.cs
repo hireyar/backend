@@ -35,7 +35,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         var job = (await (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("توسعه‌دهنده مصنوعی", "شرح شغل مصنوعی SQL و API"))).Content.ReadFromJsonAsync<JobDto>(TestJson.Options))!;
         return (owner, job);
     }
-    private static WizardTemplateRequest Template(Guid job, int count = 7) => new(job, "قالب موضوعی", "specialized", null, "شروع", "پایان", 60, FakeQuestionSuggestionProvider.Topics(count));
+    private static WizardTemplateRequest Template(Guid job, int count = 7) => new(job, "قالب موضوعی", "specialized", null, "شروع", "پایان", 30, FakeQuestionSuggestionProvider.Topics(count));
     private async Task<TemplateDto> Save(Account owner, WizardTemplateRequest r)
     {
         var response = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", r);
@@ -154,7 +154,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new QuestionSuggestionRequest(job.Id))).StatusCode);
     }
     [PostgresFact]
-    public async Task Organization_without_subscription_can_generate_and_save_topic_and_flat_templates()
+    public async Task Subscribed_organization_can_generate_and_save_topic_and_flat_templates()
     {
         var (owner, job) = await Setup(); var calls = f.QuestionAi.Calls;
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new QuestionSuggestionRequest(job.Id))).StatusCode);

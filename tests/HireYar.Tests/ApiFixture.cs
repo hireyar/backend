@@ -139,7 +139,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         return response;
     }
     public static RegisterRequest Registration(string mobile, string code) => new(mobile, code, mobile + "@example.test", "نام", "آزمایشی");
-    public async Task<Account> RegisterOwner(bool explicitSignup = false)
+    public async Task<Account> RegisterOwner(bool explicitSignup = false, bool provisionMembership = true)
     {
         var browser = Browser(); var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
         // Exercise either an existing account or the explicit OTP registration flow.
@@ -162,6 +162,27 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         }
         else await SignInAsync(browser, mobile);
         var me = (await (await browser.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
+        if (provisionMembership)
+        {
+            await using var setupScope = Services.CreateAsyncScope();
+            var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var now = Clock.GetUtcNow(); var request = Guid.NewGuid();
+            var subscriptionOrder = new HireYar.Domain.Subscriptions.SubscriptionOrder { OrganizationId = me.OrganizationId,
+                RequestId = request, RequestFingerprint = new string('a',64), Product = "subscription", ProductName = "Synthetic baseline",
+                Status = "Confirmed", Months = 12, TeamUsers = 30, UnlimitedTeam = true, UnitPriceRial = 90_000_000,
+                OriginalAmountRial = 1_080_000_000, AmountRial = 1_080_000_000, RetentionDays = 60,
+                CreatedAtUtc = now, ExpiresAtUtc = now.AddDays(1), ConfirmedAtUtc = now, ConfirmedByUserId = me.Id, PaymentReference = "synthetic-" + request };
+            var bundleOrder = new HireYar.Domain.Subscriptions.SubscriptionOrder { OrganizationId = me.OrganizationId,
+                RequestId = Guid.NewGuid(), RequestFingerprint = new string('b',64), Product = "interviews", ProductName = "Synthetic quota",
+                BundleCode = "custom", Status = "Confirmed", Quantity = 1000, UnitPriceRial = 4_000_000,
+                OriginalAmountRial = 4_000_000_000, AmountRial = 4_000_000_000, RetentionDays = 60,
+                CreatedAtUtc = now, ExpiresAtUtc = now.AddDays(1), ConfirmedAtUtc = now, ConfirmedByUserId = me.Id, PaymentReference = "synthetic-quota-" + request };
+            setupDb.SubscriptionOrders.AddRange(subscriptionOrder, bundleOrder);
+            setupDb.OrganizationMemberships.Add(new() { OrganizationId = me.OrganizationId, OrderId = subscriptionOrder.Id,
+                StartedAtUtc = now.AddDays(-1), ExpiresAtUtc = now.AddDays(-1).AddMonths(12), TeamUsers = 30, UnlimitedTeam = true, RetentionDays = 60 });
+            setupDb.InterviewQuotaGrants.Add(new() { OrganizationId = me.OrganizationId, OrderId = bundleOrder.Id, Quantity = 1000, CreatedAtUtc = now });
+            await setupDb.SaveChangesAsync();
+        }
         return new(browser, mobile, me.Id);
     }
     public async Task Db(Func<AppDbContext, Task> action) { await using var scope = Services.CreateAsyncScope(); await action(scope.ServiceProvider.GetRequiredService<AppDbContext>()); }

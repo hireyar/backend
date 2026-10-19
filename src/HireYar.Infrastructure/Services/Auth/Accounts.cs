@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 namespace HireYar.Infrastructure.Auth;
 
-public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger) : IAccounts
+public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger, HireYar.Application.Subscriptions.SubscriptionService subscriptions) : IAccounts
 {
     private SecurityOptions Settings => options.Value;
     private DateTimeOffset Now => time.GetUtcNow();
@@ -87,6 +87,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 throw new AppException(409, "invitation_unavailable", "Invitation is no longer available.");
             if (u is not null && (u.OrganizationId != org.Id || u.Role != OrganizationRole.Recruiter || u.IsActive))
                 throw new AppException(409, "mobile_unavailable", "This mobile cannot accept the invitation.");
+            await subscriptions.RequireTeamCapacityLockedAsync(org.Id, true, ct);
             var invitedName = !string.IsNullOrWhiteSpace(invitation.FirstName) && !string.IsNullOrWhiteSpace(invitation.LastName)
                 ? $"{invitation.FirstName.Trim()} {invitation.LastName.Trim()}" : null;
             if (u is null)

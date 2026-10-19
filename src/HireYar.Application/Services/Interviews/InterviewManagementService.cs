@@ -5,7 +5,7 @@ namespace HireYar.Application.Interviews;
 
 public sealed class InterviewManagementService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
     IInterviewAudioStorage storage, IInterviewInvitationSecurity invitationSecurity,
-    IInterviewDiagnostics diagnostics, IInterviewInvitationNotifier notifier)
+    IInterviewDiagnostics diagnostics, IInterviewInvitationNotifier notifier, HireYar.Application.Subscriptions.InterviewQuotaService quota)
 {
     private async Task CheckJob(Guid id, CancellationToken ct)
     { if (!await db.JobPositions.AnyAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Id == id, ct)) throw AppException.NotFound(); }
@@ -93,7 +93,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         var now = time.GetUtcNow();
         var token = invitationSecurity.CreateCode();
         var session = new InterviewSession(user.OrganizationId, jobId, applicationId, template.Id, questions, skills,
-            r.MaxQuestionCount, template.DurationMinutes * 60, now, now.AddHours(r.ExpiresInHours));
+            r.MaxQuestionCount, Math.Min(template.DurationMinutes * 60, 1800), now, now.AddHours(r.ExpiresInHours));
         session.SetInterviewType(InterviewTypes.Require(r.InterviewType));
         session.SetInteractionLimit(template.MaxFollowUpQuestionsPerQuestion);
         var job = await db.JobPositions.AsNoTracking().SingleAsync(x => x.Id == jobId && x.OrganizationId == user.OrganizationId, ct);
@@ -102,6 +102,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
             template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
         var encrypted = invitationSecurity.Protect(session.Id, token);
         session.SetProtectedAccessCode(encrypted, InterviewTokens.Hash(encrypted)); db.InterviewSessions.Add(session);
+        await quota.ReserveLockedAsync(session, ct);
         await db.SaveChangesAsync(ct);
         return new(session.Id, token, session.ExpiresAtUtc, $"/api/candidate/interviews/{session.Id}", token, invitationSecurity.Link(session.Id));
     }
@@ -137,7 +138,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
             await db.ReloadInterviewAsync(s, ct);
             if (s.Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled)) s.Cancel(time.GetUtcNow());
-            s.RevokeAccess(time.GetUtcNow()); return true;
+            s.RevokeAccess(time.GetUtcNow()); await quota.ReleaseLockedAsync(s, ct); return true;
         }, ct);
     }
     public async Task DeleteAsync(Guid id, CancellationToken ct)
@@ -152,10 +153,12 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
             await db.InterviewAnswers.Where(x => x.InterviewSessionId == id).ToListAsync(ct);
             if (s.Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled)) s.Cancel(time.GetUtcNow());
             s.MarkDeleted(time.GetUtcNow());
+            await quota.ReleaseLockedAsync(s, ct);
             return true;
         }, ct);
     }
     public async Task<InterviewSession> Scoped(Guid id, CancellationToken ct) => await db.InterviewSessions.Include(x => x.Answers)
         .SingleOrDefaultAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null, ct) ?? throw AppException.NotFound();
-    public Task<InterviewSession> MediaScopedAsync(Guid id, CancellationToken ct) => Scoped(id, ct);
+    public async Task<InterviewSession> MediaScopedAsync(Guid id, CancellationToken ct)
+    { var s = await Scoped(id, ct); await quota.RequireMediaAsync(s, ct); return s; }
 }

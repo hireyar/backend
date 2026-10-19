@@ -13,7 +13,7 @@ public sealed record WizardTemplateRequest(
     [MinLength(5), MaxLength(30)] List<string>? Questions,
     [Required, StringLength(2000)] string WelcomeMessage,
     [Required, StringLength(2000)] string GoodbyeMessage,
-    [Range(5, 60)] int DurationMinutes = 60,
+    [Range(5, 30)] int DurationMinutes = 30,
     [MinLength(5), MaxLength(10)] List<QuestionTopicRequest>? Topics = null,
     bool CandidateIntroductionEnabled = false,
     [StringLength(2000)] string CandidateIntroductionMessage = HireYar.Domain.InterviewTemplates.InterviewTemplate.DefaultCandidateIntroduction,

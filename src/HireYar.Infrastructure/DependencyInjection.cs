@@ -57,6 +57,11 @@ public static class DependencyInjection
             });
         });
         services.AddSingleton<HireYar.Application.Support.ITicketAttachmentStorage, HireYar.Infrastructure.Support.TicketS3Storage>();
+        services.AddScoped<HireYar.Application.Subscriptions.CatalogService>();
+        services.AddScoped<HireYar.Application.Subscriptions.SubscriptionService>();
+        services.AddScoped<HireYar.Application.Subscriptions.SubscriptionOrderService>();
+        services.AddScoped<HireYar.Application.Subscriptions.InterviewQuotaService>();
+        services.AddScoped<HireYar.Application.Subscriptions.IOrganizationTeamUsage, HireYar.Infrastructure.Organizations.OrganizationTeamUsage>();
         services.AddSingleton(TimeProvider.System); services.AddInterviews(config); return services;
     }
 }

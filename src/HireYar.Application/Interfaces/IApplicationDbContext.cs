@@ -7,6 +7,12 @@ namespace HireYar.Application.Common;
 
 public interface IApplicationDbContext
 {
+    DbSet<HireYar.Domain.Subscriptions.SubscriptionPlan> SubscriptionPlans { get; }
+    DbSet<HireYar.Domain.Subscriptions.InterviewBundle> InterviewBundles { get; }
+    DbSet<HireYar.Domain.Subscriptions.SubscriptionOrder> SubscriptionOrders { get; }
+    DbSet<HireYar.Domain.Subscriptions.OrganizationMembership> OrganizationMemberships { get; }
+    DbSet<HireYar.Domain.Subscriptions.InterviewQuotaGrant> InterviewQuotaGrants { get; }
+    DbSet<HireYar.Domain.Subscriptions.InterviewQuotaReservation> InterviewQuotaReservations { get; }
     // Provider-specific locking stays in Infrastructure. Callback must contain no network I/O.
     Task<T> WithOrganizationLockAsync<T>(Guid organizationId, Func<Task<T>> action, CancellationToken ct);
     DbSet<HireYar.Domain.Support.SupportTicket> SupportTickets { get; }

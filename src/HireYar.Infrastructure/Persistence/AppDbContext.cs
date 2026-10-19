@@ -12,6 +12,12 @@ namespace HireYar.Infrastructure.Persistence;
 
 public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options), IApplicationDbContext
 {
+    public DbSet<HireYar.Domain.Subscriptions.SubscriptionPlan> SubscriptionPlans => Set<HireYar.Domain.Subscriptions.SubscriptionPlan>();
+    public DbSet<HireYar.Domain.Subscriptions.InterviewBundle> InterviewBundles => Set<HireYar.Domain.Subscriptions.InterviewBundle>();
+    public DbSet<HireYar.Domain.Subscriptions.SubscriptionOrder> SubscriptionOrders => Set<HireYar.Domain.Subscriptions.SubscriptionOrder>();
+    public DbSet<HireYar.Domain.Subscriptions.OrganizationMembership> OrganizationMemberships => Set<HireYar.Domain.Subscriptions.OrganizationMembership>();
+    public DbSet<HireYar.Domain.Subscriptions.InterviewQuotaGrant> InterviewQuotaGrants => Set<HireYar.Domain.Subscriptions.InterviewQuotaGrant>();
+    public DbSet<HireYar.Domain.Subscriptions.InterviewQuotaReservation> InterviewQuotaReservations => Set<HireYar.Domain.Subscriptions.InterviewQuotaReservation>();
     public DbSet<HireYar.Domain.Support.SupportTicket> SupportTickets => Set<HireYar.Domain.Support.SupportTicket>();
     public DbSet<HireYar.Domain.Support.TicketMessage> TicketMessages => Set<HireYar.Domain.Support.TicketMessage>();
     public DbSet<HireYar.Domain.Support.TicketAttachment> TicketAttachments => Set<HireYar.Domain.Support.TicketAttachment>();
@@ -54,7 +60,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
         // and rotate a 128-bit application-managed concurrency token on every write.
         foreach (var entry in ChangeTracker.Entries().Where(e =>
             e.State is EntityState.Added or EntityState.Modified &&
-            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is InterviewIntroduction || e.Entity is BankQuestion)))
+            (e.Entity is JobPosition || e.Entity is InterviewTemplate || e.Entity is InterviewSession || e.Entity is InterviewIntroduction || e.Entity is BankQuestion || e.Entity is HireYar.Domain.Subscriptions.SubscriptionPlan || e.Entity is HireYar.Domain.Subscriptions.InterviewBundle)))
             entry.Property("RowVersion").CurrentValue = Guid.NewGuid().ToByteArray();
         return base.SaveChangesAsync(ct);
     }

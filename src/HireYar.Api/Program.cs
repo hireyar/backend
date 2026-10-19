@@ -162,7 +162,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                 } } }
         } };
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
-        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminUsers" or "AdminTickets" ? "SuperAdmin" : "Bearer", context.Document)] = [] }];
+        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminUsers" or "AdminTickets" or "AdminSubscriptions" ? "SuperAdmin" : "Bearer", context.Document)] = [] }];
     if (controller == "AdminAuth")
     {
         operation.Parameters ??= [];

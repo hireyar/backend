@@ -7,7 +7,7 @@ namespace HireYar.Application.Interviews;
 
 public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
     IInterviewAudioStorage storage, IResumeTextExtractor resumeText,
-    IInterviewInvitationSecurity invitationSecurity, IInterviewInvitationNotifier notifier)
+    IInterviewInvitationSecurity invitationSecurity, IInterviewInvitationNotifier notifier, HireYar.Application.Subscriptions.InterviewQuotaService quota)
 {
     public async Task<PanelInvitationResult> InviteAsync(WizardInvitationRequest r, Stream resume, string filename, CancellationToken ct)
     {
@@ -51,7 +51,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         var session = new InterviewSession(user.OrganizationId, job.Id, application.Id, template.Id,
             questions, template.UseTopicQuestions ? topicSkills.Values : [new InterviewSkill(skillId, "ارزیابی شغلی", true, 100, 3)],
             template.UseTopicQuestions ? topicSkills.Count * 2 : questions.Length,
-            template.DurationMinutes * 60, now, now.AddDays(r.DeadlineDays));
+            Math.Min(template.DurationMinutes * 60, 1800), now, now.AddDays(r.DeadlineDays));
         if (template.UseTopicQuestions) session.EnableProgressiveTopicQuestions(mediumFirst: true);
         session.SetInterviewType(type);
         session.SetInteractionLimit(2);
@@ -70,6 +70,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                     !await db.InterviewTemplates.AnyAsync(x => x.Id == sourceTemplateId && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && !x.IsArchived, ct))
                     throw AppException.NotFound();
                 db.CandidateApplications.Add(application); db.InterviewSessions.Add(session);
+                await quota.ReserveLockedAsync(session, ct);
                 return true;
             }, ct);
         }
@@ -115,11 +116,11 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             if (session.SupersededByInterviewId is not null) throw new AppException(409, "invitation_already_replaced", "برای این مصاحبه دعوت جدیدی ساخته شده است.");
             var job = await db.JobPositions.AsNoTracking().SingleOrDefaultAsync(j => j.Id == session.JobPositionId && j.OrganizationId == user.OrganizationId && j.DeletedAtUtc == null && j.Status != HireYar.Domain.JobPositions.JobStatus.Archived, ct) ?? throw AppException.NotFound();
             var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(t => t.Id == session.InterviewTemplateId && t.OrganizationId == user.OrganizationId && t.DeletedAtUtc == null && !t.IsArchived, ct) ?? throw AppException.NotFound();
-                await db.InterviewAnswers.Where(a => a.InterviewSessionId == session.Id).ToListAsync(ct);
+            await db.InterviewAnswers.Where(a => a.InterviewSessionId == session.Id).ToListAsync(ct);
             var now = time.GetUtcNow();
             var fresh = new InterviewSession(session.OrganizationId, session.JobPositionId, session.CandidateApplicationId, session.InterviewTemplateId,
                 session.Questions.Select(q => new InterviewQuestionSnapshot(q.QuestionId, q.SkillId, q.Text, q.Topic, q.Difficulty, q.IsActive, q.Order)),
-                session.Skills, session.MaxQuestionCount, session.MaxDurationSeconds, now, now.AddDays(r.DeadlineDays));
+                session.Skills, session.MaxQuestionCount, Math.Min(session.MaxDurationSeconds, 1800), now, now.AddDays(r.DeadlineDays));
             if (session.AskOneQuestionPerTopic) fresh.EnableTopicQuestions();
             if (session.ProgressiveTopicQuestions) fresh.EnableProgressiveTopicQuestions(session.MediumFirstTopicQuestions);
             fresh.SetInterviewType(session.InterviewType);
@@ -130,7 +131,9 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
                 session.ResumeTextSnapshot, session.Language, session.CandidateIntroductionEnabled, session.CandidateIntroductionMessage ?? "",
                 session.CompanyIntroductionEnabled, session.CompanyIntroductionMessage ?? "");
             var code = IssueCode(fresh, invitationSecurity.Unprotect(session.Id, session.ProtectedAccessCode));
+            await quota.ReleaseLockedAsync(session, ct);
             db.InterviewSessions.Add(fresh);
+            await quota.ReserveLockedAsync(fresh, ct);
             // Persist the new principal before the self-reference; this is still the same organization transaction.
             await db.SaveChangesAsync(ct);
             if (session.Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled)) session.Cancel(now);

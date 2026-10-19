@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using HireYar.Application.Interviews;
 namespace HireYar.Application.InterviewTemplates;
 
-public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user, TimeProvider time)
+public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user, TimeProvider time, HireYar.Application.Subscriptions.SubscriptionService subscriptions)
 {
     private IQueryable<InterviewTemplate> Scoped => db.InterviewTemplates.Where(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null);
     private static TemplateDto Map(InterviewTemplate x) => new(x.Id, x.JobPositionId, x.Title, x.Language, x.DurationMinutes, x.MaxFollowUpQuestionsPerQuestion, x.IsArchived, x.RowVersion,
@@ -27,6 +27,7 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
     private async Task<TemplateDto> CreateAsyncLocked(TemplateRequest request, CancellationToken ct)
     {
         await CheckJob(request.JobPositionId, ct);
+        await subscriptions.RequireAsync(user.OrganizationId, ct);
         if (request.Questions.Any(x => x.Id.HasValue)) throw AppException.Invalid("unknown_question");
         var row = new InterviewTemplate { OrganizationId = user.OrganizationId, CreatedAtUtc = time.GetUtcNow() };
         await CheckTitle(request.Title, row.Id, row.Title, ct);
@@ -36,6 +37,7 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
     private async Task<TemplateDto> SaveWizardAsyncLocked(Guid? id, WizardTemplateRequest r, byte[]? version, CancellationToken ct)
     {
         await CheckJob(r.JobPositionId, ct);
+        await subscriptions.RequireAsync(user.OrganizationId, ct);
         var row = id.HasValue ? await Scoped.Include(x => x.Questions).SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw AppException.NotFound() : new InterviewTemplate { OrganizationId = user.OrganizationId, CreatedAtUtc = time.GetUtcNow() };
         await CheckTitle(r.Title, row.Id, row.Title, ct);

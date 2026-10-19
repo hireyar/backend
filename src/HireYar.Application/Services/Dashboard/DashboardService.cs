@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Dashboard;
 
 public sealed class DashboardService(IApplicationDbContext db, ICurrentUser user,
-    TimeProvider time, HireYar.Application.Interviews.PanelWizardService panel)
+    TimeProvider time, HireYar.Application.Interviews.PanelWizardService panel, HireYar.Application.Subscriptions.SubscriptionService subscriptions)
 {
     public async Task<DashboardDto> GetAsync(CancellationToken ct)
     {
@@ -14,6 +14,7 @@ public sealed class DashboardService(IApplicationDbContext db, ICurrentUser user
             await db.InterviewTemplates.CountAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null, ct),
             await db.InterviewSessions.CountAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Status == HireYar.Domain.Interviews.InterviewStatus.Completed, ct),
             await db.InterviewSessions.CountAsync(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.Status == HireYar.Domain.Interviews.InterviewStatus.Created && x.ExpiresAtUtc > time.GetUtcNow() && x.AccessRevokedAtUtc == null, ct),
-            (await panel.ListAsync(new() { PageSize = 5 }, ct)).Items);
+            (await panel.ListAsync(new() { PageSize = 5 }, ct)).Items,
+            await subscriptions.StateAsync(user.OrganizationId, ct));
     }
 }

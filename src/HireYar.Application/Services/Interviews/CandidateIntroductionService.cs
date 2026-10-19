@@ -22,6 +22,7 @@ public sealed partial class CandidateInterviewService
     {
         var s = await Load(id, ct);
 
+        await quota.RequireMediaAsync(s, ct);
         // Only the current stage is readable; company conditions cannot be fetched early.
         if (s.Status is InterviewStatus.Created or InterviewStatus.Cancelled || s.Stage.ToString() != stageName ||
             StageText(s) is not { Length: > 0 } text) throw AppException.NotFound();

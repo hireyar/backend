@@ -76,7 +76,7 @@ public sealed partial class InterviewFlowTests
     }
 
     [PostgresFact]
-    public async Task Malformed_recording_timeline_is_isolated_and_media_has_no_package_expiry()
+    public async Task Malformed_recording_timeline_is_isolated_and_expired_media_preserves_text_report()
     {
         var (hr,invite)=await Invite();using var candidate=Candidate(invite);var state=await Start(candidate,invite.InterviewId);
         await Submit(candidate,invite.InterviewId,state.Question!.Id);await candidate.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete",null);
@@ -91,8 +91,8 @@ public sealed partial class InterviewFlowTests
         var original=f.Clock.Offset;
         try {
             f.Clock.Offset+=TimeSpan.FromDays(400);report=await NewReport(hr,invite.InterviewId);
-            Assert.Equal("BaseReady",report.State);Assert.Equal("UploadedUnverified",report.Media.State);Assert.NotNull(report.Media.Recording!.VideoUrl);
-            Assert.All(report.Questions.Where(q=>q.Answer is not null),q=> Assert.NotNull(q.Answer!.AudioUrl));
+            Assert.Equal("BaseReady",report.State);Assert.Equal("Expired",report.Media.State);Assert.Null(report.Media.Recording!.VideoUrl);
+            Assert.All(report.Questions,q=> {Assert.Null(q.Answer?.AudioUrl);Assert.Null(q.Answer?.VideoUrl);});
         } finally { f.Clock.Offset=original; }
     }
 

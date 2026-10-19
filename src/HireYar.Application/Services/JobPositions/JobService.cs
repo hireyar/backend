@@ -4,7 +4,7 @@ using HireYar.Domain.JobPositions;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.JobPositions;
 
-public sealed class JobService(IApplicationDbContext db, ICurrentUser user, TimeProvider time)
+public sealed class JobService(IApplicationDbContext db, ICurrentUser user, TimeProvider time, HireYar.Application.Subscriptions.SubscriptionService subscriptions)
 {
     private IQueryable<JobPosition> Scoped => db.JobPositions.Where(x => x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null);
     private static JobDto Map(JobPosition x) => new(x.Id, x.Title, x.Description, x.Seniority, x.Status, x.CreatedAtUtc, x.UpdatedAtUtc, x.RowVersion);
@@ -23,6 +23,7 @@ public sealed class JobService(IApplicationDbContext db, ICurrentUser user, Time
         db.WithOrganizationLockAsync(user.OrganizationId, () => CreateLockedAsync(request, ct), ct);
     private async Task<JobDto> CreateLockedAsync(JobRequest request, CancellationToken ct)
     {
+        await subscriptions.RequireAsync(user.OrganizationId, ct);
         var row = new JobPosition
         {
             OrganizationId = user.OrganizationId,

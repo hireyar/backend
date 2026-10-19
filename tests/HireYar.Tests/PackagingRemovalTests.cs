@@ -24,7 +24,7 @@ public sealed class PackagingRemovalTests(ApiFixture f)
     ];
 
     [PostgresFact]
-    public async Task Retired_routes_and_schema_are_absent_and_signup_and_team_need_no_financial_catalog()
+    public async Task Legacy_routes_and_schema_stay_removed_with_the_new_subscription_model()
     {
         var owner = await f.RegisterOwner(explicitSignup: true);
         foreach (var route in new[] { "/api/pricing/packages", "/api/pricing/ai-credit-packages", "/api/pricing/interview-types",

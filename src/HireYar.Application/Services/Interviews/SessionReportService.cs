@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 // Reading persisted facts and assessments never invokes AI or mutates report state.
-public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser user, TimeProvider time, AnswerAssessmentOptions assessmentOptions)
+public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser user, TimeProvider time, AnswerAssessmentOptions assessmentOptions, HireYar.Application.Subscriptions.InterviewQuotaService quota)
 {
     public Task<SessionReportDocument> ReadAsync(Guid id, CancellationToken ct) =>
         ReadForOrganizationAsync(user.OrganizationId,id,user.Role==OrganizationRole.Owner,ct);
@@ -18,9 +18,12 @@ public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser 
             .SingleOrDefaultAsync(s => s.Id == id && s.OrganizationId == org && s.DeletedAtUtc == null, ct)
             ?? throw AppException.NotFound();
         var candidate = await db.CandidateApplications.AsNoTracking().SingleAsync(a => a.Id == session.CandidateApplicationId && a.OrganizationId == org, ct);
+        var mediaAllowed = true;
+        try { await quota.RequireMediaAsync(session, ct); }
+        catch (AppException e) when (e.Status == 404) { mediaAllowed = false; }
         ReportTurn Turn(InterviewAnswer a) => new(a.Id, a.Status.ToString(), a.Transcript, a.AssistantMessage,
-            a.SubmittedAtUtc, a.DurationSeconds, $"/api/interviews/{id}/answers/{a.Id}/audio",
-            a.VideoStorageKey is not null ? $"/api/interviews/{id}/answers/{a.Id}/video" : null);
+            a.SubmittedAtUtc, a.DurationSeconds, mediaAllowed ? $"/api/interviews/{id}/answers/{a.Id}/audio" : null,
+            mediaAllowed && a.VideoStorageKey is not null ? $"/api/interviews/{id}/answers/{a.Id}/video" : null);
         var type = session.InterviewType;
         var assessments = await db.AnswerAssessments.AsNoTracking().Where(a => a.OrganizationId == org && a.InterviewSessionId == id).ToDictionaryAsync(a => a.AnswerId, ct);
         var questions = session.Questions.Where(q => q.AskedAtUtc is not null || session.Answers.Any(a => a.QuestionId == q.QuestionId))
@@ -45,7 +48,7 @@ public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser 
         var segments = await db.InterviewRecordingSegments.AsNoTracking().Where(r => r.OrganizationId == org && r.InterviewSessionId == id)
             .OrderBy(r => r.SegmentNumber).ToArrayAsync(ct);
         ReportRecording Recording(string json, int duration, int? number) {
-            var videoUrl = number is null ? $"/api/interviews/{id}/recording/video" : $"/api/interviews/{id}/recording/segments/{number}/video";
+            var videoUrl = !mediaAllowed ? null : number is null ? $"/api/interviews/{id}/recording/video" : $"/api/interviews/{id}/recording/segments/{number}/video";
             var validIds = session.Answers.Select(a => a.Id).ToHashSet();
             ReportOffset[] timeline;
             try {
@@ -54,7 +57,7 @@ public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser 
                     return new(videoUrl, duration, number, "Unavailable", []);
             }
             catch (JsonException) { return new(videoUrl, duration, number, "Unavailable", []); }
-            return new(videoUrl, duration, number, "CandidateReported", timeline);
+            return new(videoUrl, duration, number, "CandidateReported", mediaAllowed ? timeline : []);
         }
         var policyRow=await db.SessionReportPolicies.AsNoTracking().SingleOrDefaultAsync(p=>p.OrganizationId==org && p.InterviewSessionId==id,ct);
         var policy=SessionReportPolicyService.Read(session.Skills,policyRow,owner);
@@ -84,8 +87,8 @@ public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser 
             new(questions.Length, session.Questions.Count, questions.Count(q => q.Answer is not null), answered, questions.Count(q => q.Answer is null),
                 questions.Count(q => q.AnswerState == "Failed"), questions.Sum(q => q.Clarifications.Count),
                 durations.Length == 0 ? null : Math.Round(durations.Average(), 2), questions.Select(q => q.Difficulty).Distinct().Order().ToArray()),
-            new(true, "Available", $"/api/interviews/{id}/report/print"), questions,
-            new(recording is not null || segments.Length > 0 ? "UploadedUnverified" : "Missing",
+            new(true, mediaAllowed ? "Available" : "Expired", $"/api/interviews/{id}/report/print"), questions,
+            new(!mediaAllowed ? "Expired" : recording is not null || segments.Length > 0 ? "UploadedUnverified" : "Missing",
                 recording is null ? null : Recording(recording.TimelineJson, recording.DurationSeconds, null),
                 segments.Select(r => Recording(r.TimelineJson, r.DurationSeconds, r.SegmentNumber)).ToArray()),
             new(consent == "consent_accepted" ? "Accepted" : consent == "consent_revoked" ? "Revoked" : "Unknown",
