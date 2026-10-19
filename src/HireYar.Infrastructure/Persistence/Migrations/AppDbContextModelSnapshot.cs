@@ -1500,6 +1500,40 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.ToTable("Organizations");
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Subscriptions.ExistingOrganizationGrant", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("InterviewQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RetentionDays")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TeamUsers")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("UnlimitedTeam")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("OrganizationId");
+
+                    b.ToTable("ExistingOrganizationGrants", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExistingOrganizationGrant_Values", "\"ExpiresAtUtc\" = ((\"StartedAtUtc\" AT TIME ZONE 'UTC') + interval '1 month') AT TIME ZONE 'UTC' AND \"InterviewQuantity\" = 100 AND \"TeamUsers\" >= 1 AND \"RetentionDays\" BETWEEN 1 AND 3650");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Domain.Subscriptions.InterviewBundle", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1908,10 +1942,24 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("bytea");
 
+                    b.Property<decimal>("SixMonthDiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal>("ThreeMonthDiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal>("TwelveMonthDiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
                     b.HasKey("Id");
 
                     b.ToTable("SubscriptionPlans", t =>
                         {
+                            t.HasCheckConstraint("CK_SubscriptionPlan_PeriodDiscounts", "\"ThreeMonthDiscountPercent\" BETWEEN 0 AND 99.99 AND \"SixMonthDiscountPercent\" BETWEEN 0 AND 99.99 AND \"TwelveMonthDiscountPercent\" BETWEEN 0 AND 99.99");
+
                             t.HasCheckConstraint("CK_SubscriptionPlan_Singleton", "\"Id\" = 'd1000000-0000-0000-0000-000000000001'::uuid");
 
                             t.HasCheckConstraint("CK_SubscriptionPlan_Values", "\"MonthlyPriceRial\" BETWEEN 1 AND 1000000000000 AND \"BaseInterviewPriceRial\" BETWEEN 1 AND 1000000000000 AND \"ExtraUserMonthlyPriceRial\" BETWEEN 0 AND 1000000000000 AND \"IncludedUsers\" >= 1 AND \"PaidUserCeiling\" > \"IncludedUsers\" AND \"RetentionDays\" BETWEEN 1 AND 3650");
@@ -1929,7 +1977,10 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                             Name = "اشتراک هایریار",
                             PaidUserCeiling = 30,
                             RetentionDays = 60,
-                            RowVersion = new byte[] { 0, 0, 0, 209, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 }
+                            RowVersion = new byte[] { 0, 0, 0, 209, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+                            SixMonthDiscountPercent = 10m,
+                            ThreeMonthDiscountPercent = 5m,
+                            TwelveMonthDiscountPercent = 15m
                         });
                 });
 
@@ -2768,6 +2819,15 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Organizations.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Subscriptions.ExistingOrganizationGrant", b =>
+                {
+                    b.HasOne("HireYar.Domain.Organizations.Organization", null)
+                        .WithOne()
+                        .HasForeignKey("HireYar.Domain.Subscriptions.ExistingOrganizationGrant", "OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

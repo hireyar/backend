@@ -17,12 +17,18 @@ public sealed class CatalogService(IApplicationDbContext db)
             p.IncludedUsers, p.PaidUserCeiling, p.RetentionDays, 30, p.IsActive, p.RowVersion,
             bundles.Select(b => new BundleDto(b.Id, b.Code, b.Name, b.MinimumQuantity, b.MaximumQuantity, b.QuantityStep,
                 b.DiscountPercent, SubscriptionDefaults.Price(p.BaseInterviewPriceRial, b.MinimumQuantity),
-                SubscriptionDefaults.Price(p.BaseInterviewPriceRial, b.MinimumQuantity, b.DiscountPercent), b.IsActive, b.SortOrder, b.RowVersion)).ToArray());
+                SubscriptionDefaults.Price(p.BaseInterviewPriceRial, b.MinimumQuantity, b.DiscountPercent), b.IsActive, b.SortOrder, b.RowVersion)).ToArray(),
+            new SubscriptionPeriodDto[] { new(1, 0), new(3, p.ThreeMonthDiscountPercent), new(6, p.SixMonthDiscountPercent), new(12, p.TwelveMonthDiscountPercent) });
     }
     public async Task<PlanDto> UpdateAsync(PlanUpdateRequest r, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(r.Name) || r.IncludedUsers >= r.PaidUserCeiling) throw AppException.Invalid();
+        foreach (var discount in new[] { r.ThreeMonthDiscountPercent, r.SixMonthDiscountPercent, r.TwelveMonthDiscountPercent })
+            if (discount is { } value && (value < 0 || value > 99.99m || decimal.Round(value, 2) != value)) throw AppException.Invalid();
         var p = await db.SubscriptionPlans.SingleAsync(ct); db.SetOriginalVersion(p, r.RowVersion);
+        p.ThreeMonthDiscountPercent = r.ThreeMonthDiscountPercent ?? p.ThreeMonthDiscountPercent;
+        p.SixMonthDiscountPercent = r.SixMonthDiscountPercent ?? p.SixMonthDiscountPercent;
+        p.TwelveMonthDiscountPercent = r.TwelveMonthDiscountPercent ?? p.TwelveMonthDiscountPercent;
         p.Name = r.Name.Trim(); p.MonthlyPriceRial = r.MonthlyPriceRial; p.BaseInterviewPriceRial = r.BaseInterviewPriceRial;
         p.ExtraUserMonthlyPriceRial = r.ExtraUserMonthlyPriceRial; p.IncludedUsers = r.IncludedUsers;
         p.PaidUserCeiling = r.PaidUserCeiling; p.RetentionDays = r.RetentionDays; p.IsActive = r.IsActive;
@@ -47,9 +53,11 @@ public sealed class CatalogService(IApplicationDbContext db)
             if (r.Months is not (1 or 3 or 6 or 12) || r.TeamUsers < p.IncludedUsers || r.TeamUsers > 10000 || r.BundleCode is not null || r.Quantity is not null)
                 throw AppException.Invalid();
             var team = SubscriptionDefaults.Price(p.ExtraUserMonthlyPriceRial, Math.Min(r.TeamUsers, p.PaidUserCeiling) - p.IncludedUsers);
-            var amount = checked((p.MonthlyPriceRial + team) * r.Months);
+            var discount = r.Months switch { 3 => p.ThreeMonthDiscountPercent, 6 => p.SixMonthDiscountPercent, 12 => p.TwelveMonthDiscountPercent, _ => 0m };
+            var originalAmount = checked((p.MonthlyPriceRial + team) * r.Months);
+            var amount = SubscriptionDefaults.Price(p.MonthlyPriceRial + team, r.Months, discount);
             return new(r.Product, p.Name, "IRR", r.Months, r.TeamUsers, r.TeamUsers >= p.PaidUserCeiling,
-                p.RetentionDays, null, 0, p.MonthlyPriceRial, team, 0, amount, 0, amount, p.RowVersion, null);
+                p.RetentionDays, null, 0, p.MonthlyPriceRial, team, discount, originalAmount, originalAmount - amount, amount, p.RowVersion, null);
         }
         if (r.Product != "interviews" || r.BundleCode is null || r.Months != 1 || r.TeamUsers != 5) throw AppException.Invalid();
         var b = await db.InterviewBundles.AsNoTracking().SingleOrDefaultAsync(b => b.Code == r.BundleCode && b.IsActive, ct) ?? throw AppException.NotFound();

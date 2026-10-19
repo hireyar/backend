@@ -7,6 +7,7 @@ namespace HireYar.Application.Common;
 
 public interface IApplicationDbContext
 {
+    DbSet<HireYar.Domain.Subscriptions.ExistingOrganizationGrant> ExistingOrganizationGrants { get; }
     DbSet<HireYar.Domain.Subscriptions.SignupTrial> SignupTrials { get; }
     DbSet<HireYar.Domain.Subscriptions.SubscriptionPlan> SubscriptionPlans { get; }
     DbSet<HireYar.Domain.Subscriptions.InterviewBundle> InterviewBundles { get; }

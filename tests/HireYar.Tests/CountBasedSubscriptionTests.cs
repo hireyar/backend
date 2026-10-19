@@ -76,7 +76,7 @@ public sealed class CountBasedSubscriptionTests : IAsyncLifetime
         Assert.Equal(92_000_000, (await Quote(o, new("subscription", TeamUsers:6))).AmountRial);
         Assert.Equal(140_000_000, (await Quote(o, new("subscription", TeamUsers:30))).AmountRial);
         Assert.Equal((await Quote(o,new("subscription", TeamUsers:30))).AmountRial,(await Quote(o,new("subscription", TeamUsers:100))).AmountRial);
-        Assert.Equal(1_080_000_000, (await Quote(o, new("subscription",12))).AmountRial);
+        Assert.Equal(918_000_000, (await Quote(o, new("subscription",12))).AmountRial);
         Assert.Equal(HttpStatusCode.BadRequest,(await o.Client.Send(HttpMethod.Post,"/api/subscriptions/catalog/quote",new PurchaseSelection("subscription",2))).StatusCode);
     }
 
@@ -345,6 +345,66 @@ public sealed class CountBasedSubscriptionTests : IAsyncLifetime
         var renamed = await Read<HireYar.Application.Common.Page<SubscriptionOrderDto>>(await a.Client.Send(HttpMethod.Get,
             $"/api/admin/subscriptions/orders?organizationId={firstOrg}"));
         Assert.Equal("نام جدید آزمایشی", Assert.Single(renamed.Items).OrganizationName);
+    }
+
+    [PostgresFact]
+    public async Task Period_discounts_are_server_managed_versioned_and_existing_orders_keep_their_snapshot()
+    {
+        var o = await Owner(); var a = await Admin();
+        var plan = await Read<PlanDto>(await a.Client.Send(HttpMethod.Get, "/api/admin/subscriptions/plan"));
+        Assert.Equal(new[] { 1, 3, 6, 12 }, plan.Periods.Select(p => p.Months));
+        Assert.Equal(new[] { 0m, 5m, 10m, 15m }, plan.Periods.Select(p => p.DiscountPercent));
+        foreach (var (months, percent, amount) in new[] { (1,0m,90_000_000L), (3,5m,256_500_000L), (6,10m,486_000_000L), (12,15m,918_000_000L) })
+        {
+            var q = await Quote(o, new("subscription", months));
+            Assert.Equal(percent, q.DiscountPercent); Assert.Equal(amount, q.AmountRial);
+            Assert.Equal(90_000_000L * months, q.OriginalAmountRial);
+            Assert.Equal(q.OriginalAmountRial - q.AmountRial, q.DiscountAmountRial); Assert.Equal("IRR", q.Currency);
+        }
+        Assert.Equal(399_000_000, (await Quote(o, new("subscription", 3, 30))).AmountRial);
+        Assert.Equal(399_000_000, (await Quote(o, new("subscription", 3, 100))).AmountRial);
+        var oldQuote = await Quote(o, new("subscription", 3)); var order = await Order(o, new("subscription", 3));
+        var update = new PlanUpdateRequest(plan.Name, plan.MonthlyPriceRial, plan.BaseInterviewPriceRial,
+            plan.ExtraUserMonthlyPriceRial, plan.IncludedUsers, plan.PaidUserCeiling, plan.RetentionDays, true, plan.RowVersion, 8, 12, 20);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await o.Client.Send(HttpMethod.Put, "/api/admin/subscriptions/plan", update)).StatusCode);
+        var edited = await Read<PlanDto>(await a.Client.Send(HttpMethod.Put, "/api/admin/subscriptions/plan", update));
+        Assert.Equal(8, edited.Periods.Single(p => p.Months == 3).DiscountPercent);
+        Assert.NotEqual(Convert.ToBase64String(plan.RowVersion), Convert.ToBase64String(edited.RowVersion));
+        Assert.Equal(HttpStatusCode.Conflict, (await a.Client.Send(HttpMethod.Put, "/api/admin/subscriptions/plan", update)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await o.Client.Send(HttpMethod.Post, "/api/subscriptions/orders",
+            new CreateSubscriptionOrderRequest(Guid.NewGuid(), new("subscription",3), oldQuote.PlanVersion))).StatusCode);
+        Assert.Equal(248_400_000, (await Quote(o, new("subscription",3))).AmountRial);
+        Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Put, "/api/admin/subscriptions/plan",
+            update with { RowVersion = edited.RowVersion, ThreeMonthDiscountPercent = 5.001m })).StatusCode);
+        await Confirm(order);
+        var saved = await Read<SubscriptionOrderDto>(await o.Client.Send(HttpMethod.Get, $"/api/subscriptions/orders/{order.Id}"));
+        Assert.Equal(5, saved.DiscountPercent); Assert.Equal(256_500_000, saved.AmountRial);
+        // An older client omitting the optional fields must preserve the admin's configured discounts.
+        var withoutDiscounts = update with { RowVersion = edited.RowVersion, ThreeMonthDiscountPercent = null, SixMonthDiscountPercent = null, TwelveMonthDiscountPercent = null, Name = "Synthetic edited plan" };
+        var preserved = await Read<PlanDto>(await a.Client.Send(HttpMethod.Put, "/api/admin/subscriptions/plan", withoutDiscounts));
+        Assert.Equal(new[] { 0m, 8m, 12m, 20m }, preserved.Periods.Select(p => p.DiscountPercent));
+    }
+
+    [PostgresFact]
+    public async Task Existing_organization_gift_uses_normal_quota_and_paid_renewals_append_after_it()
+    {
+        var o = await Owner(); await Admin();
+        await f.Db(async db => {
+            var org = (await db.Users.SingleAsync(u => u.Id == o.Id)).OrganizationId;
+            var now = f.Clock.GetUtcNow();
+            db.ExistingOrganizationGrants.Add(new() { OrganizationId = org, CreatedAtUtc = now, StartedAtUtc = now,
+                ExpiresAtUtc = now.AddMonths(1), TeamUsers = 5, RetentionDays = 60 });
+            await db.SaveChangesAsync();
+        });
+        var gift = await State(o); Assert.True(gift.HasActiveSubscription); Assert.False(gift.IsTrial); Assert.Equal(100, gift.AvailableInterviews);
+        var (job, template) = await Setup(o); var invite = await Issue(o, job.Id, template.Id);
+        Assert.Equal(99, (await State(o)).AvailableInterviews);
+        using var candidate = Candidate(invite);
+        Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/start", null)).StatusCode);
+        Assert.Equal(99, (await State(o)).RemainingInterviews); Assert.Equal(1, (await State(o)).ConsumedInterviews);
+        await Subscribe(o); Assert.Equal(gift.ExpiresAtUtc!.Value.AddMonths(1), (await State(o)).ExpiresAtUtc);
+        f.Clock.Offset = TimeSpan.FromDays(100);
+        Assert.False((await State(o)).HasActiveSubscription); Assert.Equal(99, (await State(o)).RemainingInterviews);
     }
 
 }

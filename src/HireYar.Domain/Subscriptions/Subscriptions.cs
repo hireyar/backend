@@ -13,6 +13,9 @@ public sealed class SubscriptionPlan
     public long MonthlyPriceRial { get; set; } = 90_000_000;
     public long BaseInterviewPriceRial { get; set; } = 4_000_000;
     public long ExtraUserMonthlyPriceRial { get; set; } = 2_000_000;
+    public decimal ThreeMonthDiscountPercent { get; set; } = 5;
+    public decimal SixMonthDiscountPercent { get; set; } = 10;
+    public decimal TwelveMonthDiscountPercent { get; set; } = 15;
     public int IncludedUsers { get; set; } = 5;
     public int PaidUserCeiling { get; set; } = 30;
     public int RetentionDays { get; set; } = 60;
@@ -99,4 +102,17 @@ public sealed class SignupTrial
     public int InterviewQuantity { get; set; } = 2;
     public int TeamUsers { get; set; } = 5;
     public int RetentionDays { get; set; } = 60;
+}
+
+// One-time rollout gift; existing organizations only, independent of paid orders.
+public sealed class ExistingOrganizationGrant
+{
+    public Guid OrganizationId { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset StartedAtUtc { get; set; }
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+    public int InterviewQuantity { get; set; } = 100;
+    public int TeamUsers { get; set; }
+    public bool UnlimitedTeam { get; set; }
+    public int RetentionDays { get; set; }
 }
