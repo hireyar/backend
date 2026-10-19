@@ -9,17 +9,23 @@ namespace HireYar.Application.Subscriptions;
 public sealed class SubscriptionOrderService(IApplicationDbContext db, CatalogService catalog, SubscriptionService subscriptions,
     IOrganizationTeamUsage team, TimeProvider time)
 {
-    private SubscriptionOrderDto Map(SubscriptionOrder o) => new(o.Id, o.OrganizationId, o.Product, o.ProductName, o.Status == "Pending" && o.ExpiresAtUtc <= time.GetUtcNow() ? "Expired" : o.Status, "IRR",
+    private SubscriptionOrderDto Map(SubscriptionOrder o, string organizationName) => new(o.Id, o.OrganizationId, organizationName, o.Product, o.ProductName, o.Status == "Pending" && o.ExpiresAtUtc <= time.GetUtcNow() ? "Expired" : o.Status, "IRR",
         o.AmountRial, o.OriginalAmountRial, o.DiscountPercent, o.Months, o.TeamUsers, o.UnlimitedTeam, o.BundleCode,
         o.Quantity, o.CreatedAtUtc, o.ExpiresAtUtc, o.ConfirmedAtUtc);
-    public async Task<SubscriptionOrderDto> GetAsync(Guid org, Guid id, CancellationToken ct) => Map(await db.SubscriptionOrders.AsNoTracking()
-        .SingleOrDefaultAsync(o => o.OrganizationId == org && o.Id == id, ct) ?? throw AppException.NotFound());
+    private async Task<SubscriptionOrderDto> MapAsync(SubscriptionOrder order, CancellationToken ct) => Map(order,
+        await db.Organizations.AsNoTracking().Where(o => o.Id == order.OrganizationId).Select(o => o.Name).SingleAsync(ct));
+    public async Task<SubscriptionOrderDto> GetAsync(Guid org, Guid id, CancellationToken ct) => await MapAsync(await db.SubscriptionOrders.AsNoTracking()
+        .SingleOrDefaultAsync(o => o.OrganizationId == org && o.Id == id, ct) ?? throw AppException.NotFound(), ct);
     public async Task<Page<SubscriptionOrderDto>> ListAsync(Guid? org, PageQuery page, CancellationToken ct)
     {
         var q = db.SubscriptionOrders.AsNoTracking().Where(o => org == null || o.OrganizationId == org);
         var count = await q.CountAsync(ct);
-        var rows = await q.OrderByDescending(o => o.CreatedAtUtc).ThenBy(o => o.Id).Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
-        return new(rows.Select(Map).ToArray(), count, page.Page, page.PageSize);
+        var rows = await (from order in q
+            join organization in db.Organizations.AsNoTracking() on order.OrganizationId equals organization.Id
+            select new { Order = order, OrganizationName = organization.Name })
+            .OrderByDescending(x => x.Order.CreatedAtUtc).ThenBy(x => x.Order.Id)
+            .Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
+        return new(rows.Select(x => Map(x.Order, x.OrganizationName)).ToArray(), count, page.Page, page.PageSize);
     }
     public Task<SubscriptionOrderDto> CreateAsync(Guid org, CreateSubscriptionOrderRequest r, CancellationToken ct) =>
         db.WithOrganizationLockAsync(org, async () =>
@@ -30,7 +36,7 @@ public sealed class SubscriptionOrderService(IApplicationDbContext db, CatalogSe
             if (old is not null)
             {
                 if (old.RequestFingerprint != fingerprint) throw new AppException(409, "idempotency_conflict", "Reuse the request id only for the same selection.");
-                return Map(old);
+                return await MapAsync(old, ct);
             }
             var q = await catalog.QuoteAsync(r.Selection, ct);
             if (!q.PlanVersion.SequenceEqual(r.PlanVersion) || (q.BundleVersion is not null &&
@@ -44,7 +50,7 @@ public sealed class SubscriptionOrderService(IApplicationDbContext db, CatalogSe
                 TeamUsers = q.TeamUsers, UnlimitedTeam = q.UnlimitedTeam, Quantity = q.Quantity, UnitPriceRial = q.UnitPriceRial,
                 TeamMonthlyPriceRial = q.TeamMonthlyPriceRial, OriginalAmountRial = q.OriginalAmountRial, AmountRial = q.AmountRial,
                 DiscountPercent = q.DiscountPercent, RetentionDays = q.RetentionDays, CreatedAtUtc = now, ExpiresAtUtc = now.AddHours(24) };
-            db.SubscriptionOrders.Add(o); return Map(o);
+            db.SubscriptionOrders.Add(o); return await MapAsync(o, ct);
         }, ct);
     public async Task<SubscriptionOrderDto> ConfirmAsync(Guid id, Guid actor, string paymentReference, CancellationToken ct)
     {
@@ -57,7 +63,7 @@ public sealed class SubscriptionOrderService(IApplicationDbContext db, CatalogSe
             if (o.Status == "Confirmed")
             {
                 if (o.PaymentReference != reference) throw new AppException(409, "order_already_confirmed", "The order was already confirmed.");
-                return Map(o);
+                return await MapAsync(o, ct);
             }
             var now = time.GetUtcNow();
             if (o.Status != "Pending" || o.ExpiresAtUtc <= now) throw new AppException(409, "order_not_payable", "The order is cancelled or expired.");
@@ -77,7 +83,7 @@ public sealed class SubscriptionOrderService(IApplicationDbContext db, CatalogSe
                 db.InterviewQuotaGrants.Add(new() { OrganizationId = org, OrderId = o.Id, Quantity = o.Quantity, CreatedAtUtc = now });
             }
             o.Status = "Confirmed"; o.ConfirmedAtUtc = now; o.ConfirmedByUserId = actor; o.PaymentReference = reference;
-            return Map(o);
+            return await MapAsync(o, ct);
         }, ct);
     }
     public Task CancelAsync(Guid org, Guid id, CancellationToken ct) => db.WithOrganizationLockAsync(org, async () =>

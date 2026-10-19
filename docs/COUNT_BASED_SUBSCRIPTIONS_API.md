@@ -64,7 +64,9 @@ State: hasActiveSubscription، startedAtUtc، expiresAtUtc، remainingDays (ceil
 
 BundleDto: id/code/name/minimumQuantity/maximumQuantity/quantityStep/discountPercent/startingOriginalAmountRial/startingAmountRial/isActive/sortOrder/rowVersion. تعداد ثابت وقتی min=max است؛ دلخواه را از حدود/گام DB بسازید. PlanUpdateRequest: name/monthlyPriceRial/baseInterviewPriceRial/extraUserMonthlyPriceRial/includedUsers/paidUserCeiling/retentionDays/isActive/rowVersion. BundleUpdateRequest: name/minimumQuantity/maximumQuantity/quantityStep/discountPercent/sortOrder/isActive/rowVersion. حداکثر زمان مصاحبه۳۰دقیقه است و ادمین آن را بالا نمی‌برد.
 
-OrderDto: id/organizationId/product/productName/status/currency/amountRial/originalAmountRial/discountPercent/months/teamUsers/unlimitedTeam/bundleCode/quantity/createdAtUtc/expiresAtUtc/confirmedAtUtc. status یکی از Pending/Confirmed/Cancelled/Expired؛ Expired وضعیت محاسباتی است و GET برای آن write ندارد. Page قرارداد موجود items/total/pageNumber/pageSize را حفظ می‌کند.
+نام سازمان در همه پاسخ‌های سفارش (ایجاد، جزئیات، فهرست و تأیید، از جمله retry) با organizationName برمی‌گردد؛ نام جاری Organizations.Name است و با تغییر نام سازمان به‌روز می‌شود، نه snapshot زمان خرید. فهرست با JOIN و بدون کوئری جدا برای هر ردیف خوانده می‌شود؛ schema/migration تغییر ندارد.
+
+OrderDto: id/organizationId/organizationName/product/productName/status/currency/amountRial/originalAmountRial/discountPercent/months/teamUsers/unlimitedTeam/bundleCode/quantity/createdAtUtc/expiresAtUtc/confirmedAtUtc. status یکی از Pending/Confirmed/Cancelled/Expired؛ Expired وضعیت محاسباتی است و GET برای آن write ندارد. Page قرارداد موجود items/total/pageNumber/pageSize را حفظ می‌کند.
 
 خطاهای مهم:403 active_subscription_required؛409 interview_quota_exhausted، team_capacity_exceeded، pricing_changed، idempotency_conflict، payment_reference_used، order_already_confirmed، order_not_payable و concurrency_conflict. invalid_bundle_quantity و team_capacity_too_small کد400 دارند. خطای نسخه همزمانی و رقابت به کلاینت مجوز success جعلی نمی‌دهد؛ وضعیت را دوباره بخوانید.
 

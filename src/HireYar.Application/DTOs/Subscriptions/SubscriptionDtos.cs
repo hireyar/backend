@@ -24,7 +24,7 @@ public sealed record PurchaseQuote(string Product, string ProductName, string Cu
 public sealed record CreateSubscriptionOrderRequest(Guid RequestId, [Required] PurchaseSelection Selection,
     [Required, MinLength(16), MaxLength(16)] byte[] PlanVersion, byte[]? BundleVersion = null);
 public sealed record ConfirmSubscriptionOrderRequest([Required, StringLength(120, MinimumLength = 1)] string PaymentReference);
-public sealed record SubscriptionOrderDto(Guid Id, Guid OrganizationId, string Product, string ProductName, string Status, string Currency,
+public sealed record SubscriptionOrderDto(Guid Id, Guid OrganizationId, string OrganizationName, string Product, string ProductName, string Status, string Currency,
     long AmountRial, long OriginalAmountRial, decimal DiscountPercent, int Months, int TeamUsers, bool UnlimitedTeam,
     string? BundleCode, int Quantity, DateTimeOffset CreatedAtUtc, DateTimeOffset ExpiresAtUtc, DateTimeOffset? ConfirmedAtUtc);
 public sealed record SubscriptionStateDto(bool HasActiveSubscription, DateTimeOffset? StartedAtUtc, DateTimeOffset? ExpiresAtUtc,
