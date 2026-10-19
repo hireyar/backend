@@ -24,7 +24,6 @@ public sealed class InterviewRecoveryWorker(IServiceScopeFactory scopes, Intervi
                 var now = time.GetUtcNow();
                 var pending = await db.InterviewSessions.IgnoreAutoIncludes().AsNoTracking().Where(s =>
                     s.Status == InterviewStatus.ProcessingAnswer && s.DeletedAtUtc == null && s.AccessRevokedAtUtc == null && s.ExpiresAtUtc > now &&
-                    db.InterviewBillings.Any(b => b.OrganizationId == s.OrganizationId && b.InterviewSessionId == s.Id && b.Status == HireYar.Domain.Billing.InterviewBillingStatus.Reserved) &&
                     s.RecoveryAttempts < options.MaxRecoveryAttempts && (s.NextRecoveryAtUtc == null || s.NextRecoveryAtUtc <= now) &&
                     (s.ProcessingLeaseExpiresAtUtc == null || s.ProcessingLeaseExpiresAtUtc <= now))
                     .OrderBy(s => s.NextRecoveryAtUtc).ThenBy(s => s.Id).Select(s => new { s.OrganizationId, s.Id }).Take(20).ToListAsync(stoppingToken);

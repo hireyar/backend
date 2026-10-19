@@ -57,7 +57,7 @@ public sealed class AdminAuthTests(ApiFixture f)
         await f.Db(async db => { var u = await db.Users.AsNoTracking().SingleAsync(x => x.Id == target.Id); beforeStamp = u.SecurityStamp; beforeOrganization = u.OrganizationId; });
         var response = await admin.Client.Send(HttpMethod.Post, GrantRoute, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode); Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
-        var granted = (await response.Content.ReadFromJsonAsync<AdminGrantDto>(BillingJson.Options))!;
+        var granted = (await response.Content.ReadFromJsonAsync<AdminGrantDto>(TestJson.Options))!;
         Assert.Equal(target.Id, granted.Id); Assert.Equal(target.Mobile, granted.Mobile);
         Assert.InRange(granted.Password.Length, 12, 128);
         await f.Db(async db => {
@@ -68,8 +68,8 @@ public sealed class AdminAuthTests(ApiFixture f)
         var browser = f.Browser(); browser.AdminEntryKey = ApiFixture.AdminEntry;
         var login = await browser.Send(HttpMethod.Post, "/api/admin/auth/login", await Request(browser, target.Mobile, granted.Password));
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        browser.AccessToken = (await login.Content.ReadFromJsonAsync<AdminSessionDto>(BillingJson.Options))!.AccessToken;
-        Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        browser.AccessToken = (await login.Content.ReadFromJsonAsync<AdminSessionDto>(TestJson.Options))!.AccessToken;
+        Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await admin.Client.Send(HttpMethod.Post, GrantRoute, request)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Get, "/api/admin/auth/me")).StatusCode);
     }
@@ -95,13 +95,13 @@ public sealed class AdminAuthTests(ApiFixture f)
         var responses = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => admin.Client.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest(target.Mobile))));
         var success = Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK);
         Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Conflict);
-        var granted = (await success.Content.ReadFromJsonAsync<AdminGrantDto>(BillingJson.Options))!;
+        var granted = (await success.Content.ReadFromJsonAsync<AdminGrantDto>(TestJson.Options))!;
         var browser = f.Browser(); browser.AdminEntryKey = ApiFixture.AdminEntry;
         Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/admin/auth/login", await Request(browser, target.Mobile, granted.Password))).StatusCode);
     }
     private async Task<AdminLoginRequest> Request(Browser browser, string mobile, string? password = null)
     {
-        var challenge = (await (await browser.Send(HttpMethod.Get, "/api/admin/auth/captcha")).Content.ReadFromJsonAsync<AdminCaptchaDto>(BillingJson.Options))!;
+        var challenge = (await (await browser.Send(HttpMethod.Get, "/api/admin/auth/captcha")).Content.ReadFromJsonAsync<AdminCaptchaDto>(TestJson.Options))!;
         return new(mobile, password ?? ApiFixture.AdminPassword, challenge.Id, "123456");
     }
     [PostgresFact]
@@ -133,14 +133,14 @@ public sealed class AdminAuthTests(ApiFixture f)
     public async Task Admin_and_hr_tokens_are_isolated_and_logout_revokes_admin_sessions()
     {
         var admin = await f.RegisterAdmin(); var b = admin.Client;
-        Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Get, "/api/admin/auth/me")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/auth/me")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await b.Send(HttpMethod.Post, "/api/admin/auth/logout")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest(admin.Mobile))).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
         await f.SignInAsync(b, admin.Mobile);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Post, GrantRoute, new AdminGrantRequest(admin.Mobile))).StatusCode);
     }
     [PostgresFact]
@@ -152,7 +152,7 @@ public sealed class AdminAuthTests(ApiFixture f)
         var responses = await Task.WhenAll(requests.Select(r => b.Send(HttpMethod.Post, "/api/admin/auth/login", r)));
         Assert.All(responses, r => Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode));
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Post, "/api/admin/auth/login", await Request(b, admin.Mobile))).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await admin.Client.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
         await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == admin.Id); u.LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(-1); await db.SaveChangesAsync(); });
         Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Post, "/api/admin/auth/login", await Request(b, admin.Mobile))).StatusCode);
     }
@@ -165,15 +165,15 @@ public sealed class AdminAuthTests(ApiFixture f)
         try
         {
             options.RandomKey = "synthetic-rotated-entry-key-0123456789";
-            Assert.Equal(HttpStatusCode.Unauthorized, (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await admin.Client.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
         }
         finally { options.RandomKey = original; }
         await using (var scope = f.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<AdminAccounts>().ProvisionAsync(admin.Mobile, "Changed-Synthetic-Password-42!", default);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await admin.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await admin.Client.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
         var another = await f.RegisterAdmin();
         await f.Db(async db => { var u = await db.Users.SingleAsync(x => x.Id == another.Id); u.IsActive = false; await db.SaveChangesAsync(); });
-        Assert.Equal(HttpStatusCode.Unauthorized, (await another.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await another.Client.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
     }
     [PostgresFact]
     public async Task Entry_probing_is_rate_limited_in_production()
@@ -190,15 +190,15 @@ public sealed class AdminAuthTests(ApiFixture f)
         var admin = await f.RegisterAdmin(); var b = f.Browser(); b.AdminEntryKey = ApiFixture.AdminEntry;
         var response = await b.Send(HttpMethod.Post, "/api/admin/auth/login", await Request(b, admin.Mobile));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode); Assert.False(response.Headers.Contains("Set-Cookie"));
-        var original = (await response.Content.ReadFromJsonAsync<AdminSessionDto>(BillingJson.Options))!.AccessToken;
+        var original = (await response.Content.ReadFromJsonAsync<AdminSessionDto>(TestJson.Options))!.AccessToken;
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(original);
         Assert.DoesNotContain(jwt.Claims, c => c.Type is "org" or "role");
         var settings = f.Services.GetRequiredService<IOptions<SecurityOptions>>().Value;
         var expired = new JwtSecurityToken(settings.Issuer, settings.Audience + ":super-admin", jwt.Claims, DateTime.UtcNow.AddMinutes(-30), DateTime.UtcNow.AddMinutes(-1),
             new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SigningKey)), SecurityAlgorithms.HmacSha256));
         b.AccessToken = new JwtSecurityTokenHandler().WriteToken(expired);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
         b.AccessToken = original[..^8] + "AAAAAAAA";
-        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Get, "/api/admin/users/super-admins")).StatusCode);
     }
 }

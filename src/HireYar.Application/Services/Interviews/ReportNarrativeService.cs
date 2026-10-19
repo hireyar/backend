@@ -35,7 +35,7 @@ public sealed class ReportNarrativeService(IApplicationDbContext db,ICurrentUser
     {
         if(fingerprint is null || fingerprint.Length!=64 || !fingerprint.All(Uri.IsHexDigit)) throw AppException.Invalid("report_fingerprint_invalid");
 
-        var claim=await db.WithOrganizationBillingLockAsync<Claim?>(org,async () => {
+        var claim=await db.WithOrganizationLockAsync<Claim?>(org,async () => {
             var report=await reports.ReadForOrganizationAsync(org,id,true,ct);
             if(report.Narrative is {State:"Available" or "InsufficientEvidence",GeneratedAtUtc:not null} cached) {
                 var previous=await Row(org,id,cached.InputHash,ct);
@@ -70,7 +70,7 @@ public sealed class ReportNarrativeService(IApplicationDbContext db,ICurrentUser
             "narrative_invalid_output"=>e.Code,_=>"narrative_provider_failed"};}
         catch(Exception) {failure="narrative_internal_error";}
         finally {if(task is not null) _=task.ContinueWith(t=>{_=t.Exception;},CancellationToken.None,TaskContinuationOptions.OnlyOnFaulted|TaskContinuationOptions.ExecuteSynchronously,TaskScheduler.Default);}
-        await db.WithOrganizationBillingLockAsync(org,async () => {
+        await db.WithOrganizationLockAsync(org,async () => {
             var row=await Row(org,id,claim.Hash,ct);
             if(row?.AttemptId!=claim.Token || row.LeaseExpiresAtUtc<=time.GetUtcNow()) return false;
             var fresh=await reports.ReadForOrganizationAsync(org,id,true,ct);var input=await Input(org,id,fresh,ct);

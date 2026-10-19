@@ -41,7 +41,6 @@ builder.Services.AddScoped<ICurrentInterviewAccess, CurrentInterviewAccess>();
 builder.Services.AddScoped<PanelWizardService>();
 builder.Services.AddScoped<HireYar.Application.Support.TicketService>();
 builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
-builder.Services.AddScoped<HireYar.Api.Billing.RialBillingResponses>();
 builder.Services.AddControllers().AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
 builder.Services.Configure<ApiBehaviorOptions>(o => o.InvalidModelStateResponseFactory = c =>
 {
@@ -133,7 +132,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                         {
                             ["questionId"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" },
                             ["audio"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary", Description = "Required audio file; default maximum 20 MiB. See mediaCapabilities for configured limits." },
-                            ["durationSeconds"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "Client-observed duration, default maximum 600 seconds; does not determine billing." },
+                            ["durationSeconds"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "Client-observed duration, default maximum 600 seconds." },
                             ["lastSpeechEndUtc"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "date-time", Description = "UTC timestamp of the last detected speech, excluding the silence wait." },
                             ["clientTurnId"] = new OpenApiSchema { Type = JsonSchemaType.String, MaxLength = 128, Description = "Stable identifier for one turn, unique within the interview. Reuse for transport retries; another question with the same identifier returns 409." },
                             ["video"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary", Description = "Optional WebM/MP4 video, default maximum 40 MiB; only record when mediaCapabilities.videoAnswers is true." }
@@ -163,7 +162,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                 } } }
         } };
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
-        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminPricing" or "AdminUsers" or "AdminTickets" ? "SuperAdmin" : "Bearer", context.Document)] = [] }];
+        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminUsers" or "AdminTickets" ? "SuperAdmin" : "Bearer", context.Document)] = [] }];
     if (controller == "AdminAuth")
     {
         operation.Parameters ??= [];

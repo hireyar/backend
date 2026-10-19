@@ -7,27 +7,8 @@ namespace HireYar.Application.Common;
 
 public interface IApplicationDbContext
 {
-    DbSet<HireYar.Domain.Billing.RegistrationTrial> RegistrationTrials { get; }
-    DbSet<HireYar.Domain.Billing.PricingPackage> PricingPackages { get; }
-    // Infrastructure supplies one SQL statement for contract reads, overriding its split-query default.
-    IQueryable<HireYar.Domain.Billing.PricingPackage> PricingCatalog { get; }
-    DbSet<HireYar.Domain.Billing.InterviewTypeDefinition> InterviewTypes { get; }
-    DbSet<HireYar.Domain.Billing.PackageInterviewType> PackageInterviewTypes { get; }
-    DbSet<HireYar.Domain.Billing.PackagePeriod> PackagePeriods { get; }
-    DbSet<HireYar.Domain.Billing.FeatureDefinition> FeatureDefinitions { get; }
-    DbSet<HireYar.Domain.Billing.PackageFeature> PackageFeatures { get; }
-    DbSet<HireYar.Domain.Billing.AiCreditPackage> AiCreditPackages { get; }
-    DbSet<HireYar.Domain.Billing.Payment> Payments { get; }
-    DbSet<HireYar.Domain.Billing.TeamSeatPurchase> TeamSeatPurchases { get; }
-    DbSet<HireYar.Domain.Billing.SubscriptionPurchase> SubscriptionPurchases { get; }
-    DbSet<HireYar.Domain.Billing.OrganizationSubscription> OrganizationSubscriptions { get; }
-    DbSet<HireYar.Domain.Billing.SubscriptionReplacement> SubscriptionReplacements { get; }
-    DbSet<HireYar.Domain.Billing.OrganizationAiWallet> OrganizationAiWallets { get; }
-    DbSet<HireYar.Domain.Billing.AiCreditTransaction> AiCreditTransactions { get; }
-    DbSet<HireYar.Domain.Billing.AiCreditReservation> AiCreditReservations { get; }
-    DbSet<HireYar.Domain.Billing.InterviewBilling> InterviewBillings { get; }
     // Provider-specific locking stays in Infrastructure. Callback must contain no network I/O.
-    Task<T> WithOrganizationBillingLockAsync<T>(Guid organizationId, Func<Task<T>> action, CancellationToken ct);
+    Task<T> WithOrganizationLockAsync<T>(Guid organizationId, Func<Task<T>> action, CancellationToken ct);
     DbSet<HireYar.Domain.Support.SupportTicket> SupportTickets { get; }
     DbSet<HireYar.Domain.Support.TicketMessage> TicketMessages { get; }
     DbSet<HireYar.Domain.Support.TicketAttachment> TicketAttachments { get; }

@@ -1,11 +1,9 @@
-using HireYar.Api.Billing;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using HireYar.Application.Interviews;
 using HireYar.Application.InterviewTemplates;
 using HireYar.Application.JobPositions;
-using HireYar.Application.Billing;
 using HireYar.Domain.Interviews;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -34,15 +32,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
     {
         f.QuestionAi.Reset(); f.InterviewAi.Reset();
         var owner = await f.RegisterOwner();
-        if (advanced) await f.FundInterviewsAsync(owner);
-        else
-        {
-            var pricing = (await (await owner.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
-            var period = pricing.Packages.Single(p => p.Code == "basic").Periods.Single(p => p.Months == 1);
-            var purchase = (await (await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options))!;
-            Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{purchase.Payment.Id}/verify")).StatusCode);
-        }
-        var job = (await (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("توسعه‌دهنده مصنوعی", "شرح شغل مصنوعی SQL و API"))).Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
+        var job = (await (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("توسعه‌دهنده مصنوعی", "شرح شغل مصنوعی SQL و API"))).Content.ReadFromJsonAsync<JobDto>(TestJson.Options))!;
         return (owner, job);
     }
     private static WizardTemplateRequest Template(Guid job, int count = 7) => new(job, "قالب موضوعی", "specialized", null, "شروع", "پایان", 60, FakeQuestionSuggestionProvider.Topics(count));
@@ -50,7 +40,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
     {
         var response = await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", r);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return (await response.Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!;
+        return (await response.Content.ReadFromJsonAsync<TemplateDto>(TestJson.Options))!;
     }
     private async Task<PanelInvitationResult> Invite(Account owner, Guid job, Guid template, string type = "specialized")
     {
@@ -164,14 +154,14 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new QuestionSuggestionRequest(job.Id))).StatusCode);
     }
     [PostgresFact]
-    public async Task Basic_keeps_flat_questions_and_cannot_generate_or_save_topic_bank()
+    public async Task Organization_without_subscription_can_generate_and_save_topic_and_flat_templates()
     {
-        var (owner, job) = await Setup(false); var calls = f.QuestionAi.Calls;
-        Assert.Equal(HttpStatusCode.Forbidden, (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new QuestionSuggestionRequest(job.Id))).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", Template(job.Id))).StatusCode);
-        Assert.Equal(calls, f.QuestionAi.Calls);
-        var basic = Template(job.Id) with { Topics = null, Questions = Enumerable.Range(1, 5).Select(i => $"سؤال {i}").ToList(), InterviewType = "general" };
-        var saved = await Save(owner, basic); Assert.False(saved.UseTopicQuestions); Assert.Null(saved.Topics); Assert.Equal(5, saved.InterviewQuestionCount);
+        var (owner, job) = await Setup(); var calls = f.QuestionAi.Calls;
+        Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/question-suggestions", new QuestionSuggestionRequest(job.Id))).StatusCode);
+        Assert.Equal(calls + 1, f.QuestionAi.Calls);
+        var topic = await Save(owner, Template(job.Id)); Assert.True(topic.UseTopicQuestions);
+        var flat = Template(job.Id) with { Title = "Flat template", Topics = null, Questions = Enumerable.Range(1, 5).Select(i => $"Question {i}").ToList(), InterviewType = "general" };
+        var saved = await Save(owner, flat); Assert.False(saved.UseTopicQuestions); Assert.Null(saved.Topics); Assert.Equal(5, saved.InterviewQuestionCount);
     }
     [PostgresFact]
     public async Task Malformed_and_failed_AI_responses_return_explicit_errors_without_persisting()
@@ -205,10 +195,10 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         var update = Template(job.Id, 5); update.Topics![0].Questions[0] = new("easy", "ویرایش کاربر");
         var response = await owner.Client.Send(HttpMethod.Put, $"/api/panel-wizard/templates/{saved.Id}", new UpdateWizardTemplateRequest(update, saved.RowVersion));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var edited = (await response.Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!;
+        var edited = (await response.Content.ReadFromJsonAsync<TemplateDto>(TestJson.Options))!;
         Assert.Equal("ویرایش کاربر", edited.Topics![0].Questions[0].Text); Assert.Equal(15, edited.Questions.Count);
         Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Put, $"/api/panel-wizard/templates/{saved.Id}", new UpdateWizardTemplateRequest(update, saved.RowVersion))).StatusCode);
-        var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/interview-templates")).Content.ReadFromJsonAsync<HireYar.Application.Common.Page<TemplateListDto>>(BillingJson.Options))!;
+        var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/interview-templates")).Content.ReadFromJsonAsync<HireYar.Application.Common.Page<TemplateListDto>>(TestJson.Options))!;
         Assert.Equal(10, Assert.Single(list.Items).InterviewQuestionCount);
     }
     [PostgresFact]
@@ -218,7 +208,7 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
     private async Task VerifyProgression(string type)
     {
         var (owner, job) = await Setup(); var template = await Save(owner, Template(job.Id, 5));
-        var other = (await (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("موقعیت دوم", "شرح دوم"))).Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
+        var other = (await (await owner.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("موقعیت دوم", "شرح دوم"))).Content.ReadFromJsonAsync<JobDto>(TestJson.Options))!;
         var issued = await Invite(owner, other.Id, template.Id, type); var id = issued.Invitation.InterviewId;
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Put, $"/api/panel-wizard/templates/{template.Id}", new UpdateWizardTemplateRequest(Template(job.Id, 7), template.RowVersion))).StatusCode);
         await f.Db(async db => { var s = await db.InterviewSessions.SingleAsync(s => s.Id == id); Assert.False(s.AskOneQuestionPerTopic); Assert.True(s.MediumFirstTopicQuestions); Assert.Equal(10, s.MaxQuestionCount); Assert.Equal(15, s.Questions.Count); Assert.NotEqual(template.Id, s.InterviewTemplateId); Assert.Equal(5, s.Skills.Count); });
@@ -310,25 +300,5 @@ public sealed class AdvancedQuestionTests(ApiFixture f)
         }
         finally { f.InterviewAi.Reset(); }
     }
-    [PostgresFact]
-    public async Task Advanced_session_start_rechecks_topic_capabilities_even_for_general_invitation()
-    {
-        var (owner, job) = await Setup(); var template = await Save(owner, Template(job.Id, 5));
-        var pricing = (await (await owner.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
-        var basic = pricing.Packages.Single(p => p.Code == "basic").Periods.Single(p => p.Months == 1);
-        var purchase = (await (await owner.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new SubscriptionPurchaseRequest(basic.Id))).Content.ReadFromJsonAsync<RialPurchaseResult>(BillingJson.Options))!;
-        Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Post, $"/api/billing/payments/{purchase.Payment.Id}/verify")).StatusCode);
-        DateTimeOffset expiry = default;
-        await f.Db(async db => { var org = await db.Users.Where(u => u.Id == owner.Id).Select(u => u.OrganizationId).SingleAsync();
-            expiry = await db.OrganizationSubscriptions.Where(s => s.OrganizationId == org && s.Status == HireYar.Domain.Billing.SubscriptionStatus.Active).Select(s => s.ExpiresAtUtc).SingleAsync(); });
-        try
-        {
-            f.Clock.Offset = expiry - DateTimeOffset.UtcNow - TimeSpan.FromHours(1);
-            var issued = await Invite(owner, job.Id, template.Id, "general");
-            f.Clock.Offset += TimeSpan.FromHours(2);
-            using var candidate = f.CreateClient(); candidate.DefaultRequestHeaders.Authorization = new("Bearer", issued.Invitation.Token);
-            Assert.Equal(HttpStatusCode.Forbidden, (await candidate.PostAsync($"/api/candidate/interviews/{issued.Invitation.InterviewId}/start", null)).StatusCode);
-        }
-        finally { f.Clock.Offset = TimeSpan.Zero; }
-    }
+
 }

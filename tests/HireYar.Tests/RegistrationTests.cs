@@ -30,14 +30,14 @@ public sealed class RegistrationTests : IAsyncLifetime
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString();
 
     [PostgresFact]
-    public async Task Login_does_not_register_and_explicit_registration_persists_profile_referral_and_trial()
+    public async Task Login_does_not_register_and_explicit_registration_persists_profile_referral()
     {
         var b = f.Browser(); var r = await Request(b, Mobile());
         var login = await b.Send(HttpMethod.Post, "/api/auth/otp/verify", new VerifyOtpRequest(r.Mobile, r.Code));
         Assert.Equal(HttpStatusCode.Conflict, login.StatusCode); Assert.Equal("registration_required", await Code(login));
         await f.Db(async db => {
             Assert.False(await db.Users.AnyAsync()); Assert.False(await db.Organizations.AnyAsync());
-            Assert.False(await db.RegistrationTrials.AnyAsync()); Assert.False(await db.RefreshTokens.AnyAsync());
+            Assert.False(await db.RefreshTokens.AnyAsync());
             Assert.Null((await db.OtpChallenges.SingleAsync()).ConsumedAtUtc);
         });
         r = r with { FirstName = "  نام  ", LastName = "  نمونه  ", ReferralCode = "  FUTURE-42  " };
@@ -46,16 +46,15 @@ public sealed class RegistrationTests : IAsyncLifetime
         Assert.False(string.IsNullOrEmpty(b.RefreshToken));
         var body = await signup.Content.ReadFromJsonAsync<JsonElement>(); Assert.False(body.TryGetProperty("refreshToken", out _));
         b.AccessToken = body.GetProperty("accessToken").GetString();
-        var me = (await (await b.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var me = (await (await b.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         Assert.Equal("نام نمونه", me.FullName); Assert.Equal(r.Email, me.Email); Assert.Equal(OrganizationRole.Owner, me.Role);
         await f.Db(async db => {
             var u = await db.Users.SingleAsync(); Assert.Equal(me.Id, u.Id); Assert.True(u.PhoneNumberConfirmed); Assert.False(u.EmailConfirmed);
             Assert.Equal("FUTURE-42", u.ReferralCode); Assert.Equal(r.Email.ToUpperInvariant(), u.NormalizedEmail);
-            Assert.Single(await db.RegistrationTrials.ToListAsync()); Assert.Single(await db.AiCreditTransactions.ToListAsync());
-        });
+            });
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Post, "/api/auth/register", r)).StatusCode);
         await f.SignInAsync(b, r.Mobile);
-        var later = (await (await b.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(BillingJson.Options))!;
+        var later = (await (await b.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         Assert.Equal(me, later);
         Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Post, "/api/auth/refresh")).StatusCode);
     }
@@ -63,26 +62,24 @@ public sealed class RegistrationTests : IAsyncLifetime
     [PostgresFact]
     public async Task Registering_existing_mobile_never_logs_in_or_changes_profile()
     {
-        var owner = await f.RegisterOwner(signupTrial: true); var b = f.Browser(); var r = await Request(b, owner.Mobile);
+        var owner = await f.RegisterOwner(explicitSignup: true); var b = f.Browser(); var r = await Request(b, owner.Mobile);
         var response = await b.Send(HttpMethod.Post, "/api/auth/register", r with { Email = "changed@example.test", FirstName = "Changed", ReferralCode = "OTHER" });
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode); Assert.Equal("mobile_already_registered", await Code(response));
         Assert.Empty(b.RefreshToken);
         await f.Db(async db => {
             var u = await db.Users.SingleAsync(); Assert.Equal(owner.Id, u.Id); Assert.Equal(r.Email, u.Email); Assert.Equal("نام آزمایشی", u.FullName); Assert.Null(u.ReferralCode);
-            Assert.Single(await db.Organizations.ToListAsync()); Assert.Single(await db.RegistrationTrials.ToListAsync());
-        });
+            Assert.Single(await db.Organizations.ToListAsync()); });
         Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Post, "/api/auth/otp/verify", new VerifyOtpRequest(r.Mobile, r.Code))).StatusCode);
     }
 
     [PostgresFact]
     public async Task Duplicate_normalized_email_rolls_back_and_same_otp_can_register_with_another_email()
     {
-        var owner = await f.RegisterOwner(signupTrial: true); var b = f.Browser(); var r = await Request(b, Mobile());
+        var owner = await f.RegisterOwner(explicitSignup: true); var b = f.Browser(); var r = await Request(b, Mobile());
         var response = await b.Send(HttpMethod.Post, "/api/auth/register", r with { Email = owner.Mobile + "@EXAMPLE.TEST" });
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode); Assert.Equal("email_unavailable", await Code(response));
         await f.Db(async db => {
-            Assert.Single(await db.Users.ToListAsync()); Assert.Single(await db.Organizations.ToListAsync()); Assert.Single(await db.RegistrationTrials.ToListAsync());
-            Assert.Null((await db.OtpChallenges.SingleAsync(x => x.Mobile == r.Mobile)).ConsumedAtUtc);
+            Assert.Single(await db.Users.ToListAsync()); Assert.Single(await db.Organizations.ToListAsync()); Assert.Null((await db.OtpChallenges.SingleAsync(x => x.Mobile == r.Mobile)).ConsumedAtUtc);
         });
         Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Post, "/api/auth/register", r with { ReferralCode = "  " })).StatusCode);
         await f.Db(async db => Assert.Null((await db.Users.SingleAsync(x => x.PhoneNumber == r.Mobile)).ReferralCode));
@@ -125,7 +122,7 @@ public sealed class RegistrationTests : IAsyncLifetime
         var b = f.Browser(); var r = await Request(b,mobile);
         var response = await b.Send(HttpMethod.Post, "/api/auth/register",r);
         Assert.Equal(HttpStatusCode.Conflict,response.StatusCode); Assert.Equal("team_invitation_pending",await Code(response));
-        await f.Db(async db => { Assert.Single(await db.Users.ToListAsync()); Assert.False(await db.RegistrationTrials.AnyAsync()); Assert.Null((await db.OtpChallenges.SingleAsync(x=>x.Mobile==mobile)).ConsumedAtUtc); });
+        await f.Db(async db => { Assert.Single(await db.Users.ToListAsync()); Assert.Null((await db.OtpChallenges.SingleAsync(x=>x.Mobile==mobile)).ConsumedAtUtc); });
     }
 
     [PostgresFact]
@@ -137,8 +134,7 @@ public sealed class RegistrationTests : IAsyncLifetime
         Assert.Single(results,x=>x.StatusCode==HttpStatusCode.OK); Assert.Single(results,x=>x.StatusCode==HttpStatusCode.Conflict);
         await f.Db(async db=> {
             Assert.Single(await db.Users.ToListAsync()); Assert.Single(await db.Organizations.ToListAsync());
-            Assert.Single(await db.RegistrationTrials.ToListAsync()); Assert.Single(await db.RefreshTokens.ToListAsync());
-            Assert.Single(await db.AiCreditTransactions.ToListAsync());
+            Assert.Single(await db.RefreshTokens.ToListAsync());
             Assert.Single(await db.OtpChallenges.Where(x=>x.ConsumedAtUtc!=null).ToListAsync());
         });
         var loser = results[0].StatusCode == HttpStatusCode.Conflict ? a : b;
@@ -146,13 +142,13 @@ public sealed class RegistrationTests : IAsyncLifetime
     }
 
     [PostgresFact]
-    public async Task Migration_preserves_legacy_accounts_is_idempotent_and_refuses_to_drop_captured_codes()
+    public async Task Legacy_accounts_remain_readable_migrations_are_idempotent_and_rollback_is_blocked()
     {
         var legacy = await f.RegisterOwner();
         await f.Db(async db => {
             var migrations = db.Database.GetMigrations().ToArray();
             var index = Array.FindIndex(migrations,x=>x.EndsWith("_SeparateRegistrationFromLogin"));
-            var migrator = db.GetService<IMigrator>(); await migrator.MigrateAsync(migrations[index-1]);
+            var migrator = db.GetService<IMigrator>();
             var sql = migrator.GenerateScript(migrations[index-1],migrations[index],MigrationsSqlGenerationOptions.Idempotent);
             await db.Database.ExecuteSqlRawAsync(sql); await db.Database.ExecuteSqlRawAsync(sql);
             Assert.False(db.Database.HasPendingModelChanges());

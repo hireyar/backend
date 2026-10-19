@@ -1,4 +1,4 @@
--- Read-only diagnostic for /api/dashboard and /api/billing/panel.
+-- Read-only diagnostic for /api/dashboard and interview management.
 -- Run against the same database and search_path used by the deployed API.
 -- Does not read application/user data or apply migrations.
 BEGIN TRANSACTION READ ONLY;
@@ -9,16 +9,8 @@ WITH required(table_name, column_name) AS (VALUES
     ('InterviewSessions', 'PositionTitleSnapshot'),
     ('InterviewSessions', 'TemplateTitleSnapshot'),
     ('CandidateApplications', 'ResumeStorageKey'),
-    ('SubscriptionReplacements', 'SubscriptionId'),
-    ('SubscriptionReplacements', 'EndedAtUtc'),
-    ('SubscriptionPurchases', 'Operation'),
-    ('SubscriptionPurchases', 'OriginalAmountSnapshot'),
-    ('SubscriptionPurchases', 'DiscountAmountSnapshot'),
-    ('SubscriptionPurchases', 'ProratedCreditAmountSnapshot'),
-    ('SubscriptionPurchases', 'ReplacesSubscriptionId'),
-    ('Payments', 'SubtotalAmountSnapshot'),
-    ('Payments', 'TaxAmountSnapshot'),
-    ('Payments', 'TaxPercentSnapshot')
+    ('InterviewSessions', 'InterviewType')
+
 )
 SELECT table_name, column_name,
     CASE WHEN to_regclass(format('%I', table_name)) IS NULL THEN 'MISSING TABLE'
@@ -30,9 +22,9 @@ SELECT table_name, column_name,
          ELSE 'OK' END AS status
 FROM required ORDER BY table_name, column_name;
 
--- EF history should contain both entries; a missing history table is itself diagnostic.
+-- EF history must contain the forward-only removal migration.
 SELECT "MigrationId" FROM "__EFMigrationsHistory"
-WHERE "MigrationId" IN ('20261005130515_AddPanelWizard', '20261005133142_AddSubscriptionCreditPanel')
+WHERE "MigrationId" IN ('20261019065637_RemoveLegacyPackagingAndBilling')
 ORDER BY "MigrationId";
 
 ROLLBACK;

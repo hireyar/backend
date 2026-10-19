@@ -24,7 +24,7 @@ public sealed partial class InterviewFlowTests
             await isolated.Db(async db => {
                 var exception = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261008135241_AddShortInterviewInvitations"));
                 Assert.Equal("P0001", exception.SqlState);
-                Assert.Contains("downgrade is unsafe", exception.MessageText);
+                Assert.Contains("pre-removal backup", exception.MessageText);
                 Assert.Contains("20261010054552_AddInterviewReportReview", await db.Database.GetAppliedMigrationsAsync());
                 Assert.True(await db.InterviewReviewEntries.AnyAsync(e => e.InterviewSessionId == invite.InterviewId));
             });

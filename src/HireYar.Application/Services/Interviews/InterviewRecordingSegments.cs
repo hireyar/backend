@@ -19,7 +19,7 @@ public sealed partial class InterviewReviewService
     public async Task<InterviewRecordingProgressDto> RecordingProgressAsync(Guid id, bool candidate, CancellationToken ct)
     {
         var s = candidate ? await Candidate(id, ct) : await Owner(id, ct);
-        await billing.RequireMediaRetentionAsync(s, ct);
+
         var rows = await SegmentRows(s, ct);
         var legacy = await db.InterviewSessionRecordings.AnyAsync(r => r.OrganizationId == s.OrganizationId && r.InterviewSessionId == id, ct);
         return new(rows.Length + 1, rows.Sum(r => r.SizeBytes), rows.Sum(r => r.DurationSeconds), rows.Select(SegmentDto).ToArray(), legacy);
@@ -34,7 +34,7 @@ public sealed partial class InterviewReviewService
             timeline.Any(t => t is null || t.StartSeconds < 0 || t.EndSeconds <= t.StartSeconds || t.EndSeconds > duration ||
                 !s.Answers.Any(a => a.Id == t.AnswerId)) || timeline.Select(t => t.AnswerId).Distinct().Count() != timeline.Count)
             throw AppException.Invalid("recording_timeline_invalid");
-        await billing.RequireMediaRetentionAsync(s, ct);
+
         var type = await VideoUploadValidator.ValidateAsync(video, fileName, mime, size, new() { MaxVideoUploadBytes = MaximumSegmentBytes }, ct);
         if (video.Length != size) throw AppException.Invalid("recording_size_mismatch");
         var hash = Convert.ToHexString(await SHA256.HashDataAsync(video, ct)); video.Position = 0;
@@ -44,7 +44,7 @@ public sealed partial class InterviewReviewService
             JsonSerializer.Serialize(JsonSerializer.Deserialize<InterviewRecordingOffset[]>(r.TimelineJson, Json), Json) == serialized;
         async Task<InterviewRecordingSegmentDto?> CheckState()
         {
-            await db.ReloadInterviewAsync(s, ct); CheckCandidate(s); await billing.RequireMediaRetentionAsync(s, ct);
+            await db.ReloadInterviewAsync(s, ct); CheckCandidate(s);
             if (await db.InterviewSessionRecordings.AnyAsync(r => r.OrganizationId == s.OrganizationId && r.InterviewSessionId == id, ct))
                 throw new AppException(409, "recording_mode_conflict", "This session already has a full recording.");
             var rows = await SegmentRows(s, ct);
@@ -55,14 +55,14 @@ public sealed partial class InterviewReviewService
                 throw new AppException(413, "recording_limit", "The total recording limit was reached.");
             return null;
         }
-        var replay = await db.WithOrganizationBillingLockAsync(s.OrganizationId, CheckState, ct);
+        var replay = await db.WithOrganizationLockAsync(s.OrganizationId, CheckState, ct);
         if (replay is not null) return replay;
         var saved = await storage.SaveAsync(video, "videos", id, MaximumSegmentBytes, ct);
         var committed = false; var won = false;
         try
         {
             if (saved.SizeBytes != size) throw AppException.Invalid("recording_size_mismatch");
-            var result = await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+            var result = await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
                 var winner = await CheckState(); if (winner is not null) return winner;
                 var row = new InterviewRecordingSegment { InterviewSessionId = id, OrganizationId = s.OrganizationId,
                     SegmentNumber = number, UploadId = uploadId, StorageKey = saved.Key, ContentHash = hash, ContentType = type,
@@ -76,7 +76,7 @@ public sealed partial class InterviewReviewService
 
     public async Task<(Stream Content, string ContentType, string ContentHash)> OpenSegmentAsync(Guid id, int number, CancellationToken ct)
     {
-        var s = await Owner(id, ct); await billing.RequireMediaRetentionAsync(s, ct);
+        var s = await Owner(id, ct);
         var row = await db.InterviewRecordingSegments.AsNoTracking().SingleOrDefaultAsync(r => r.OrganizationId == s.OrganizationId &&
             r.InterviewSessionId == id && r.SegmentNumber == number, ct) ?? throw AppException.NotFound();
         return (await storage.OpenReadAsync(row.StorageKey, ct), row.ContentType, row.ContentHash);

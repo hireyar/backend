@@ -9,7 +9,7 @@ public sealed record WizardPositionRequest(
 public sealed record WizardTemplateRequest(
     Guid JobPositionId,
     [Required, StringLength(200)] string Title,
-    [Required, RegularExpression("^[a-z][a-z0-9_]{1,63}$")] string InterviewType,
+    [Required, RegularExpression("^(general|specialized)$")] string InterviewType,
     [MinLength(5), MaxLength(30)] List<string>? Questions,
     [Required, StringLength(2000)] string WelcomeMessage,
     [Required, StringLength(2000)] string GoodbyeMessage,
@@ -42,7 +42,7 @@ public sealed record WizardInvitationRequest(Guid JobPositionId, Guid TemplateId
     [Required, EmailAddress, StringLength(256)] string Email,
     [Required, RegularExpression("^09[0-9]{9}$")] string Phone,
     [Range(1, 14)] int DeadlineDays = 3,
-    [Required, RegularExpression("^[a-z][a-z0-9_]{1,63}$")] string InterviewType = "general",
+    [Required, RegularExpression("^(general|specialized)$")] string InterviewType = "general",
     [StringLength(32000)] string? ResumeText = null, bool SendEmail = false, bool SendSms = false);
 public sealed record PanelInvitationResult(InterviewInvitation Invitation, string EmailDelivery, string SmsDelivery);
 public sealed record ResendInterviewRequest([Range(1, 14)] int DeadlineDays = 3, bool SendEmail = false, bool SendSms = false);

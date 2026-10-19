@@ -19,7 +19,7 @@ public sealed class ComprehensiveReportCalculationTests
         var skills=new[]{new InterviewSkill(a,"A",true,20,3),new InterviewSkill(b,"B",true,80,3)};
         var snapshots=new[]{new InterviewQuestionSnapshot(Guid.NewGuid(),a,"easy A","A",1,true),new InterviewQuestionSnapshot(Guid.NewGuid(),a,"medium A","A",3,true),new InterviewQuestionSnapshot(Guid.NewGuid(),b,"hard B","B",5,true)};
         var session=new InterviewSession(Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),snapshots,skills,3,1800,now,now.AddDays(1));
-        if(general) session.SetRequiredCapability("hr_interview");session.Start(snapshots[0].QuestionId,now);session.Complete(InterviewCompletionReason.Manual,now.AddSeconds(1));
+        if(general) session.SetInterviewType("general");session.Start(snapshots[0].QuestionId,now);session.Complete(InterviewCompletionReason.Manual,now.AddSeconds(1));
         var scores=new[]{100m,60m,20m};
         var questions=snapshots.Select((q,i)=> {
             var answerId=Guid.NewGuid();var evidence=new[]{new AnswerAssessmentEvidence(answerId,0,4,"test")};
@@ -118,7 +118,7 @@ public sealed partial class InterviewFlowTests
     [PostgresFact]
     public async Task Comprehensive_general_report_persists_seven_metrics_and_preserves_base_on_corrupt_policy_or_dimension()
     {
-        f.AssessmentAi.Reset();var (hr,invite)=await Invite();await f.Db(async db=>{var session=await db.InterviewSessions.SingleAsync(s=>s.Id==invite.InterviewId);session.SetRequiredCapability("hr_interview");await db.SaveChangesAsync();});
+        f.AssessmentAi.Reset();var (hr,invite)=await Invite();await f.Db(async db=>{var session=await db.InterviewSessions.SingleAsync(s=>s.Id==invite.InterviewId);session.SetInterviewType("general");await db.SaveChangesAsync();});
         using var candidate=Candidate(invite);var state=await Start(candidate,invite.InterviewId);await Submit(candidate,invite.InterviewId,state.Question!.Id);await candidate.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete",null);
         var report=await NewReport(hr,invite.InterviewId);Guid org=default;await f.Db(async db=>org=await db.InterviewSessions.Where(s=>s.Id==invite.InterviewId).Select(s=>s.OrganizationId).SingleAsync());
         f.AssessmentAi.Handler=(_,_)=>Task.FromResult(WithDimensions("general"));await Assess(f,org,report.Questions[0].Answer!.AnswerId);report=await NewReport(hr,invite.InterviewId);
@@ -159,7 +159,7 @@ public sealed partial class InterviewFlowTests
                 Assert.True(reportIndex > 0);
                 reportMigration = migrations[reportIndex]; previousMigration = migrations[reportIndex - 1];
                 var migrator = db.GetService<IMigrator>();
-                await migrator.MigrateAsync(previousMigration);
+
                 var script = migrator.GenerateScript(previousMigration, reportMigration, MigrationsSqlGenerationOptions.Idempotent);
                 await db.Database.ExecuteSqlRawAsync(script);
                 await db.Database.ExecuteSqlRawAsync(script);

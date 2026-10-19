@@ -1,3 +1,4 @@
+// Historical migration SQL only. Not registered or used by the current runtime.
 namespace HireYar.Infrastructure.Persistence;
 
 // One-time migration seed. Never runs on startup or updates administrator-modified catalog rows.

@@ -1,11 +1,10 @@
 using HireYar.Application.Common;
-using HireYar.Application.Billing;
 using HireYar.Domain.Interviews;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Interviews;
 
 public sealed class InterviewManagementService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
-    ISubscriptionEntitlementService entitlements, InterviewBillingService billing, IInterviewAudioStorage storage, IInterviewInvitationSecurity invitationSecurity,
+    IInterviewAudioStorage storage, IInterviewInvitationSecurity invitationSecurity,
     IInterviewDiagnostics diagnostics, IInterviewInvitationNotifier notifier)
 {
     private async Task CheckJob(Guid id, CancellationToken ct)
@@ -64,20 +63,18 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
     }
     public async Task<InterviewInvitation> InviteAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct)
     {
-        var quote = await billing.CurrentRateAsync(ct);
-        var invitation = await db.WithOrganizationBillingLockAsync(user.OrganizationId, () => InviteLockedAsync(jobId, applicationId, r, quote, ct), ct);
+        var invitation = await db.WithOrganizationLockAsync(user.OrganizationId, () => InviteLockedAsync(jobId, applicationId, r, ct), ct);
         var candidate = await db.CandidateApplications.AsNoTracking().SingleAsync(x => x.Id == applicationId && x.OrganizationId == user.OrganizationId, ct);
         var session = await db.InterviewSessions.AsNoTracking().SingleAsync(x => x.Id == invitation.InterviewId && x.OrganizationId == user.OrganizationId, ct);
         var delivery = await notifier.SendAsync(new(candidate.Email, candidate.Phone, $"{candidate.FirstName} {candidate.LastName}",
             session.PositionTitleSnapshot ?? "", invitation), r.SendEmail, r.SendSms, ct);
         return invitation with { EmailDelivery = delivery.EmailDelivery, SmsDelivery = delivery.SmsDelivery };
     }
-    private async Task<InterviewInvitation> InviteLockedAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, AiDisplayRateDto quote, CancellationToken ct)
+    private async Task<InterviewInvitation> InviteLockedAsync(Guid jobId, Guid applicationId, CreateInterviewRequest r, CancellationToken ct)
     {
         await CheckJob(jobId, ct);
         if (!await db.CandidateApplications.AnyAsync(x => x.Id == applicationId && x.OrganizationId == user.OrganizationId && x.JobPositionId == jobId, ct))
             throw AppException.NotFound();
-        await entitlements.RequireAsync(user.OrganizationId, ["ai_interview"], ct);
         var template = await db.InterviewTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == r.TemplateId
         && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null && x.JobPositionId == jobId && !x.IsArchived, ct)
             ?? throw AppException.NotFound();
@@ -97,10 +94,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         var token = invitationSecurity.CreateCode();
         var session = new InterviewSession(user.OrganizationId, jobId, applicationId, template.Id, questions, skills,
             r.MaxQuestionCount, template.DurationMinutes * 60, now, now.AddHours(r.ExpiresInHours));
-        var type = await InterviewTypeService.RequireTypeAsync(db,
-            r.InterviewType ?? (r.RequiredCapabilityCode == "technical_interview" ? "specialized" : "general"), ct);
-        session.SetRequiredCapability(InterviewTypeService.Capability(type));
-        session.SetPricingInterviewType(type.Code);
+        session.SetInterviewType(InterviewTypes.Require(r.InterviewType));
         session.SetInteractionLimit(template.MaxFollowUpQuestionsPerQuestion);
         var job = await db.JobPositions.AsNoTracking().SingleAsync(x => x.Id == jobId && x.OrganizationId == user.OrganizationId, ct);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
@@ -108,7 +102,6 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
             template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
         var encrypted = invitationSecurity.Protect(session.Id, token);
         session.SetProtectedAccessCode(encrypted, InterviewTokens.Hash(encrypted)); db.InterviewSessions.Add(session);
-        await billing.ReserveInvitationLockedAsync(session, quote, ct);
         await db.SaveChangesAsync(ct);
         return new(session.Id, token, session.ExpiresAtUtc, $"/api/candidate/interviews/{session.Id}", token, invitationSecurity.Link(session.Id));
     }
@@ -141,7 +134,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
     public async Task RevokeAsync(Guid id, CancellationToken ct)
     {
         var s = await Scoped(id, ct);
-        await billing.FinishAsync(s, true, async () => {
+        await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
             await db.ReloadInterviewAsync(s, ct);
             if (s.Status is not (InterviewStatus.Completed or InterviewStatus.Cancelled)) s.Cancel(time.GetUtcNow());
             s.RevokeAccess(time.GetUtcNow()); return true;
@@ -149,10 +142,10 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
     }
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
-        // Load answers only after the billing lock, so settlement cannot miss an answer committed while deletion waited.
+        // Load answers under the organization lock to serialize deletion with pending writes.
         var s = await db.InterviewSessions.IgnoreAutoIncludes().SingleOrDefaultAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null, ct)
             ?? throw AppException.NotFound();
-        await billing.FinishAsync(s, false, async () =>
+        await db.WithOrganizationLockAsync(s.OrganizationId, async () =>
         {
             await db.ReloadInterviewAsync(s, ct);
             if (s.DeletedAtUtc is not null) throw AppException.NotFound();
@@ -164,6 +157,5 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
     }
     public async Task<InterviewSession> Scoped(Guid id, CancellationToken ct) => await db.InterviewSessions.Include(x => x.Answers)
         .SingleOrDefaultAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null, ct) ?? throw AppException.NotFound();
-    public async Task<InterviewSession> MediaScopedAsync(Guid id, CancellationToken ct)
-    { var session = await Scoped(id, ct); await billing.RequireMediaRetentionAsync(session, ct); return session; }
+    public Task<InterviewSession> MediaScopedAsync(Guid id, CancellationToken ct) => Scoped(id, ct);
 }

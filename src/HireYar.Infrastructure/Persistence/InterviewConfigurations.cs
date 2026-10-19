@@ -75,9 +75,7 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
         b.HasOne<InterviewSession>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.SupersededByInterviewId })
             .HasPrincipalKey(x => new { x.OrganizationId, x.Id });
         b.HasIndex(x => x.SupersededByInterviewId).IsUnique().HasFilter("\"SupersededByInterviewId\" IS NOT NULL");
-        b.Property(x => x.RequiredCapabilityCode).HasMaxLength(64);
-        b.Property(x => x.PricingInterviewTypeCode).HasMaxLength(64);
-        b.HasOne<HireYar.Domain.Billing.InterviewTypeDefinition>().WithMany().HasForeignKey(x => x.PricingInterviewTypeCode);
+        b.Property(x => x.InterviewType).HasMaxLength(64);
         b.Property(x => x.PositionTitleSnapshot).HasMaxLength(200);
         b.Property(x => x.PositionDescriptionSnapshot).HasMaxLength(10000);
         b.Property(x => x.TemplateTitleSnapshot).HasMaxLength(200);
@@ -113,7 +111,7 @@ public sealed class InterviewSessionConfiguration : IEntityTypeConfiguration<Int
             t.HasCheckConstraint("CK_Interview_Interactions", "\"MaxInteractionsPerQuestion\" BETWEEN 0 AND 3");
             t.HasCheckConstraint("CK_Interview_Status", "\"Status\" IN ('Created','WaitingForAnswer','ProcessingAnswer','Completed','Cancelled')");
             t.HasCheckConstraint("CK_Interview_Limits", "\"MaxQuestionCount\" BETWEEN 1 AND 30 AND \"MaxDurationSeconds\" BETWEEN 300 AND 3600");
-            t.HasCheckConstraint("CK_Interview_Capability", "\"RequiredCapabilityCode\" IN ('hr_interview','technical_interview')");
+            t.HasCheckConstraint("CK_Interview_Type", "\"InterviewType\" IN ('general','specialized')");
         });
         b.HasMany(x => x.Answers).WithOne().HasForeignKey(x => x.InterviewSessionId);
         b.Navigation(x => x.Answers).HasField("answers").UsePropertyAccessMode(PropertyAccessMode.Field);

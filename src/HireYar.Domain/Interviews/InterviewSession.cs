@@ -98,13 +98,7 @@ public sealed class InterviewSession
                 g.Count() == 3 && g.Select(q => q.Difficulty).Order().SequenceEqual(new[] { 1, 3, 5 }) && g.Select(q => q.SkillId).Distinct().Count() == 1), "invalid_topic_plan");
         AskOneQuestionPerTopic = true;
     }
-    public string? PricingInterviewTypeCode { get; private set; }
-    public void SetPricingInterviewType(string code)
-    {
-        InterviewRules.Require(Status == InterviewStatus.Created, "interview_already_started");
-        PricingInterviewTypeCode = InterviewRules.Text(code, 64);
-    }
-    public string RequiredCapabilityCode { get; private set; } = "technical_interview";
+    public string InterviewType { get; private set; } = "specialized";
     public string? PositionTitleSnapshot { get; private set; }
     public string? PositionDescriptionSnapshot { get; private set; }
     public string? TemplateTitleSnapshot { get; private set; }
@@ -171,10 +165,10 @@ public sealed class InterviewSession
         GoodbyeMessage = InterviewRules.Text(goodbye, 2000);
     }
     public DateTimeOffset? QuestionReadyAtUtc { get; private set; }
-    public void SetRequiredCapability(string code)
+    public void SetInterviewType(string code)
     {
-        InterviewRules.Require(Status == InterviewStatus.Created && code is "hr_interview" or "technical_interview", "invalid_interview_capability");
-        RequiredCapabilityCode = code;
+        InterviewRules.Require(Status == InterviewStatus.Created && code is "general" or "specialized", "invalid_interview_type");
+        InterviewType = code;
     }
     public void MarkQuestionReady(DateTimeOffset now)
     {

@@ -44,7 +44,7 @@ public sealed class InterviewAuthenticationHandler(IOptionsMonitor<Authenticatio
         {
             if (s.ProtectedAccessCode is not null)
             {
-                await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+                await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
                     var current = await db.InterviewSessions.IgnoreAutoIncludes().SingleAsync(x => x.Id == id && x.OrganizationId == s.OrganizationId, Context.RequestAborted);
                     if (current.SupersededByInterviewId is null && current.DeletedAtUtc is null)
                     {

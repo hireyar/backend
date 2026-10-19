@@ -27,7 +27,7 @@ public sealed class SessionReportPolicyService(IApplicationDbContext db, ICurren
         } catch(JsonException) {return new("Defaulted",row.Revision,60,80,0.6m,defaults,"SessionSnapshot",canEdit,"report_policy_invalid");}
     }
     public Task<ReportPolicy> UpdateAsync(Guid id, ReportPolicyRequest request, CancellationToken ct) =>
-        db.WithOrganizationBillingLockAsync(user.OrganizationId,async()=> {
+        db.WithOrganizationLockAsync(user.OrganizationId,async()=> {
             if(user.Role!=OrganizationRole.Owner) throw new AppException(403,"forbidden","Only the owner may change report policy.");
             await reports.ReadAsync(id,ct);
             var skills=(await db.InterviewSessions.IgnoreAutoIncludes().Include(s=>s.Skills).SingleAsync(s=>s.Id==id && s.OrganizationId==user.OrganizationId,ct)).Skills;

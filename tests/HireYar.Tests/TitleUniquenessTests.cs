@@ -20,7 +20,7 @@ public sealed class TitleUniquenessTests(ApiFixture f)
     private static async Task<T> Read<T>(HttpResponseMessage response, HttpStatusCode expected)
     {
         Assert.Equal(expected, response.StatusCode);
-        return (await response.Content.ReadFromJsonAsync<T>(BillingJson.Options))!;
+        return (await response.Content.ReadFromJsonAsync<T>(TestJson.Options))!;
     }
     private static async Task Duplicate(HttpResponseMessage response, string code)
     {
@@ -140,7 +140,7 @@ public sealed class TitleUniquenessTests(ApiFixture f)
             client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest(" con‌current ", "Synthetic description")));
         var winner = Assert.Single(jobs, x => x.IsSuccessStatusCode);
         await Duplicate(Assert.Single(jobs, x => x.StatusCode == HttpStatusCode.Conflict), "job_title_duplicate");
-        var job = (await winner.Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
+        var job = (await winner.Content.ReadFromJsonAsync<JobDto>(TestJson.Options))!;
         var templates = await Task.WhenAll(
             owner.Client.Send(HttpMethod.Post, "/api/interview-templates", Template(job.Id, "Con current")),
             client.Send(HttpMethod.Post, "/api/panel-wizard/templates", WizardTemplate(job.Id, " concurrent ")));

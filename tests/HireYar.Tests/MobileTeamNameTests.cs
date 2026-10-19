@@ -19,14 +19,14 @@ public sealed partial class MobileTeamTests
         var owner = await f.RegisterOwner(); var mobile = Mobile();
         var invitation = await Invite(owner, mobile, " سارا ", " نیک‌نام ");
         Assert.Equal("سارا", invitation.FirstName); Assert.Equal("نیک‌نام", invitation.LastName);
-        var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(BillingJson.Options))!;
+        var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(TestJson.Options))!;
         var listed = Assert.Single(list.Items);
         Assert.Equal(invitation.Id, listed.Id); Assert.Equal(invitation.Mobile, listed.Mobile);
         Assert.Equal("سارا", listed.FirstName); Assert.Equal("نیک‌نام", listed.LastName); Assert.Equal("Pending", listed.Status);
         await f.Db(async db => { var row = await db.MobileTeamInvitations.SingleAsync(x => x.Id == invitation.Id); Assert.Equal("سارا", row.FirstName); Assert.Equal("نیک‌نام", row.LastName); Assert.False(await db.Users.AnyAsync(x => x.PhoneNumber == mobile)); });
         var member = await Accept(invitation); var me = await Me(member);
         Assert.Equal("سارا نیک‌نام", me.FullName); Assert.Equal(OrganizationRole.Recruiter, me.Role);
-        var members = (await (await owner.Client.Send(HttpMethod.Get, "/api/team/members")).Content.ReadFromJsonAsync<Page<TeamMemberDto>>(BillingJson.Options))!;
+        var members = (await (await owner.Client.Send(HttpMethod.Get, "/api/team/members")).Content.ReadFromJsonAsync<Page<TeamMemberDto>>(TestJson.Options))!;
         Assert.Equal("سارا نیک‌نام", members.Items.Single(x => x.Id == me.Id).FullName);
         Assert.Equal(HttpStatusCode.OK, (await member.Send(HttpMethod.Put, "/api/auth/me", new HireYar.Application.Auth.NameRequest("نام ویرایش‌شده"))).StatusCode);
         Assert.Equal("نام ویرایش‌شده", (await Me(member)).FullName);
@@ -62,7 +62,7 @@ public sealed partial class MobileTeamTests
     }
 
     [PostgresFact]
-    public async Task Name_migration_preserves_legacy_invites_and_existing_names_and_guards_lossy_downgrade()
+    public async Task Legacy_invites_preserve_existing_names_and_schema_rollback_is_blocked()
     {
         var owner = await f.RegisterOwner(); var organization = (await Me(owner.Client)).OrganizationId;
         var existingMobile = Mobile(); var newMobile = Mobile(); var existingId = Guid.NewGuid();
@@ -71,15 +71,13 @@ public sealed partial class MobileTeamTests
             db.Users.Add(new ApplicationUser { Id = existingId, UserName = existingMobile, PhoneNumber = existingMobile, FullName = "نام قبلی عضو", OrganizationId = organization,
                 Role = OrganizationRole.Recruiter, IsActive = false, PhoneNumberConfirmed = true, CreatedAtUtc = now, UpdatedAtUtc = now });
             await db.SaveChangesAsync();
-            const string previous = "20261013092724_AddMobileTeamInvitations";
-            await db.GetService<IMigrator>().MigrateAsync(previous);
             await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"MobileTeamInvitations\" (\"Id\",\"OrganizationId\",\"Mobile\",\"CreatedAtUtc\",\"ExpiresAtUtc\") VALUES ({existingInvite},{organization},{existingMobile},{now},{now.AddDays(3)}), ({newInvite},{organization},{newMobile},{now},{now.AddDays(3)})");
             await db.GetService<IMigrator>().MigrateAsync();
             Assert.False(db.Database.HasPendingModelChanges());
             var legacy = await db.MobileTeamInvitations.AsNoTracking().ToListAsync(); Assert.Equal(2, legacy.Count);
             Assert.All(legacy, x => { Assert.Null(x.FirstName); Assert.Null(x.LastName); });
         });
-        var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(BillingJson.Options))!;
+        var list = (await (await owner.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(TestJson.Options))!;
         var existing = await Me(await Accept(list.Items.Single(x => x.Id == existingInvite)));
         Assert.Equal(existingId, existing.Id); Assert.Equal("نام قبلی عضو", existing.FullName);
         Assert.Equal("کاربر", (await Me(await Accept(list.Items.Single(x => x.Id == newInvite)))).FullName);

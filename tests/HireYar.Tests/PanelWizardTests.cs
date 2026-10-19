@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using HireYar.Api.Billing;
 using System.Net;
 using HireYar.Domain.Interviews;
 using System.Net.Http.Headers;
@@ -20,13 +19,13 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         Enumerable.Range(1, count).Select(x => $"سؤال مصنوعی {x}").ToList(), "شروع آزمایشی", "پایان آزمایشی");
     private async Task<(Account Hr, JobDto Job, TemplateDto Template)> Setup()
     {
-        var hr = await f.RegisterOwner(); await f.FundInterviewsAsync(hr);
+        var hr = await f.RegisterOwner();
         var jobResponse = await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("موقعیت مصنوعی", "شرح شغل مصنوعی"));
         Assert.Equal(HttpStatusCode.OK, jobResponse.StatusCode);
-        var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
+        var job = (await jobResponse.Content.ReadFromJsonAsync<JobDto>(TestJson.Options))!;
         var templateResponse = await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", Template(job.Id));
         Assert.Equal(HttpStatusCode.OK, templateResponse.StatusCode);
-        return (hr, job, (await templateResponse.Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!);
+        return (hr, job, (await templateResponse.Content.ReadFromJsonAsync<TemplateDto>(TestJson.Options))!);
     }
     private async Task<HttpResponseMessage> Invite(Account hr, Guid job, Guid template, string phone = "09123456789", string filename = "resume.pdf", byte[]? bytes = null, string interviewType = "general", bool sendEmail = false, bool sendSms = false)
     {
@@ -130,39 +129,16 @@ public sealed partial class PanelWizardTests(ApiFixture f)
         var (hr, job, template) = await Setup(); var stranger = await f.RegisterOwner();
         Assert.Equal(HttpStatusCode.BadRequest, (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", Template(job.Id, 4))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await Invite(hr, job.Id, template.Id, phone: "123")).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await Invite(hr, job.Id, template.Id, interviewType: "unknown")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Invite(hr, job.Id, template.Id, interviewType: "unknown")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await Invite(hr, job.Id, template.Id, filename: "resume.pdf", bytes: "not-pdf"u8.ToArray())).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await Invite(stranger, job.Id, template.Id)).StatusCode);
         var empty = await (await hr.Client.Send(HttpMethod.Get, "/api/interviews")).Content.ReadFromJsonAsync<Page<PanelInterviewDto>>(); Assert.Empty(empty!.Items);
-        var second = (await (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("دوم", "شرح دوم"))).Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
+        var second = (await (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("دوم", "شرح دوم"))).Content.ReadFromJsonAsync<JobDto>(TestJson.Options))!;
         var result = await Invite(hr, second.Id, template.Id); Assert.Equal(HttpStatusCode.OK, result.StatusCode);
         var issued = (await result.Content.ReadFromJsonAsync<PanelInvitationResult>())!;
         await f.Db(async db => { var s = await db.InterviewSessions.SingleAsync(x => x.Id == issued.Invitation.InterviewId); Assert.NotEqual(template.Id, s.InterviewTemplateId); Assert.Equal(second.Id, s.JobPositionId); Assert.Equal("شرح دوم", s.PositionDescriptionSnapshot); });
         Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.Send(HttpMethod.Get, $"/api/interviews/{issued.Invitation.InterviewId}/resume")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await hr.Client.Send(HttpMethod.Get, "/api/interviews?statuses=unknown")).StatusCode);
-    }
-    [PostgresFact]
-    public async Task Invitation_type_is_independent_of_bank_and_existing_capabilities_are_enforced()
-    {
-        var hr = await f.RegisterOwner();
-        var job = (await (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/positions", new WizardPositionRequest("مصنوعی", "شرح مصنوعی"))).Content.ReadFromJsonAsync<JobDto>(BillingJson.Options))!;
-        var template = (await (await hr.Client.Send(HttpMethod.Post, "/api/panel-wizard/templates", Template(job.Id) with { InterviewType = "specialized" })).Content.ReadFromJsonAsync<TemplateDto>(BillingJson.Options))!;
-        Assert.Equal(HttpStatusCode.Forbidden, (await Invite(hr, job.Id, template.Id)).StatusCode);
-        var packages = (await (await hr.Client.Send(HttpMethod.Get, "/api/pricing/packages")).Content.ReadFromJsonAsync<PricingResponse>(BillingJson.Options))!;
-        var period = packages.Packages.Single(x => x.Code == "basic").Periods.Single(x => x.Months == 1);
-        var purchase = (await (await hr.Client.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new HireYar.Application.Billing.SubscriptionPurchaseRequest(period.Id))).Content.ReadFromJsonAsync<HireYar.Api.Billing.RialPurchaseResult>(BillingJson.Options))!;
-        Assert.Equal(HttpStatusCode.OK, (await hr.Client.Send(HttpMethod.Post, $"/api/billing/payments/{purchase.Payment.Id}/verify")).StatusCode);
-        await f.Db(async db=> {
-            var org=await db.Users.Where(x=>x.Id==hr.Id).Select(x=>x.OrganizationId).SingleAsync();
-            await using var scope=f.Services.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<HireYar.Application.Billing.WalletService>().AdjustAsync(org,new(Guid.NewGuid(),100m,"Synthetic type tariff credit"),default);
-        });
-        var general = await Invite(hr, job.Id, template.Id); Assert.Equal(HttpStatusCode.OK, general.StatusCode);
-        var issued = (await general.Content.ReadFromJsonAsync<PanelInvitationResult>())!;
-        await f.Db(async db => Assert.Equal("hr_interview", (await db.InterviewSessions.SingleAsync(x => x.Id == issued.Invitation.InterviewId)).RequiredCapabilityCode));
-        Assert.Equal(HttpStatusCode.Conflict, (await Invite(hr, job.Id, template.Id, interviewType: "specialized")).StatusCode);
-        var rows = (await (await hr.Client.Send(HttpMethod.Get, "/api/interviews")).Content.ReadFromJsonAsync<Page<PanelInterviewDto>>())!;
-        Assert.Equal("general", Assert.Single(rows.Items).InterviewType);
     }
     [PostgresFact]
     public async Task Short_access_code_and_link_are_recoverable_only_in_the_owning_organization_panel()

@@ -53,8 +53,11 @@ public sealed class SecurityTests(ApiFixture f)
         using var production = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.ConfigureLogging(logging => { logging.ClearProviders(); logging.AddProvider(logs); });
-            builder.ConfigureServices(services => services.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(new TestAiDisplayRates()));
             builder.UseEnvironment("Production");
+            builder.UseSetting("SkipLocalSettings", "true");
+            builder.UseSetting("AI:Provider", "Disabled");
+            builder.UseSetting("AnswerAssessments:WorkerEnabled", "false");
+            builder.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
             builder.UseSetting("InterviewStorage:VideoProvider", "Local");
             builder.UseSetting("ConnectionStrings:Default", "Host=localhost;Database=hireyar_test;Username=test;Password=test");
             builder.UseSetting("Security:SigningKey", new string('x', 32));
@@ -90,8 +93,11 @@ public sealed class SecurityTests(ApiFixture f)
     {
         using var production = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            builder.ConfigureServices(services => services.AddSingleton<HireYar.Application.Billing.IAiDisplayRateProvider>(new TestAiDisplayRates()));
             builder.UseEnvironment("Production");
+            builder.UseSetting("SkipLocalSettings", "true");
+            builder.UseSetting("AI:Provider", "Disabled");
+            builder.UseSetting("AnswerAssessments:WorkerEnabled", "false");
+            builder.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
             builder.UseSetting("InterviewStorage:VideoProvider", "Local");
             builder.UseSetting("ConnectionStrings:Default", "Host=localhost;Database=hireyar_test;Username=test;Password=test");
             builder.UseSetting("Security:SigningKey", new string('x', 32));
@@ -118,8 +124,8 @@ public sealed class SecurityTests(ApiFixture f)
         Assert.DoesNotContain("referralCode", requiredRegistrationFields);
         var adminLogin = openApi.GetProperty("paths").GetProperty("/api/admin/auth/login").GetProperty("post");
         Assert.Contains(adminLogin.GetProperty("parameters").EnumerateArray(), x => x.GetProperty("name").GetString() == "X-Admin-Entry" && x.GetProperty("required").GetBoolean());
-        var adminPricing = openApi.GetProperty("paths").GetProperty("/api/admin/pricing/packages").GetProperty("get");
-        Assert.True(adminPricing.GetProperty("security")[0].TryGetProperty("SuperAdmin", out _));
+        var adminUsers = openApi.GetProperty("paths").GetProperty("/api/admin/users/super-admins").GetProperty("get");
+        Assert.True(adminUsers.GetProperty("security")[0].TryGetProperty("SuperAdmin", out _));
         var uploadContent = openApi.GetProperty("paths").GetProperty("/api/candidate/interviews/{interviewId}/answers").GetProperty("post").GetProperty("requestBody").GetProperty("content");
         Assert.False(uploadContent.TryGetProperty("application/x-www-form-urlencoded", out _));
         var uploadSchema = uploadContent.GetProperty("multipart/form-data").GetProperty("schema");

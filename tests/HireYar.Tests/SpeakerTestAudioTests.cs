@@ -18,12 +18,6 @@ public sealed partial class PanelWizardTests
     {
         var (hr, job, template) = await Setup();
         var invite = (await (await Invite(hr, job.Id, template.Id)).Content.ReadFromJsonAsync<PanelInvitationResult>())!.Invitation;
-        (Guid BillId, decimal Rate, Guid ReservationId, decimal Reserved) before = default;
-        await f.Db(async db=> {
-            var bill=await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==invite.InterviewId);
-            var reservation=await db.AiCreditReservations.SingleAsync(x=>x.InterviewSessionId==invite.InterviewId);
-            before=(bill.Id,bill.RatePerMinuteRial,reservation.Id,reservation.ReservedAmountRial);
-        });
         using var encoder = new FfmpegPcmSpeechEncoder(Options.Create(new SpeechEncodingOptions
             { FfmpegPath = Environment.GetEnvironmentVariable("HIREYAR_TEST_FFMPEG")! }));
         using var handler = new StageGeminiHandler { Fail = true };
@@ -55,11 +49,6 @@ public sealed partial class PanelWizardTests
             var session = await db.InterviewSessions.SingleAsync(s => s.Id == invite.InterviewId);
             Assert.Equal(InterviewStatus.Created, session.Status); Assert.Null(session.StartedAtUtc);
             Assert.False(await db.InterviewAnswers.AnyAsync(a => a.InterviewSessionId == session.Id));
-            var bill=await db.InterviewBillings.SingleAsync(x=>x.InterviewSessionId==session.Id);
-            var reservation=await db.AiCreditReservations.SingleAsync(x=>x.InterviewSessionId==session.Id);
-            Assert.Equal(before.BillId,bill.Id);Assert.Equal(before.Rate,bill.RatePerMinuteRial);
-            Assert.Equal(0,bill.BillableSeconds);Assert.Equal(0m,bill.BilledAmountRial);
-            Assert.Equal(before.ReservationId,reservation.Id);Assert.Equal(before.Reserved,reservation.ReservedAmountRial);
             var sound = Assert.Single(await db.QuestionAudios.Where(x => x.OrganizationId == session.OrganizationId).ToListAsync());
             Assert.Equal("google/gemini-3.8-flash-tts", sound.AudioModel); Assert.Equal("Aoede", sound.AudioVoice);
             Assert.Equal(QuestionAudioService.Hash("سلام وقت بخیر", speech.Profile), sound.AudioHash);

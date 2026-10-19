@@ -12,10 +12,9 @@ public sealed partial class AnswerAssessmentService
     // Owner retry or future-completion worker; the successful primary score and its budget never change.
     public async Task RepairDimensionsAsync(Guid org, Guid sessionId, Guid answerId, CancellationToken ct)
     {
-        var claim = await db.WithOrganizationBillingLockAsync<Claim?>(org, async () => {
+        var claim = await db.WithOrganizationLockAsync<Claim?>(org, async () => {
             var source = await LoadAsync(org, answerId, ct);
             if (source is not { } data || data.Session.Id != sessionId) throw AppException.NotFound();
-            if (!await IncludedAsync(data.Session, ct)) throw new AppException(403,"feature_unavailable","Reports are not included.");
             var row = await RowAsync(org,answerId,ct);
             if (data.Session.Status != InterviewStatus.Completed || data.Answer.IsInteraction || string.IsNullOrWhiteSpace(data.Answer.Transcript) || row?.State != "Succeeded")
                 throw new AppException(409,"dimensions_not_ready","A successful final answer assessment is required.");
@@ -51,7 +50,7 @@ public sealed partial class AnswerAssessmentService
             _=>"dimensions_provider_failed"}; }
         catch(Exception) { failure="dimensions_internal_error"; }
         finally { if(task is not null) _=task.ContinueWith(t=>{_=t.Exception;},CancellationToken.None,TaskContinuationOptions.OnlyOnFaulted|TaskContinuationOptions.ExecuteSynchronously,TaskScheduler.Default); }
-        await db.WithOrganizationBillingLockAsync(org,async () => {
+        await db.WithOrganizationLockAsync(org,async () => {
             var row=await RowAsync(org,answerId,ct); var source=await LoadAsync(org,answerId,ct);
             if(row?.DimensionAttemptId!=claim.Token || row.DimensionLeaseExpiresAtUtc<=time.GetUtcNow()) return false;
             row.DimensionAttemptId=null;row.DimensionLeaseExpiresAtUtc=null;

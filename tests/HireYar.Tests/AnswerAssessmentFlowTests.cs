@@ -166,9 +166,11 @@ public sealed partial class InterviewFlowTests
         try {
             var flow=new InterviewFlowTests(isolated);var x=await flow.CompletedForAssessment();
             await isolated.Db(async db=> {
+                // Preserve the primary-only historical completion scenario without rolling back the schema.
+                await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"InterviewSessions\" SET \"AutomaticReportCompletionEnabled\" = false WHERE \"Id\" = {x.Session}");
                 Assert.Empty(await db.AnswerAssessments.ToArrayAsync());
                 var migrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();var index=Array.FindIndex(migrations,m=>m.EndsWith("_AddAnswerReportAssessments",StringComparison.Ordinal));var latest=migrations[index];Assert.EndsWith("_AddAnswerReportAssessments",latest);
-                var migrator=db.GetService<IMigrator>();await migrator.MigrateAsync(migrations[index-1]);var script=migrator.GenerateScript(migrations[index-1],latest,MigrationsSqlGenerationOptions.Idempotent);
+                var migrator=db.GetService<IMigrator>();var script=migrator.GenerateScript(migrations[index-1],latest,MigrationsSqlGenerationOptions.Idempotent);
                 await db.Database.ExecuteSqlRawAsync(script);await db.Database.ExecuteSqlRawAsync(script);await migrator.MigrateAsync(migrations[^1]);Assert.False(db.Database.HasPendingModelChanges());
                 Assert.False(await db.InterviewSessions.Where(s=>s.Id==x.Session).Select(s=>s.AutomaticReportCompletionEnabled).SingleAsync());
                 var futureScript=migrator.GenerateScript(migrations[^2],migrations[^1],MigrationsSqlGenerationOptions.Idempotent);

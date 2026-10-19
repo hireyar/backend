@@ -21,7 +21,7 @@ public sealed partial class CandidateInterviewService
     public async Task<Stream> OpenStageAudioAsync(Guid id, string stageName, CancellationToken ct)
     {
         var s = await Load(id, ct);
-        await billing.RequireMediaRetentionAsync(s, ct);
+
         // Only the current stage is readable; company conditions cannot be fetched early.
         if (s.Status is InterviewStatus.Created or InterviewStatus.Cancelled || s.Stage.ToString() != stageName ||
             StageText(s) is not { Length: > 0 } text) throw AppException.NotFound();
@@ -45,7 +45,7 @@ public sealed partial class CandidateInterviewService
             return await Map(s, false, ct);
         }
         RequireIntroductionStage(s);
-        await billing.EnsureProcessingAllowedAsync(s, ct);
+
         var receivedAt = time.GetUtcNow();
         if (capture.LastSpeechEndUtc is { } ended && (ended.Offset != TimeSpan.Zero || ended > receivedAt.AddSeconds(30) || ended < s.StageChangedAtUtc?.AddSeconds(-30)))
             throw AppException.Invalid("last_speech_end_invalid");
@@ -59,7 +59,7 @@ public sealed partial class CandidateInterviewService
         try
         {
             if (capture.Video is { } videoSource) savedVideo = await storage.SaveAsync(videoSource, "videos", id, options.MaxVideoUploadBytes, ct);
-            await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+            await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
                 await db.ReloadInterviewAsync(s, ct); CheckAccess(s);
                 introduction = await db.InterviewIntroductions.SingleOrDefaultAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == id, ct);
                 if (introduction is not null)
@@ -67,7 +67,7 @@ public sealed partial class CandidateInterviewService
                     if (introduction.ClientTurnId != turnId) throw new AppException(409, "introduction_already_submitted", "Retry the stored introduction.");
                     replay = true; return true;
                 }
-                RequireIntroductionStage(s); await billing.EnsureProcessingAllowedAsync(s, ct);
+                RequireIntroductionStage(s);
                 if (await db.InterviewAnswers.AnyAsync(x => x.InterviewSessionId == id && x.ClientTurnId == turnId, ct))
                     throw new AppException(409, "client_turn_id_conflict", "The turn identifier belongs to a question.");
                 introduction = new(s.OrganizationId, id, turnId, saved.Key, mime.Split(';')[0].Trim().ToLowerInvariant(), saved.SizeBytes,
@@ -106,10 +106,10 @@ public sealed partial class CandidateInterviewService
         var introduction = await db.InterviewIntroductions.SingleOrDefaultAsync(x => x.OrganizationId == s.OrganizationId && x.InterviewSessionId == id && x.Id == introductionId, ct)
             ?? throw AppException.NotFound();
         Guid lease = default;
-        await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+        await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
             await db.ReloadInterviewAsync(s, ct); await db.ReloadIntroductionAsync(introduction, ct); CheckAccess(s);
             if (introduction.Status == IntroductionStatus.Processed) return false;
-            RequireIntroductionStage(s); await billing.EnsureProcessingAllowedAsync(s, ct);
+            RequireIntroductionStage(s);
             if (IntroductionRecoveryPending(s, introduction)) throw new AppException(409, "background_retry_pending", "Background recovery is pending.");
             lease = introduction.Claim(time.GetUtcNow(), options.LeaseSeconds, false); return true;
         }, ct);
@@ -125,14 +125,14 @@ public sealed partial class CandidateInterviewService
         var introduction = await db.InterviewIntroductions.SingleOrDefaultAsync(x => x.OrganizationId == organizationId && x.InterviewSessionId == id, ct);
         if (introduction is null) return;
         Guid lease = default;
-        await db.WithOrganizationBillingLockAsync(organizationId, async () => {
+        await db.WithOrganizationLockAsync(organizationId, async () => {
             await db.ReloadInterviewAsync(s, ct); await db.ReloadIntroductionAsync(introduction, ct);
             var now = time.GetUtcNow();
             if (s.Stage != InterviewStage.CandidateIntroduction || s.Status != InterviewStatus.WaitingForAnswer || s.DeletedAtUtc is not null ||
                 s.AccessRevokedAtUtc is not null || s.ExpiresAtUtc <= now || s.RemainingSeconds(now) == 0 ||
                 introduction.Status == IntroductionStatus.Processed || introduction.RecoveryAttempts >= options.MaxRecoveryAttempts ||
                 introduction.NextRecoveryAtUtc > now || introduction.ProcessingLeaseExpiresAtUtc > now) return false;
-            await billing.EnsureProcessingAllowedAsync(s, ct);
+
             lease = introduction.Claim(now, options.LeaseSeconds, true); return true;
         }, ct);
         if (lease != Guid.Empty)
@@ -154,9 +154,9 @@ public sealed partial class CandidateInterviewService
         }
         catch (Exception e) when (e is InterviewProviderException or IOException or UnauthorizedAccessException)
         { failure = e is InterviewProviderException p ? p.Code : "audio_unavailable"; }
-        await db.WithOrganizationBillingLockAsync(s.OrganizationId, async () => {
+        await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
             await db.ReloadInterviewAsync(s, ct); await db.ReloadIntroductionAsync(introduction, ct); CheckAccess(s);
-            await billing.EnsureProcessingAllowedAsync(s, ct);
+
             if (s.Stage != InterviewStage.CandidateIntroduction || s.Status != InterviewStatus.WaitingForAnswer) throw AppException.Conflict();
             introduction.CheckLease(lease, time.GetUtcNow());
             if (failure is not null)

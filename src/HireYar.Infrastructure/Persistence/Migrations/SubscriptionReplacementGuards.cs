@@ -1,3 +1,4 @@
+// Historical migration SQL only. Not registered or used by the current runtime.
 namespace HireYar.Infrastructure.Persistence;
 
 internal static class SubscriptionReplacementGuards

@@ -18,7 +18,7 @@ public static class ComprehensiveReportBuilder
         ReportPolicy policy, IReadOnlyList<InterviewReviewEntry> reviews, bool canReview)
     {
         var completed=session.Status==InterviewStatus.Completed;
-        var general=session.RequiredCapabilityCode=="hr_interview";
+        var general=session.InterviewType=="general";
         var snapshots=session.Questions.ToDictionary(q=>q.QuestionId);
         var scored=questions.Where(Scored).ToArray();
         var weights=policy.Weights.ToDictionary(w=>w.SkillId,w=>w.Weight);

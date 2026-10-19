@@ -55,7 +55,6 @@ public sealed class TemplateConfiguration : IEntityTypeConfiguration<InterviewTe
     {
         b.HasKey(x => x.Id); b.Property(x => x.Title).HasMaxLength(200).IsRequired(); b.Property(x => x.Language).HasMaxLength(20).IsRequired();
         b.Property(x => x.InterviewType).HasMaxLength(64).IsRequired();
-        b.HasOne<HireYar.Domain.Billing.InterviewTypeDefinition>().WithMany().HasForeignKey(x => x.InterviewType);
         b.Property(x => x.WelcomeMessage).HasMaxLength(2000).IsRequired();
         b.Property(x => x.GoodbyeMessage).HasMaxLength(2000).IsRequired();
         b.Property(x => x.CandidateIntroductionMessage).HasMaxLength(2000).IsRequired();
