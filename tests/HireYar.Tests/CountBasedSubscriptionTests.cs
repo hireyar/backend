@@ -305,4 +305,46 @@ public sealed class CountBasedSubscriptionTests : IAsyncLifetime
         Assert.Equal(2, (await State(o)).AvailableInterviews);
     }
 
+    [PostgresFact]
+    public async Task Order_responses_include_current_organization_names_and_preserve_tenant_scope()
+    {
+        var first = await Owner(); var second = await Owner(); var a = await Admin();
+        Guid firstOrg = default, secondOrg = default;
+        await f.Db(async db => {
+            firstOrg = (await db.Users.SingleAsync(u => u.Id == first.Id)).OrganizationId;
+            secondOrg = (await db.Users.SingleAsync(u => u.Id == second.Id)).OrganizationId;
+            (await db.Organizations.SingleAsync(o => o.Id == firstOrg)).Name = "سازمان آزمایشی اول";
+            (await db.Organizations.SingleAsync(o => o.Id == secondOrg)).Name = "سازمان آزمایشی دوم";
+            await db.SaveChangesAsync();
+        });
+        var key = Guid.NewGuid(); var selection = new PurchaseSelection("subscription");
+        var one = await Order(first, selection, key); var two = await Order(second, selection);
+        Assert.Equal("سازمان آزمایشی اول", one.OrganizationName);
+        Assert.Equal("سازمان آزمایشی دوم", two.OrganizationName);
+        var page = await Read<HireYar.Application.Common.Page<SubscriptionOrderDto>>(await a.Client.Send(HttpMethod.Get,
+            "/api/admin/subscriptions/orders?page=1&pageSize=100"));
+        Assert.Equal(one.OrganizationName, page.Items.Single(o => o.Id == one.Id).OrganizationName);
+        Assert.Equal(two.OrganizationName, page.Items.Single(o => o.Id == two.Id).OrganizationName);
+        var filtered = await Read<HireYar.Application.Common.Page<SubscriptionOrderDto>>(await a.Client.Send(HttpMethod.Get,
+            $"/api/admin/subscriptions/orders?organizationId={firstOrg}"));
+        Assert.Equal(one.Id, Assert.Single(filtered.Items).Id);
+        var own = await Read<HireYar.Application.Common.Page<SubscriptionOrderDto>>(await first.Client.Send(HttpMethod.Get,
+            $"/api/subscriptions/orders?organizationId={secondOrg}"));
+        Assert.Equal(firstOrg, Assert.Single(own.Items).OrganizationId);
+        Assert.Equal(HttpStatusCode.NotFound, (await second.Client.Send(HttpMethod.Get, $"/api/subscriptions/orders/{one.Id}")).StatusCode);
+        await f.Db(async db => {
+            (await db.Organizations.SingleAsync(o => o.Id == firstOrg)).Name = "نام جدید آزمایشی";
+            await db.SaveChangesAsync();
+        });
+        Assert.Equal("نام جدید آزمایشی", (await Read<SubscriptionOrderDto>(await first.Client.Send(HttpMethod.Get,
+            $"/api/subscriptions/orders/{one.Id}"))).OrganizationName);
+        Assert.Equal("نام جدید آزمایشی", (await Order(first, selection, key)).OrganizationName);
+        for (var i = 0; i < 2; i++)
+            Assert.Equal("نام جدید آزمایشی", (await Read<SubscriptionOrderDto>(await a.Client.Send(HttpMethod.Post,
+                $"/api/admin/subscriptions/orders/{one.Id}/confirm", new ConfirmSubscriptionOrderRequest("synthetic-name-confirm")))).OrganizationName);
+        var renamed = await Read<HireYar.Application.Common.Page<SubscriptionOrderDto>>(await a.Client.Send(HttpMethod.Get,
+            $"/api/admin/subscriptions/orders?organizationId={firstOrg}"));
+        Assert.Equal("نام جدید آزمایشی", Assert.Single(renamed.Items).OrganizationName);
+    }
+
 }

@@ -1,3 +1,9 @@
+## نام سازمان در پاسخ سفارش‌ها — 2026-10-19
+
+اعتبارسنجی: build کل solution صفر warning/error؛۱۵/۱۵ تست CountBasedSubscriptionTests روی PostgreSQL18 اختصاصی loopback55546 و FFmpeg محلی با providerهای مصنوعی موفق، صفر Failed/Skipped. regression تازه نام دو سازمان در فهرست/فیلتر، عدم نشت بین سازمان‌ها، rename، جزئیات و retry ایجاد/تأیید را پوشش می‌دهد. TRX: tests/HireYar.Tests/TestResults/order-organization-name.trx؛ build/test logs در artifacts/order-organization-name-*.log. کل suite تکرار نشده؛ migration جدید، commit/push/deploy و تغییر Angular انجام نشده‌اند. کاربر اعلام کرد مایگریشن trial را اجرا کرده و خطای قبلی current/dashboard رفع شده؛ عامل مقصد را تغییر نداده است.
+
+فیلد organizationName به SubscriptionOrderDto اضافه شد؛ ایجاد، جزئیات، فهرست و تأیید سفارش و پاسخ idempotent همگی نام جاری Organizations.Name را می‌دهند. فهرست با JOIN در همان کوئری صفحه خوانده می‌شود و N+1 ندارد؛ فیلتر/صفحه‌بندی و scope سازمانی قبلی حفظ است. نام snapshot خرید نیست؛ rename در خواندن بعدی دیده می‌شود. schema/migration تغییری ندارد. قرارداد API و پرامپت Angular برای نمایش نام در جدول سوپرادمین به‌روز شدند؛ فرانت جداست.
+
 ## هدیه ثبت‌نام۴۸ساعته و۲مصاحبه — 2026-10-19 / ADR-073
 
 اعتبارسنجی ADR-073: build کل solution صفر warning/error؛۳۴تست مرتبط متمایز آخرین نتیجه Passed و صفر Skipped دارند، روی PostgreSQL18 مستقل loopback55544 و FFmpeg واقعی محلی با OTP/AI/storage مصنوعی. اجرای signup-trial-final دارای۳۲Passed و۲Fail تست زمان بود؛ پس از اصلاح fixture زمان/JWT (بدون تغییر کد محصول)، هر۲تست در signup-trial-expiry-final با۰Fail پاس شدند. سه regression جدید هدیه یک‌باره۴۸ساعت/۲مصاحبه، مصرف/رزرو/لغو، انقضا و تمدید را پوشش می‌دهند؛ ثبت‌نام rollback و رقابت، پذیرش تیم، dashboard و migration regression نیز اجرا شدند. کل suite تکرار نشده است. EF بدون drift و git diff --check موفق؛ SQL در artifacts/signup-trial-migrations.sql، TRXها در tests/HireYar.Tests/TestResults هستند. migration مقصد، Angular، commit/push/deploy انجام نشده‌اند.
