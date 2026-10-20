@@ -114,13 +114,24 @@ public sealed partial class CountBasedSubscriptionTests
     {
         const string previous = "20261019112006_AddSubscriptionPeriodDiscounts";
         await f.Db(async db => await db.GetService<IMigrator>().MigrateAsync(previous));
-        // Seed historical schema directly; current confirmation requires the sales migration.
-        var owner = await f.RegisterOwner(); var (job, template) = await Setup(owner);
-        var old = await Issue(owner, job.Id, template.Id);
-        using var candidate = Candidate(old);
-        Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{old.InterviewId}/start", null)).StatusCode);
+        // Seed pre-migration facts directly. Current entitlement handlers require newer administration tables.
+        var owner = await f.RegisterOwner();
+        Guid historicalJobId=Guid.Empty, historicalTemplateId=Guid.Empty, historicalSessionId=Guid.Empty;
         await f.Db(async db => {
-            var s = await db.InterviewSessions.SingleAsync(s => s.Id == old.InterviewId);
+            var org=await db.Users.Where(x=>x.Id==owner.Id).Select(x=>x.OrganizationId).SingleAsync(); var now=f.Clock.GetUtcNow();
+            var job=new HireYar.Domain.JobPositions.JobPosition {OrganizationId=org,Title="Synthetic historical role",Description="Synthetic description",Status=HireYar.Domain.JobPositions.JobStatus.Active,CreatedAtUtc=now,UpdatedAtUtc=now};
+            var template=new HireYar.Domain.InterviewTemplates.InterviewTemplate {OrganizationId=org,JobPositionId=job.Id,Title="Synthetic historical template",InterviewType="general",DurationMinutes=30,CreatedAtUtc=now,UpdatedAtUtc=now};
+            template.Questions=Enumerable.Range(1,5).Select(i=>new HireYar.Domain.InterviewTemplates.InterviewQuestion {InterviewTemplateId=template.Id,Text="Synthetic question "+i,Order=i}).ToList();
+            var application=new CandidateApplication {OrganizationId=org,JobPositionId=job.Id,FirstName="Synthetic",LastName="Candidate",Email="historical@example.test"};
+            var skill=Guid.NewGuid();var question=Guid.NewGuid();
+            var session=new InterviewSession(org,job.Id,application.Id,template.Id,[new(question,skill,"Synthetic question","Synthetic topic",3,true)],[new(skill,"Synthetic skill",true,100,3)],1,1800,now,now.AddDays(1));
+            session.SetAccessTokenHash(new string('a',64));session.Start(question,now);
+            db.JobPositions.Add(job);db.InterviewTemplates.Add(template);db.CandidateApplications.Add(application);db.InterviewSessions.Add(session);
+            db.InterviewQuotaReservations.Add(new(){OrganizationId=org,InterviewSessionId=session.Id,State="Consumed",RetentionDays=60,CreatedAtUtc=now,ConsumedAtUtc=now});
+            await db.SaveChangesAsync(); historicalJobId=job.Id;historicalTemplateId=template.Id;historicalSessionId=session.Id;
+        });
+        await f.Db(async db => {
+            var s = await db.InterviewSessions.SingleAsync(s => s.Id == historicalSessionId);
             s.Complete(InterviewCompletionReason.Manual, f.Clock.GetUtcNow()); await db.SaveChangesAsync();
             var sql = db.GetService<IMigrator>().GenerateScript(previous, null, MigrationsSqlGenerationOptions.Idempotent);
             await db.Database.OpenConnectionAsync();
@@ -128,12 +139,12 @@ public sealed partial class CountBasedSubscriptionTests
             await command.ExecuteNonQueryAsync(); await command.ExecuteNonQueryAsync();
             Assert.False(db.Database.HasPendingModelChanges());
         });
-        var historical = await Usage(owner, old.InterviewId);
+        var historical = await Usage(owner, historicalSessionId);
         Assert.Equal("Completed", historical.Interview.Status); Assert.Equal(1, historical.Interview.CreditsConsumed);
         Assert.NotNull(historical.Interview.ActualDurationSeconds);
         Assert.Equal(5, historical.Events.Count); Assert.All(historical.Events, e => Assert.True(e.IsHistorical));
         Assert.Contains(historical.Events, e => e.EventType == "Completed");
-        var live = await Issue(owner, job.Id, template.Id);
+        var live = await Issue(owner, historicalJobId, historicalTemplateId);
         using var liveCandidate = Candidate(live);
         Assert.Equal(HttpStatusCode.OK, (await liveCandidate.PostAsync($"/api/candidate/interviews/{live.InterviewId}/start", null)).StatusCode);
         await f.Db(async db => {
@@ -143,6 +154,7 @@ public sealed partial class CountBasedSubscriptionTests
                 e => e.EventType == "Completed" && !e.IsHistorical);
             var error = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync(previous));
             Assert.Equal(PostgresErrorCodes.RaiseException, error.SqlState);
+            await db.GetService<IMigrator>().MigrateAsync();
         });
         Assert.Equal("Completed", (await Usage(owner, live.InterviewId)).Interview.Status);
     }

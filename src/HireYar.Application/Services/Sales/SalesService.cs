@@ -49,7 +49,7 @@ public sealed class SalesService(IApplicationDbContext db, TimeProvider time)
     public Task AccrueAsync(SubscriptionOrder order,CancellationToken ct) => db.WithSalesLockAsync(async () => {
         if(order.Product!="subscription") return false;
         var lead=await db.SalesLeads.SingleOrDefaultAsync(x=>x.OrganizationId==order.OrganizationId,ct);
-        if(lead is null || await db.SalesCommissions.AnyAsync(x=>x.OrderId==order.Id,ct)) return false;
+        if(lead is null || lead.AgentId is null || await db.SalesCommissions.AnyAsync(x=>x.OrderId==order.Id,ct)) return false;
         var agent=await db.SalesAgents.SingleAsync(x=>x.Id==lead.AgentId,ct);
         var renewal=await db.SubscriptionOrders.AnyAsync(x=>x.OrganizationId==order.OrganizationId && x.Id!=order.Id && x.Product=="subscription" && x.Status=="Confirmed",ct);
         var percent=renewal ? agent.RenewalPercent : agent.FirstSalePercent;
@@ -134,4 +134,3 @@ public sealed class SalesService(IApplicationDbContext db, TimeProvider time)
             agent==null ? await db.SalesAgents.CountAsync(x=>x.IsActive,ct) : 0,await db.SalesPayouts.CountAsync(x=>(agent==null || x.AgentId==agent) && x.Status=="Requested",ct));
     }
 }
-

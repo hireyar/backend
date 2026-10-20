@@ -42,6 +42,9 @@ public sealed class TestClock : TimeProvider
 }
 public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public const string SalesEntry = "synthetic-sales-entry-key-for-tests-only";
+    public bool SalesEnabled { get; init; } = true;
+    public int SalesRateLimit { get; init; } = 1000;
     public const string AdminEntry = "synthetic-admin-entry-key-for-tests-only";
     public const string AdminPassword = "Synthetic-Admin-Password-42!";
     public bool AdminEnabled { get; init; } = true;
@@ -72,6 +75,9 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("TicketStorage:AccessKey", "synthetic");
         b.UseSetting("TicketStorage:SecretKey", "synthetic");
         b.UseSetting("TicketStorage:Bucket", "hireyar-ticketing");
+        b.UseSetting("SalesAdmin:Enabled", SalesEnabled.ToString());
+        b.UseSetting("SalesAdmin:RandomKey", SalesEntry);
+        b.UseSetting("SalesAdmin:AuthRequestsPerMinute", SalesRateLimit.ToString());
         b.UseSetting("SuperAdmin:Enabled", AdminEnabled.ToString());
         b.UseSetting("SuperAdmin:RandomKey", AdminEntry);
         b.UseSetting("SuperAdmin:AuthRequestsPerMinute", AdminRateLimit.ToString());
@@ -205,6 +211,7 @@ public sealed class Browser(HttpClient client)
     private readonly Dictionary<string, string> cookies = new();
     public string? AccessToken { get; set; }
     public string? AdminEntryKey { get; set; }
+    public string? SalesEntryKey { get; set; }
     public string RefreshToken => cookies.GetValueOrDefault("hireyar.refresh", "");
     public void SetRefresh(string value) => cookies["hireyar.refresh"] = value;
     private void Capture(HttpResponseMessage response)
@@ -212,6 +219,7 @@ public sealed class Browser(HttpClient client)
     private HttpRequestMessage Request(HttpMethod method, string url, object? body = null)
     {
         var request = new HttpRequestMessage(method, url); if (body is not null) request.Content = JsonContent.Create(body, options: TestJson.Options);
+        if (SalesEntryKey is not null) request.Headers.Add("X-Sales-Entry", SalesEntryKey);
         if (AdminEntryKey is not null) request.Headers.Add("X-Admin-Entry", AdminEntryKey);
         if (AccessToken is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
         request.Headers.TryAddWithoutValidation("Cookie", string.Join("; ", cookies.Select(x => $"{x.Key}={x.Value}"))); return request;

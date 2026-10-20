@@ -27,6 +27,8 @@ public static class DependencyInjection
         services.AddOptions<SuperAdminOptions>().Bind(config.GetSection("SuperAdmin"))
             .Validate(x => x.IsValid(), "SuperAdmin requires a 32 to 128 character URL-safe RandomKey when enabled and AccessMinutes between 1 and 30.")
             .ValidateOnStart();
+        services.AddOptions<SalesAdminOptions>().Bind(config.GetSection("SalesAdmin"))
+            .Validate(x=>x.IsValid(), "SalesAdmin requires a 32 to 128 character URL-safe RandomKey when enabled, AccessMinutes 1 to 30, and AuthRequestsPerMinute 1 to 1000.").ValidateOnStart();
         services.AddSingleton<IAdminCaptcha, AdminCaptcha>();
         services.AddScoped<AdminAccounts>();
         services.AddScoped<IAdminAccounts>(s => s.GetRequiredService<AdminAccounts>());
@@ -44,6 +46,8 @@ public static class DependencyInjection
             new HttpClient { BaseAddress = new Uri("https://api.kavenegar.com/"), Timeout = TimeSpan.FromSeconds(10) },
             s.GetRequiredService<Microsoft.Extensions.Options.IOptions<KavenegarOptions>>()));
         services.AddScoped<IAccounts, Accounts>();
+        services.AddScoped<HireYar.Application.Administration.IAdminCustomers, HireYar.Infrastructure.Administration.AdminCustomers>();
+        services.AddScoped<HireYar.Application.Administration.CustomerSubscriptionAdministration>();
         services.AddScoped<HireYar.Application.Sales.ISalesAccounts, HireYar.Infrastructure.Sales.SalesAccounts>();
         services.AddScoped<HireYar.Application.Sales.ISalesLeads, HireYar.Infrastructure.Sales.SalesLeads>();
         services.AddScoped<HireYar.Application.Sales.SalesService>();

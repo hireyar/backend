@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 namespace HireYar.Infrastructure.Sales;
 
-public sealed class SalesAccounts(AppDbContext db, IOptions<SecurityOptions> security, TimeProvider time) : ISalesAccounts
+public sealed class SalesAccounts(AppDbContext db, IOptions<SecurityOptions> security, TimeProvider time, IOptions<SalesAdminOptions> options) : ISalesAccounts
 {
     private static readonly PasswordHasher<SalesAgent> Hasher = new();
     private static readonly SalesAgent Dummy = new();
@@ -21,6 +21,7 @@ public sealed class SalesAccounts(AppDbContext db, IOptions<SecurityOptions> sec
     internal static SalesAgentDto Map(SalesAgent a) => new(a.Id,a.FullName,a.Mobile,a.IsActive,a.FirstSalePercent,a.RenewalPercent);
     public Task<SalesSessionDto> LoginAsync(SalesLoginRequest r, CancellationToken ct) => db.WithSalesLockAsync(async () =>
     {
+        if (!options.Value.Enabled) throw AppException.NotFound();
         var now = time.GetUtcNow();
         var a = await db.SalesAgents.SingleOrDefaultAsync(x => x.Mobile == r.Mobile, ct);
         if (a is null || !a.IsActive || a.LockoutEndUtc > now) {
@@ -34,13 +35,14 @@ public sealed class SalesAccounts(AppDbContext db, IOptions<SecurityOptions> sec
             return new SalesSessionDto("",now);
         }
         a.FailedAttempts = 0; a.LockoutEndUtc = null;
-        var expires = now.AddMinutes(15);
+        var expires = now.AddMinutes(options.Value.AccessMinutes);
         var token = new JwtSecurityToken(security.Value.Issuer,security.Value.Audience+":sales",
-            [new Claim("sub",a.Id.ToString()),new Claim("sales_stamp",a.SecurityStamp.ToString()),new Claim("sales_agent","true"),new Claim("jti",Guid.NewGuid().ToString())],
+            [new Claim("sub",a.Id.ToString()),new Claim("sales_stamp",a.SecurityStamp.ToString()),new Claim("sales_agent","true"),new Claim("sales_entry",options.Value.EntryFingerprint),new Claim("jti",Guid.NewGuid().ToString())],
             now.UtcDateTime,expires.UtcDateTime,new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(security.Value.SigningKey)),SecurityAlgorithms.HmacSha256));
         return new SalesSessionDto(new JwtSecurityTokenHandler().WriteToken(token),expires);
     },ct);
     public async Task<SalesAgentDto?> ValidateAsync(Guid id, Guid stamp, CancellationToken ct) {
+        if (!options.Value.Enabled) return null;
         var now = time.GetUtcNow();
         var a = await db.SalesAgents.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.SecurityStamp == stamp && x.IsActive && (x.LockoutEndUtc == null || x.LockoutEndUtc <= now), ct);
         return a is null ? null : Map(a);
@@ -109,4 +111,3 @@ public sealed class SalesLeads(AppDbContext db, TimeProvider time) : ISalesLeads
         return result ?? throw new AppException(409,"lead_already_claimed","Mobile already claimed.");
     }
 }
-

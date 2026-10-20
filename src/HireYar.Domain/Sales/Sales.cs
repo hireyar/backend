@@ -18,10 +18,12 @@ public sealed class SalesAgent
 public sealed class SalesLead
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid AgentId { get; set; }
+    public Guid? AgentId { get; set; }
     public string Mobile { get; set; } = "";
     public string CustomerName { get; set; } = "";
     public string Note { get; set; } = "";
+    public string ContactOrganizationName { get; set; } = "";
+    public string? ContactEmail { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset LastContactAtUtc { get; set; }
     public DateTimeOffset? FollowUpAtUtc { get; set; }

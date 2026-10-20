@@ -17,6 +17,7 @@ internal static class OpenApiText
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("AdminCustomers", _) => "فهرست و مدیریت مشتریان، اشتراک، اعتبار مصاحبه و تاریخچه؛ فقط سوپرادمین",
         ("SalesAuth", _) => "ورود و نشست مستقل فروشنده با موبایل و رمز؛ بدون کپچا",
         ("Sales", _) => "لیدها و پورسانت‌ها و درخواست واریز فروشنده جاری",
         ("AdminSales", _) => "مدیریت نیروهای فروش، انتقال لید و بررسی درخواست واریز؛ سوپرادمین",

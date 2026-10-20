@@ -7,6 +7,8 @@ namespace HireYar.Application.Common;
 
 public interface IApplicationDbContext
 {
+    DbSet<HireYar.Domain.Administration.CustomerAdministrationEvent> CustomerAdministrationEvents { get; }
+    DbSet<HireYar.Domain.Administration.CustomerSubscriptionOverride> CustomerSubscriptionOverrides { get; }
     Task<T> WithSalesLockAsync<T>(Func<Task<T>> action, CancellationToken ct);
     DbSet<HireYar.Domain.Sales.SalesAgent> SalesAgents { get; }
     DbSet<HireYar.Domain.Sales.SalesLead> SalesLeads { get; }

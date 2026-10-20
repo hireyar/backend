@@ -28,7 +28,7 @@ public sealed class SalesTests : IAsyncLifetime
         var a=await Admin();
         var mobile="09"+Random.Shared.NextInt64(100_000_000,1_000_000_000).ToString();
         var c=await Read<SalesCredentialsDto>(await a.Client.Send(HttpMethod.Post,"/api/admin/sales/agents",new SalesAgentRequest("فروشنده آزمایشی",mobile)));
-        var b=f.Browser(); b.AccessToken=(await Read<SalesSessionDto>(await b.Send(HttpMethod.Post,"/api/sales/auth/login",new SalesLoginRequest(mobile,c.Password)))).AccessToken;
+        var b=f.Browser(); b.SalesEntryKey=ApiFixture.SalesEntry; b.AccessToken=(await Read<SalesSessionDto>(await b.Send(HttpMethod.Post,"/api/sales/auth/login",new SalesLoginRequest(mobile,c.Password)))).AccessToken;
         return (b,c);
     }
     private async Task<SubscriptionOrderDto> Buy(Account owner,string product="subscription") {
@@ -109,7 +109,7 @@ public sealed class SalesTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized,(await seller.Client.Send(HttpMethod.Get,"/api/auth/me")).StatusCode);
         var reset=await Read<SalesCredentialsDto>(await a.Client.Send(HttpMethod.Post,$"/api/admin/sales/agents/{s.Id}/reset-password"));
         Assert.Equal(HttpStatusCode.Unauthorized,(await seller.Client.Send(HttpMethod.Get,"/api/sales/auth/me")).StatusCode);
-        var browser=f.Browser(); var login=new SalesLoginRequest(s.Mobile,reset.Password);
+        var browser=f.Browser(); browser.SalesEntryKey=ApiFixture.SalesEntry; var login=new SalesLoginRequest(s.Mobile,reset.Password);
         browser.AccessToken=(await Read<SalesSessionDto>(await browser.Send(HttpMethod.Post,"/api/sales/auth/login",login))).AccessToken;
         var failed=await Task.WhenAll(Enumerable.Range(0,5).Select(_=>browser.Send(HttpMethod.Post,"/api/sales/auth/login",login with {Password="Wrong-Synthetic-Password-42!"})));
         Assert.All(failed,x=>Assert.Equal(HttpStatusCode.Unauthorized,x.StatusCode));
@@ -158,6 +158,8 @@ public sealed class SalesTests : IAsyncLifetime
         await f.Db(async db=> {
             var ex=await Assert.ThrowsAsync<PostgresException>(()=>db.GetService<IMigrator>().MigrateAsync(previous));
             Assert.Contains("sales history requires backup",ex.MessageText);
+            // A refused older Down can follow successful empty newer Downs; restore current schema before current handlers.
+            await db.GetService<IMigrator>().MigrateAsync();
         });
         Assert.Single((await Commissions(agent.Client)).Rows.Items);
     }
@@ -186,4 +188,3 @@ public sealed class SalesTests : IAsyncLifetime
         Assert.Contains("no-store",(await agent.Client.Send(HttpMethod.Get,"/api/sales/commissions")).Headers.CacheControl!.ToString());
     }
 }
-
