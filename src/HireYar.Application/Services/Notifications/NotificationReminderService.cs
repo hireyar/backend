@@ -18,11 +18,10 @@ public sealed class NotificationReminderService(IApplicationDbContext db, Subscr
             if (recipient is null) return result;
             var openLow = db.Notifications.Where(n => n.OrganizationId == organizationId &&
                 n.RecipientUserId == recipient.Value && n.Type == "InterviewCreditsLow" && n.ResolvedAtUtc == null);
-            if (!state.HasActiveSubscription || state.IsTrial || state.AvailableInterviews >= 2)
+            if (state.AvailableInterviews >= 2)
             {
                 await openLow.ExecuteUpdateAsync(s => s.SetProperty(n => n.ResolvedAtUtc, time.GetUtcNow()), ct);
             }
-            if (!state.HasActiveSubscription || state.IsTrial) return result;
 
             if (state.ExpiresAtUtc is { } expiry)
             {
