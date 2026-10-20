@@ -17,6 +17,9 @@ internal static class OpenApiText
 
     public static string? Summary(string? controller, string? action) => (controller, action) switch
     {
+        ("SalesAuth", _) => "ورود و نشست مستقل فروشنده با موبایل و رمز؛ بدون کپچا",
+        ("Sales", _) => "لیدها و پورسانت‌ها و درخواست واریز فروشنده جاری",
+        ("AdminSales", _) => "مدیریت نیروهای فروش، انتقال لید و بررسی درخواست واریز؛ سوپرادمین",
         ("SubscriptionCatalog", "Get") => "یک اشتراک و بسته‌های مصاحبه؛ تمام مبالغ ریالی",
         ("SubscriptionCatalog", "Quote") => "محاسبه سرورِ قیمت اشتراک/بسته با نسخه کاتالوگ",
         ("Subscriptions", "Current") => "اشتراک و روزهای باقی‌مانده و سهمیه مصرف/رزرو/قابل دعوت سازمان",

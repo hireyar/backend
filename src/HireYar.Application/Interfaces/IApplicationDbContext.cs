@@ -7,6 +7,12 @@ namespace HireYar.Application.Common;
 
 public interface IApplicationDbContext
 {
+    Task<T> WithSalesLockAsync<T>(Func<Task<T>> action, CancellationToken ct);
+    DbSet<HireYar.Domain.Sales.SalesAgent> SalesAgents { get; }
+    DbSet<HireYar.Domain.Sales.SalesLead> SalesLeads { get; }
+    DbSet<HireYar.Domain.Sales.SalesCommission> SalesCommissions { get; }
+    DbSet<HireYar.Domain.Sales.SalesPayout> SalesPayouts { get; }
+    DbSet<HireYar.Domain.Sales.SalesAudit> SalesAudits { get; }
     DbSet<HireYar.Domain.Subscriptions.InterviewUsageEvent> InterviewUsageEvents { get; }
     DbSet<HireYar.Domain.Subscriptions.ExistingOrganizationGrant> ExistingOrganizationGrants { get; }
     DbSet<HireYar.Domain.Subscriptions.SignupTrial> SignupTrials { get; }
