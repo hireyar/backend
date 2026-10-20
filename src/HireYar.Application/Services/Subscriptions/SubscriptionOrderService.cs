@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Application.Subscriptions;
 
 public sealed class SubscriptionOrderService(IApplicationDbContext db, CatalogService catalog, SubscriptionService subscriptions,
-    IOrganizationTeamUsage team, TimeProvider time)
+    IOrganizationTeamUsage team, TimeProvider time, HireYar.Application.Sales.SalesService sales)
 {
     private SubscriptionOrderDto Map(SubscriptionOrder o, string organizationName) => new(o.Id, o.OrganizationId, organizationName, o.Product, o.ProductName, o.Status == "Pending" && o.ExpiresAtUtc <= time.GetUtcNow() ? "Expired" : o.Status, "IRR",
         o.AmountRial, o.OriginalAmountRial, o.DiscountPercent, o.Months, o.TeamUsers, o.UnlimitedTeam, o.BundleCode,
@@ -83,6 +83,7 @@ public sealed class SubscriptionOrderService(IApplicationDbContext db, CatalogSe
                 db.InterviewQuotaGrants.Add(new() { OrganizationId = org, OrderId = o.Id, Quantity = o.Quantity, CreatedAtUtc = now });
             }
             o.Status = "Confirmed"; o.ConfirmedAtUtc = now; o.ConfirmedByUserId = actor; o.PaymentReference = reference;
+            await sales.AccrueAsync(o, ct);
             return await MapAsync(o, ct);
         }, ct);
     }

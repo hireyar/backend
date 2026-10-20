@@ -114,7 +114,8 @@ public sealed partial class CountBasedSubscriptionTests
     {
         const string previous = "20261019112006_AddSubscriptionPeriodDiscounts";
         await f.Db(async db => await db.GetService<IMigrator>().MigrateAsync(previous));
-        var owner = await Owner(); await Subscribe(owner); await BuyBundle(owner); var (job, template) = await Setup(owner);
+        // Seed historical schema directly; current confirmation requires the sales migration.
+        var owner = await f.RegisterOwner(); var (job, template) = await Setup(owner);
         var old = await Issue(owner, job.Id, template.Id);
         using var candidate = Candidate(old);
         Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{old.InterviewId}/start", null)).StatusCode);
@@ -122,7 +123,9 @@ public sealed partial class CountBasedSubscriptionTests
             var s = await db.InterviewSessions.SingleAsync(s => s.Id == old.InterviewId);
             s.Complete(InterviewCompletionReason.Manual, f.Clock.GetUtcNow()); await db.SaveChangesAsync();
             var sql = db.GetService<IMigrator>().GenerateScript(previous, null, MigrationsSqlGenerationOptions.Idempotent);
-            await db.Database.ExecuteSqlRawAsync(sql); await db.Database.ExecuteSqlRawAsync(sql);
+            await db.Database.OpenConnectionAsync();
+            await using var command = db.Database.GetDbConnection().CreateCommand(); command.CommandText = sql;
+            await command.ExecuteNonQueryAsync(); await command.ExecuteNonQueryAsync();
             Assert.False(db.Database.HasPendingModelChanges());
         });
         var historical = await Usage(owner, old.InterviewId);

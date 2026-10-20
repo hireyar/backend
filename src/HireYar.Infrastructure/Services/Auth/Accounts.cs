@@ -129,6 +129,14 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
                 OrganizationId = org.Id, Role = OrganizationRole.Owner,
                 CreatedAtUtc = Now, UpdatedAtUtc = Now };
             Check(await users.CreateAsync(u));
+            await db.WithSalesLockAsync(async () => {
+                var lead = await db.SalesLeads.SingleOrDefaultAsync(x => x.Mobile == r.Mobile, ct);
+                if (lead is not null && lead.OrganizationId is null) {
+                    lead.OrganizationId = org.Id; lead.RegisteredAtUtc = u.CreatedAtUtc;
+                    db.SalesAudits.Add(new() { ActorId = u.Id, LeadId = lead.Id, Action = "Registered", CreatedAtUtc = Now });
+                }
+                return true;
+            }, ct);
             var plan = await db.SubscriptionPlans.AsNoTracking().SingleAsync(ct);
             var trialStart = Now;
             db.SignupTrials.Add(new() { OrganizationId = org.Id, StartedAtUtc = trialStart,

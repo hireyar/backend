@@ -87,7 +87,21 @@ builder.Services.AddAuthentication().AddJwtBearer(SuperAdminOptions.Scheme, o =>
         ValidAlgorithms = [SecurityAlgorithms.HmacSha256], ClockSkew = TimeSpan.FromSeconds(5), NameClaimType = "sub"
     };
 });
+builder.Services.AddScoped<SalesAccountValidation>();
+builder.Services.AddAuthentication().AddJwtBearer("Sales", o =>
+{
+    o.MapInboundClaims = false; o.EventsType = typeof(SalesAccountValidation);
+    o.TokenValidationParameters = new()
+    {
+        ValidateIssuer = true, ValidateAudience = true, ValidateIssuerSigningKey = true, ValidateLifetime = true,
+        RequireExpirationTime = true, RequireSignedTokens = true,
+        ValidIssuer = security.Issuer, ValidAudience = security.Audience + ":sales",
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(security.SigningKey)),
+        ValidAlgorithms = [SecurityAlgorithms.HmacSha256], ClockSkew = TimeSpan.FromSeconds(5), NameClaimType = "sub"
+    };
+});
 builder.Services.AddAuthorization(o => {
+    o.AddPolicy("SalesAgent", p => p.AddAuthenticationSchemes("Sales").RequireAuthenticatedUser().RequireClaim("sales_agent", "true"));
     o.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme).RequireAuthenticatedUser().Build();
     o.AddPolicy("SystemAdmin", p => p.AddAuthenticationSchemes(SuperAdminOptions.Scheme).RequireAuthenticatedUser().RequireClaim("system_admin", "true"));
 });
@@ -108,6 +122,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
     doc.Components ??= new(); doc.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
     doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
     doc.Components.SecuritySchemes["SuperAdmin"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT", Description = "Short-lived administrator session from password and CAPTCHA login; HR tokens cannot access admin endpoints." };
+    doc.Components.SecuritySchemes["Sales"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT", Description = "Independent sales session: mobile/password without CAPTCHA." };
     doc.Components.SecuritySchemes["InterviewToken"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", Description = "Six ASCII digit access code scoped to the interview ID in the route. Legacy opaque invitation tokens remain supported. Cannot access HR endpoints." };
     return Task.CompletedTask;
 }).AddOperationTransformer(async (operation, context, ct) =>
@@ -162,7 +177,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                 } } }
         } };
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
-        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminUsers" or "AdminTickets" or "AdminSubscriptions" ? "SuperAdmin" : "Bearer", context.Document)] = [] }];
+        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminUsers" or "AdminTickets" or "AdminSubscriptions" or "AdminSales" ? "SuperAdmin" : controller is "Sales" or "SalesAuth" ? "Sales" : "Bearer", context.Document)] = [] }];
     if (controller == "AdminAuth")
     {
         operation.Parameters ??= [];
