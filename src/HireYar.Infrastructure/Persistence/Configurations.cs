@@ -15,6 +15,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<ApplicationUser
 {
     public void Configure(EntityTypeBuilder<ApplicationUser> b)
     {
+        b.HasAlternateKey(x => new { x.OrganizationId, x.Id });
         b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
         b.Property(x => x.ReferralCode).HasMaxLength(64);
         b.Property(x => x.Email).HasMaxLength(256); b.Property(x => x.NormalizedEmail).HasMaxLength(256);

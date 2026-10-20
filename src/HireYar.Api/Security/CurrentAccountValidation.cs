@@ -6,6 +6,13 @@ namespace HireYar.Api.Security;
 
 public sealed class CurrentAccountValidation(AppDbContext db) : JwtBearerEvents
 {
+    public override Task MessageReceived(MessageReceivedContext context)
+    {
+        if (context.Request.Path == HireYar.Api.Notifications.NotificationsHub.Path &&
+            string.IsNullOrEmpty(context.Request.Headers.Authorization))
+            context.Token = context.Request.Query["access_token"];
+        return Task.CompletedTask;
+    }
     public override async Task TokenValidated(TokenValidatedContext context)
     {
         if (!Guid.TryParse(context.Principal?.FindFirstValue("sub"), out var id)) { context.Fail("Invalid account."); return; }

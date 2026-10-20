@@ -7,6 +7,7 @@ namespace HireYar.Application.Common;
 
 public interface IApplicationDbContext
 {
+    DbSet<HireYar.Domain.Notifications.Notification> Notifications { get; }
     DbSet<HireYar.Domain.Administration.CustomerAdministrationEvent> CustomerAdministrationEvents { get; }
     DbSet<HireYar.Domain.Administration.CustomerSubscriptionOverride> CustomerSubscriptionOverrides { get; }
     Task<T> WithSalesLockAsync<T>(Func<Task<T>> action, CancellationToken ct);

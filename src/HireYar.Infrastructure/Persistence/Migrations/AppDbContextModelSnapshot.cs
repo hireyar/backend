@@ -1587,6 +1587,68 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ReadAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId");
+
+                    b.HasIndex("OrganizationId", "RecipientUserId", "CreatedAtUtc")
+                        .HasFilter("\"ReadAtUtc\" IS NULL");
+
+                    b.HasIndex("OrganizationId", "RecipientUserId", "CreatedAtUtc", "Id");
+
+                    b.HasIndex("OrganizationId", "RecipientUserId", "Type", "SourceKey")
+                        .IsUnique();
+
+                    b.ToTable("Notifications", t =>
+                        {
+                            t.HasCheckConstraint("CK_Notification_ReadTime", "\"ReadAtUtc\" IS NULL OR \"ReadAtUtc\" >= \"CreatedAtUtc\"");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Domain.Organizations.Organization", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3256,6 +3318,22 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Organizations.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Notifications.Notification", b =>
+                {
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HireYar.Infrastructure.Auth.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "RecipientUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
