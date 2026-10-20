@@ -1,13 +1,16 @@
 using System.Security.Claims;
+using HireYar.Api.Security;
 using HireYar.Application.Common;
 using HireYar.Application.Sales;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 namespace HireYar.Api.Controllers;
-[ApiController,Route("api/sales/auth"),EnableRateLimiting("auth")]
+[ApiController,Route("api/sales/auth"),EnableRateLimiting("sales-auth"),ServiceFilter(typeof(SalesEntryFilter))]
 public sealed class SalesAuthController(ISalesAccounts accounts) : ControllerBase
 {
+    [AllowAnonymous,HttpGet("entry")]
+    public IActionResult Entry()=>Ok(new {enabled=true});
     [AllowAnonymous,HttpPost("login")]
     public async Task<SalesSessionDto> Login(SalesLoginRequest r,CancellationToken ct) {
         var result=await accounts.LoginAsync(r,ct);

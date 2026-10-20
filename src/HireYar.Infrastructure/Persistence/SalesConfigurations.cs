@@ -20,7 +20,7 @@ public sealed class SalesConfigurations : IEntityTypeConfiguration<SalesAgent>, 
         b.HasIndex(x => x.Mobile).IsUnique(); b.HasIndex(x => x.OrganizationId).IsUnique(); b.HasIndex(x => new { x.AgentId, x.CreatedAtUtc });
         b.HasOne<SalesAgent>().WithMany().HasForeignKey(x => x.AgentId);
         b.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
-        b.Property(x => x.Mobile).HasMaxLength(11); b.Property(x => x.CustomerName).HasMaxLength(200); b.Property(x => x.Note).HasMaxLength(2000);
+        b.Property(x => x.Mobile).HasMaxLength(11); b.Property(x => x.CustomerName).HasMaxLength(200); b.Property(x => x.Note).HasMaxLength(2000); b.Property(x => x.ContactOrganizationName).HasMaxLength(200); b.Property(x => x.ContactEmail).HasMaxLength(256);
         b.ToTable(t => t.HasCheckConstraint("CK_SalesLead_Values", "\"Mobile\" ~ '^09[0-9]{9}$' AND length(btrim(\"CustomerName\")) > 0 AND ((\"OrganizationId\" IS NULL AND \"RegisteredAtUtc\" IS NULL) OR (\"OrganizationId\" IS NOT NULL AND \"RegisteredAtUtc\" IS NOT NULL))"));
     }
     public void Configure(EntityTypeBuilder<SalesCommission> b)

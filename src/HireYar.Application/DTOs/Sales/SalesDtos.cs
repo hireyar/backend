@@ -14,7 +14,7 @@ public sealed record SalesLeadRequest([Required, RegularExpression("^09[0-9]{9}$
     [Required, StringLength(200)] string CustomerName, [StringLength(2000)] string Note = "");
 public sealed record SalesFollowUpRequest([StringLength(2000)] string Note, DateTimeOffset? FollowUpAtUtc);
 public sealed record SalesTransferRequest(Guid TargetAgentId, bool IncludeCustomers, [Required, StringLength(1000)] string Reason);
-public sealed record SalesLeadDto(Guid Id, Guid AgentId, string CustomerName, string Mobile, string Note, string Status,
+public sealed record SalesLeadDto(Guid Id, Guid? AgentId, string CustomerName, string Mobile, string Note, string Status,
     DateTimeOffset CreatedAtUtc, DateTimeOffset LastContactAtUtc, DateTimeOffset? FollowUpAtUtc, DateTimeOffset? RegisteredAtUtc);
 public sealed class SalesLeadFilter
 {
@@ -40,4 +40,3 @@ public sealed record SalesPayoutDto(Guid Id, Guid AgentId, string AgentName, lon
     DateTimeOffset CreatedAtUtc, DateTimeOffset? ReviewedAtUtc, string? ReviewNote);
 public sealed record SalesAuditDto(Guid Id, Guid ActorId, Guid? LeadId, string Action, string Reason, DateTimeOffset CreatedAtUtc);
 public sealed record SalesStatsDto(int CallsLast30Days, int Waiting, int Registered, int Won, int Dead, long CurrentMonthCommissionRial, int ActiveAgents, int PendingPayouts);
-

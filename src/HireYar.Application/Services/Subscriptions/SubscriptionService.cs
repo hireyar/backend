@@ -9,9 +9,14 @@ public sealed class SubscriptionService(IApplicationDbContext db, TimeProvider t
     private async Task<(OrganizationMembership? Membership, bool IsTrial)> CurrentStateAsync(Guid org, CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        var paid = await db.OrganizationMemberships.AsNoTracking().Where(m => m.OrganizationId == org && m.StartedAtUtc <= now && m.ExpiresAtUtc > now)
+        var replacement = await db.CustomerSubscriptionOverrides.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == org, ct);
+        var excluded = replacement?.ExcludedOrderIds ?? [];
+        var paid = await db.OrganizationMemberships.AsNoTracking().Where(m => !excluded.Contains(m.OrderId) && m.OrganizationId == org && m.StartedAtUtc <= now && m.ExpiresAtUtc > now)
             .OrderByDescending(m => m.StartedAtUtc).FirstOrDefaultAsync(ct);
         if (paid is not null) return (paid, false);
+        if (replacement is not null) return replacement.IsStopped || replacement.StartedAtUtc > now || replacement.ExpiresAtUtc <= now ? (null, false) :
+            (new OrganizationMembership { OrganizationId = org, StartedAtUtc = replacement.StartedAtUtc, ExpiresAtUtc = replacement.ExpiresAtUtc,
+                TeamUsers = replacement.TeamUsers, UnlimitedTeam = replacement.UnlimitedTeam, RetentionDays = replacement.RetentionDays }, false);
         var gift = await db.ExistingOrganizationGrants.AsNoTracking().SingleOrDefaultAsync(g => g.OrganizationId == org && g.StartedAtUtc <= now && g.ExpiresAtUtc > now, ct);
         if (gift is not null) return (new OrganizationMembership { OrganizationId = org, StartedAtUtc = gift.StartedAtUtc,
             ExpiresAtUtc = gift.ExpiresAtUtc, TeamUsers = gift.TeamUsers, UnlimitedTeam = gift.UnlimitedTeam, RetentionDays = gift.RetentionDays }, false);
@@ -22,8 +27,11 @@ public sealed class SubscriptionService(IApplicationDbContext db, TimeProvider t
     public async Task<DateTimeOffset?> CoverageEndAsync(Guid org, CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        var paidEnd = await db.OrganizationMemberships.Where(m => m.OrganizationId == org && m.ExpiresAtUtc > now)
+        var replacement = await db.CustomerSubscriptionOverrides.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == org, ct);
+        var excluded = replacement?.ExcludedOrderIds ?? [];
+        var paidEnd = await db.OrganizationMemberships.Where(m => !excluded.Contains(m.OrderId) && m.OrganizationId == org && m.ExpiresAtUtc > now)
             .Select(m => (DateTimeOffset?)m.ExpiresAtUtc).MaxAsync(ct);
+        if (replacement is not null) return new[] { paidEnd, !replacement.IsStopped && replacement.ExpiresAtUtc > now ? (DateTimeOffset?)replacement.ExpiresAtUtc : null }.Max();
         var trialEnd = await db.SignupTrials.Where(t => t.OrganizationId == org && t.ExpiresAtUtc > now)
             .Select(t => (DateTimeOffset?)t.ExpiresAtUtc).SingleOrDefaultAsync(ct);
         var giftEnd = await db.ExistingOrganizationGrants.Where(g => g.OrganizationId == org && g.ExpiresAtUtc > now)
@@ -45,6 +53,7 @@ public sealed class SubscriptionService(IApplicationDbContext db, TimeProvider t
         var total = await db.InterviewQuotaGrants.Where(g => g.OrganizationId == org).SumAsync(g => (long)g.Quantity, ct);
         total += await db.SignupTrials.Where(t => t.OrganizationId == org).SumAsync(t => (long)t.InterviewQuantity, ct);
         total += await db.ExistingOrganizationGrants.Where(g => g.OrganizationId == org).SumAsync(g => (long)g.InterviewQuantity, ct);
+        total += await db.CustomerAdministrationEvents.Where(x => x.OrganizationId == org).SumAsync(x => (long)x.CreditQuantity, ct);
         var consumed = await db.InterviewQuotaReservations.CountAsync(r => r.OrganizationId == org && r.State == "Consumed", ct);
         var held = await (from r in db.InterviewQuotaReservations join s in db.InterviewSessions on r.InterviewSessionId equals s.Id
             where r.OrganizationId == org && s.OrganizationId == org && r.State == "Reserved" &&

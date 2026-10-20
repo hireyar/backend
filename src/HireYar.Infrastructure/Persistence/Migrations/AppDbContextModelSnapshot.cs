@@ -22,6 +22,115 @@ namespace HireYar.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("HireYar.Domain.Administration.CustomerAdministrationEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BundleCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreditQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CustomerKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("DetailsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorId");
+
+                    b.HasIndex("CustomerId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "CreatedAtUtc");
+
+                    b.ToTable("CustomerAdministrationEvents", t =>
+                        {
+                            t.HasCheckConstraint("CK_CustomerAdminEvent_Values", "\"CustomerKind\" IN ('User','Lead') AND \"RequestId\" <> '00000000-0000-0000-0000-000000000000'::uuid AND length(btrim(\"Reason\")) > 0 AND ((\"Action\"='InterviewCreditGranted' AND \"CreditQuantity\" BETWEEN 1 AND 100000 AND \"OrganizationId\" IS NOT NULL AND \"BundleCode\" IS NOT NULL) OR (\"Action\" IN ('ProfileUpdated','SellerChanged','SubscriptionSet','SubscriptionDaysAdjusted','SubscriptionStopped') AND \"CreditQuantity\"=0 AND \"BundleCode\" IS NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Administration.CustomerSubscriptionOverride", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.PrimitiveCollection<Guid[]>("ExcludedOrderIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsStopped")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("RetentionDays")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TeamUsers")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("UnlimitedTeam")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("OrganizationId");
+
+                    b.HasIndex("EventId")
+                        .IsUnique();
+
+                    b.ToTable("CustomerSubscriptionOverrides", t =>
+                        {
+                            t.HasCheckConstraint("CK_CustomerOverride_Values", "(\"IsStopped\" OR \"ExpiresAtUtc\" > \"StartedAtUtc\") AND \"TeamUsers\" > 0 AND \"RetentionDays\" BETWEEN 1 AND 3650");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Domain.InterviewTemplates.InterviewQuestion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1654,8 +1763,17 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AgentId")
+                    b.Property<Guid?>("AgentId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ContactOrganizationName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -2834,6 +2952,35 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Administration.CustomerAdministrationEvent", b =>
+                {
+                    b.HasOne("HireYar.Infrastructure.Auth.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Administration.CustomerSubscriptionOverride", b =>
+                {
+                    b.HasOne("HireYar.Domain.Administration.CustomerAdministrationEvent", null)
+                        .WithOne()
+                        .HasForeignKey("HireYar.Domain.Administration.CustomerSubscriptionOverride", "EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HireYar.Domain.Organizations.Organization", null)
+                        .WithOne()
+                        .HasForeignKey("HireYar.Domain.Administration.CustomerSubscriptionOverride", "OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HireYar.Domain.InterviewTemplates.InterviewQuestion", b =>
                 {
                     b.HasOne("HireYar.Domain.InterviewTemplates.InterviewTemplate", null)
@@ -3154,8 +3301,7 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                     b.HasOne("HireYar.Domain.Sales.SalesAgent", null)
                         .WithMany()
                         .HasForeignKey("AgentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("HireYar.Domain.Organizations.Organization", null)
                         .WithMany()

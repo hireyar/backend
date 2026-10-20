@@ -87,7 +87,7 @@ builder.Services.AddAuthentication().AddJwtBearer(SuperAdminOptions.Scheme, o =>
         ValidAlgorithms = [SecurityAlgorithms.HmacSha256], ClockSkew = TimeSpan.FromSeconds(5), NameClaimType = "sub"
     };
 });
-builder.Services.AddScoped<SalesAccountValidation>();
+builder.Services.AddScoped<SalesAccountValidation>(); builder.Services.AddScoped<SalesEntryFilter>();
 builder.Services.AddAuthentication().AddJwtBearer("Sales", o =>
 {
     o.MapInboundClaims = false; o.EventsType = typeof(SalesAccountValidation);
@@ -112,6 +112,7 @@ builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
     o.AddPolicy("tickets", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    o.AddPolicy("sales-auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("SalesAdmin:AuthRequestsPerMinute") ?? 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("admin-auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("SuperAdmin:AuthRequestsPerMinute") ?? 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("candidate", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("CandidateRateLimit:PermitLimit") ?? 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("AuthRateLimit:PermitLimit") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -177,11 +178,11 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, context, ct) =>
                 } } }
         } };
     if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
-        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminUsers" or "AdminTickets" or "AdminSubscriptions" or "AdminSales" ? "SuperAdmin" : controller is "Sales" or "SalesAuth" ? "Sales" : "Bearer", context.Document)] = [] }];
-    if (controller == "AdminAuth")
+        operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(controller == "CandidateInterviews" ? "InterviewToken" : controller is "AdminAuth" or "AdminUsers" or "AdminTickets" or "AdminSubscriptions" or "AdminSales" or "AdminCustomers" ? "SuperAdmin" : controller is "Sales" or "SalesAuth" ? "Sales" : "Bearer", context.Document)] = [] }];
+    if (controller is "AdminAuth" or "SalesAuth")
     {
         operation.Parameters ??= [];
-        operation.Parameters.Add(new OpenApiParameter { Name = "X-Admin-Entry", In = ParameterLocation.Header, Required = true,
+        operation.Parameters.Add(new OpenApiParameter { Name = controller == "SalesAuth" ? "X-Sales-Entry" : "X-Admin-Entry", In = ParameterLocation.Header, Required = true,
             Description = "Configured private admin entry key from the frontend route; incorrect or missing values return 404.", Schema = new OpenApiSchema { Type = JsonSchemaType.String } });
     }
     if (context.Description.RelativePath?.StartsWith("api/auth", StringComparison.Ordinal) == true && context.Description.HttpMethod != "GET")
