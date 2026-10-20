@@ -12,7 +12,7 @@ using Npgsql;
 namespace HireYar.Tests;
 
 [Collection("Postgres")]
-public sealed class CountBasedSubscriptionTests : IAsyncLifetime
+public sealed partial class CountBasedSubscriptionTests : IAsyncLifetime
 {
     private readonly ApiFixture f = new();
     private Account? admin;

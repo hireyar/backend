@@ -61,6 +61,9 @@ public static class DependencyInjection
         services.AddScoped<HireYar.Application.Subscriptions.SubscriptionService>();
         services.AddScoped<HireYar.Application.Subscriptions.SubscriptionOrderService>();
         services.AddScoped<HireYar.Application.Subscriptions.InterviewQuotaService>();
+        services.AddScoped<HireYar.Application.Subscriptions.InterviewUsageService>();
+        services.AddScoped<HireYar.Infrastructure.Subscriptions.InterviewUsageExpiration>();
+        services.AddHostedService<HireYar.Infrastructure.Subscriptions.InterviewUsageExpirationWorker>();
         services.AddScoped<HireYar.Application.Subscriptions.IOrganizationTeamUsage, HireYar.Infrastructure.Organizations.OrganizationTeamUsage>();
         services.AddSingleton(TimeProvider.System); services.AddInterviews(config); return services;
     }

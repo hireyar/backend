@@ -1,3 +1,9 @@
+## سوابق مصرف مصاحبه — 2026-10-20 / ADR-075
+
+بک‌اند صفحه جدید سوابق مصرف Owner پیاده شد: GET /api/subscriptions/usage و /usage/{id}، فیلتر وضعیت/بازه ایجاد UTC و صفحه‌بندی؛ زمان ایجاد/مهلت/مدت تنظیم‌شده/شروع/پایان/مدت واقعی، اعتبار تعدادی کسرشده و رزرو زنده. حذف/جایگزینی سابقه را پنهان نمی‌کند. رویدادهای ایجاد، رزرو، شروع، مصرف، پایان، لغو، انقضا، ابطال، جایگزینی، حذف و آزادسازی در PostgreSQL ماندگار/immutable هستند؛ GET بدون write/AI و تاریخچه پس از پایان اشتراک هم خواندنی است. migration جدید 20261020093013_AddInterviewUsageHistory داده قابل‌بازیابی قبلی را با isHistorical بازسازی می‌کند؛ مقصد اعمال نشده. [قرارداد](INTERVIEW_USAGE_HISTORY_API.md) و [پرامپت کامل Angular](INTERVIEW_USAGE_HISTORY_FRONTEND_PROMPT.md) آماده‌اند؛ فرانت در این ریپو نیست.
+
+Build نهایی صفر warning/error؛ EF بدون pending model changes. آخرین نتیجه هر۱۴۱تست مرتبط روی PostgreSQL18 واقعی Passed و صفر Skip است: اجرای گسترده139Pass/2Fail داشت؛ پس از انتخاب FFmpeg مخصوص پروژه و اصلاح انتظار قدیمی محافظ rollback، بازاجرای نهایی۵تست شامل هر دو مورد و هر سه تست جدید با5Pass/0Fail/0Skip موفق شد. TRXهای usage-history-final و usage-history-repaired و جزئیات در HANDOFF؛ کل suite اجرا نشده. SQL قابل بازبینی artifacts/interview-usage-history-migrations.sql؛ commit/push/deploy/production انجام نشده‌اند.
+
 ## اصلاح کاراکتر صفر در ساخت مصاحبه — 2026-10-19
 
 دو لاگ ارسالی یک شکست SaveChanges در PanelWizardService با SQLSTATE=22021 هستند؛ PostgreSQL متن دارای U+0000 را رد می‌کند. فایل واقعی رزومه/درخواست در دسترس نیست و نام فیلد از parameter $45 به‌تنهایی قابل اثبات نیست. نقص مسیر رزومه با PDF مصنوعی دارای گلیف صفر و resumeText دستی بازتولید شد: هر دو پیش از snapshot از NUL پاک می‌شوند؛ Trim و متن فارسی/نیم‌فاصله/خط جدید محفوظ‌اند. خروجی خالی با400/resume_text_required و متن بیش از32000 با400/invalid_resume_text رد می‌شود. مشخصات هویتی دارای NUL بدون تغییر خودکار نام با400 رد می‌شوند. فایل اصلی رزومه تغییر نمی‌کند؛ schema/migration و قرارداد موفق تغییر ندارند.

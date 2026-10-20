@@ -1729,6 +1729,44 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HireYar.Domain.Subscriptions.InterviewUsageEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("InterviewSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsHistorical")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InterviewSessionId", "EventType")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "InterviewSessionId");
+
+                    b.HasIndex("OrganizationId", "OccurredAtUtc", "Id");
+
+                    b.ToTable("InterviewUsageEvents", t =>
+                        {
+                            t.HasCheckConstraint("CK_InterviewUsageEvent_Type", "\"EventType\" IN ('Created','Started','Completed','Cancelled','Expired','Replaced','AccessRevoked','Deleted','Reserved','CreditConsumed','Released')");
+                        });
+                });
+
             modelBuilder.Entity("HireYar.Domain.Subscriptions.OrganizationMembership", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2865,6 +2903,16 @@ namespace HireYar.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "InterviewSessionId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HireYar.Domain.Subscriptions.InterviewUsageEvent", b =>
+                {
                     b.HasOne("HireYar.Domain.Interviews.InterviewSession", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId", "InterviewSessionId")

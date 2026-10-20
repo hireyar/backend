@@ -57,7 +57,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Put, "/api/auth/me", new NameRequest("Should not save", "Forbidden org"))).StatusCode);
         Assert.Equal("Member name", (await Me(member)).FullName);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Put, "/api/organization", new OrganizationRequest("Forbidden"))).StatusCode);
-        foreach (var path in new[] { "/api/team/members", "/api/team/invitations" })
+        foreach (var path in new[] { "/api/team/members", "/api/team/invitations", "/api/subscriptions/usage", $"/api/subscriptions/usage/{Guid.NewGuid()}" })
             Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Get, path)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(Mobile(), "نام", "آزمایشی"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, $"/api/team/members/{owner.Id}/deactivate")).StatusCode);
