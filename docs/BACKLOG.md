@@ -1,3 +1,10 @@
+## سوابق مصرف مصاحبه — 2026-10-20 / ADR-075
+
+- انجام‌شده بک‌اند: API فهرست/جزئیات scoped فقط Owner، فیلتر و صفحه‌بندی، زمان‌های مصاحبه، مصرف تعدادی قطعی، timeline ماندگار و حفظ سابقه حذف/ارسال مجدد؛ ثبت انقضا توسط worker داخل برنامه، backfill مشخص‌شده با isHistorical و guardهای PostgreSQL.
+- تحویل فرانت: [پرامپت مستقل Angular](INTERVIEW_USAGE_HISTORY_FRONTEND_PROMPT.md) و [قرارداد API](INTERVIEW_USAGE_HISTORY_API.md). پیاده‌سازی UI در ریپوی جدا باقی است.
+- باقی برای انتشار مستقل: اعمال migration 20261020093013_AddInterviewUsageHistory پیش از نسخه API و اتصال فرانت؛ هیچ‌کدام روی مقصد انجام نشده‌اند و این فهرست مجوز push/deploy نیست.
+- اعتبارسنجی تکمیل‌شده: build صفر warning/error و EF بدون drift؛ آخرین نتیجه۱۴۱تست مرتبط Passed، صفر Skip، با139Pass در اجرای گسترده و بازاجرای موفق۵تست شامل دو مورد اصلاح‌شده. PostgreSQL18 واقعی، SQL idempotent دوبار اجرا و rollback/immutability/scope آزموده شدند؛ جزئیات HANDOFF. کل suite اجرا نشده.
+
 ## اصلاح کاراکتر صفر در ساخت مصاحبه — 2026-10-19
 
 دو لاگ ارسالی یک شکست SaveChanges در PanelWizardService با SQLSTATE=22021 هستند؛ PostgreSQL متن دارای U+0000 را رد می‌کند. فایل واقعی رزومه/درخواست در دسترس نیست و نام فیلد از parameter $45 به‌تنهایی قابل اثبات نیست. نقص مسیر رزومه با PDF مصنوعی دارای گلیف صفر و resumeText دستی بازتولید شد: هر دو پیش از snapshot از NUL پاک می‌شوند؛ Trim و متن فارسی/نیم‌فاصله/خط جدید محفوظ‌اند. خروجی خالی با400/resume_text_required و متن بیش از32000 با400/invalid_resume_text رد می‌شود. مشخصات هویتی دارای NUL بدون تغییر خودکار نام با400 رد می‌شوند. فایل اصلی رزومه تغییر نمی‌کند؛ schema/migration و قرارداد موفق تغییر ندارند.

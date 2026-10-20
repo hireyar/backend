@@ -24,9 +24,11 @@ public sealed partial class InterviewFlowTests
             await isolated.Db(async db => {
                 var exception = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261008135241_AddShortInterviewInvitations"));
                 Assert.Equal("P0001", exception.SqlState);
-                Assert.Contains("pre-removal backup", exception.MessageText);
+                Assert.Contains("Cannot remove interview usage history", exception.MessageText);
+                Assert.Contains("20261020093013_AddInterviewUsageHistory", await db.Database.GetAppliedMigrationsAsync());
                 Assert.Contains("20261010054552_AddInterviewReportReview", await db.Database.GetAppliedMigrationsAsync());
                 Assert.True(await db.InterviewReviewEntries.AnyAsync(e => e.InterviewSessionId == invite.InterviewId));
+                Assert.True(await db.InterviewUsageEvents.AnyAsync(e => e.InterviewSessionId == invite.InterviewId));
             });
         }
         finally { await ((IAsyncLifetime)isolated).DisposeAsync(); }
