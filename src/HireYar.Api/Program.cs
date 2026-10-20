@@ -20,10 +20,23 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 var builder = WebApplication.CreateBuilder(args);
+// Browser SignalR transports use access_token in the query. Never log request URLs.
+builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.AspNetCore.Http.Connections", LogLevel.Warning);
+builder.Services.AddSignalR();
+builder.Services.AddScoped<HireYar.Application.Notifications.NotificationService>();
+builder.Services.AddScoped<HireYar.Application.Notifications.INotificationRecipients, HireYar.Infrastructure.Notifications.NotificationRecipients>();
+builder.Services.AddScoped<HireYar.Application.Notifications.INotificationPublisher, HireYar.Api.Notifications.SignalRNotificationPublisher>();
 // Developer-specific settings stay outside Git; environment variables retain final precedence.
 if (!builder.Configuration.GetValue<bool>("SkipLocalSettings"))
     builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.local.json", optional: true, reloadOnChange: true);
 builder.Configuration.AddEnvironmentVariables();
+var notificationOptions = builder.Configuration.GetSection("Notifications").Get<HireYar.Infrastructure.Notifications.NotificationReminderOptions>() ?? new();
+if (notificationOptions.PollSeconds is < 10 or > 3600) throw new InvalidOperationException("Invalid notification polling interval.");
+builder.Services.AddSingleton(notificationOptions);
+builder.Services.AddHostedService<HireYar.Infrastructure.Notifications.NotificationReminderWorker>();
+builder.Services.AddScoped<HireYar.Application.Notifications.NotificationReminderService>();
+
 var security = builder.Configuration.GetSection("Security").Get<SecurityOptions>() ?? new();
 if (Encoding.UTF8.GetByteCount(security.SigningKey) < 32 || string.IsNullOrWhiteSpace(security.Issuer) || string.IsNullOrWhiteSpace(security.Audience)
     || security.AccessMinutes is < 1 or > 60 || security.RefreshDays is < 1 or > 30)
@@ -230,6 +243,7 @@ app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "HireYar v1"));
 // IP limits also cover failed candidate authentication attempts.
 app.UseRouting(); app.UseCors(); app.UseRateLimiter(); app.UseAuthentication(); app.UseAuthorization();
 app.UseMiddleware<InterviewDiagnosticMiddleware>();
+app.MapHub<HireYar.Api.Notifications.NotificationsHub>(HireYar.Api.Notifications.NotificationsHub.Path, options => options.CloseOnAuthenticationExpiration = true);
 app.MapControllers(); app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapOpenApi().AllowAnonymous();
 app.Run();

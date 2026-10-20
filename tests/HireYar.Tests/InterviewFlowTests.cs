@@ -98,14 +98,14 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
         public Task<Stream> OpenReadAsync(string key, CancellationToken ct) => inner.OpenReadAsync(key, ct);
         public async Task DeleteAsync(string key, CancellationToken ct) { await inner.DeleteAsync(key, ct); Deleted = true; }
     }
-    private async Task<(Account Hr, InterviewInvitation Invite)> Invite()
+    private async Task<(Account Hr, InterviewInvitation Invite)> Invite(Account? account = null)
     {
-        f.InterviewAi.Reset(); var hr = await f.RegisterOwner();
-        var job = await (await hr.Client.Send(HttpMethod.Post, "/api/job-positions", new { title = "Backend", description = "Synthetic description", seniority = "Senior", status = "Active" })).Content.ReadFromJsonAsync<JsonElement>();
+        f.InterviewAi.Reset(); var hr = account ?? await f.RegisterOwner();
+        var job = await (await hr.Client.Send(HttpMethod.Post, "/api/job-positions", new { title = account is null ? "Backend" : $"Backend {Guid.NewGuid():N}", description = "Synthetic description", seniority = "Senior", status = "Active" })).Content.ReadFromJsonAsync<JsonElement>();
         var id = job.GetProperty("id").GetGuid();
-        var template = await (await hr.Client.Send(HttpMethod.Post, "/api/interview-templates", new { jobPositionId = id, title = "Interview", durationMinutes = 30, maxFollowUpQuestionsPerQuestion = 0, language = "fa-IR", isArchived = false,
+        var template = await (await hr.Client.Send(HttpMethod.Post, "/api/interview-templates", new { jobPositionId = id, title = account is null ? "Interview" : $"Interview {Guid.NewGuid():N}", durationMinutes = 30, maxFollowUpQuestionsPerQuestion = 0, language = "fa-IR", isArchived = false,
             questions = new[] { new { text = "Legacy question", order = 1, competency = "SQL", evaluationGuidance = "Observable evidence" } } })).Content.ReadFromJsonAsync<JsonElement>();
-        var skill = await (await hr.Client.Send(HttpMethod.Post, "/api/skills", new { name = "SQL" })).Content.ReadFromJsonAsync<JsonElement>();
+        var skill = await (await hr.Client.Send(HttpMethod.Post, "/api/skills", new { name = account is null ? "SQL" : $"SQL {Guid.NewGuid():N}" })).Content.ReadFromJsonAsync<JsonElement>();
         var skillId = skill.GetProperty("id").GetGuid();
         Assert.Equal(HttpStatusCode.NoContent, (await hr.Client.Send(HttpMethod.Put, $"/api/job-positions/{id}/skills/{skillId}", new { isRequired = true, priority = 100, targetDifficulty = 3 })).StatusCode);
         for (var i = 0; i < 3; i++)
@@ -324,6 +324,8 @@ public sealed partial class InterviewFlowTests(ApiFixture f)
             start = (await response.Content.ReadFromJsonAsync<CandidateInterviewDto>())!;
         }
         Assert.Equal("Completed", start.Status); Assert.Equal(3, start.Progress.AnsweredQuestions);
+        var completedNotice = Assert.Single((await Notifications(hr)).Items, n => n.Type == "InterviewCompleted");
+        Assert.Equal("InterviewReport", completedNotice.Target); Assert.Equal(invite.InterviewId, completedNotice.InterviewId);
         var reportResponse = await hr.Client.Send(HttpMethod.Get, $"/api/interviews/{invite.InterviewId}"); Assert.Equal(HttpStatusCode.OK, reportResponse.StatusCode);
         var report = await reportResponse.Content.ReadFromJsonAsync<JsonElement>(); Assert.Equal(3, report.GetProperty("evidence").GetArrayLength());
         await f.Db(async db => {

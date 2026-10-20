@@ -1,3 +1,11 @@
+## اعلان‌های داشبورد — 2026-10-20: Verified محلی / ADR-079
+
+پاک‌سازی نهایی: دیتابیس fixture باقی‌مانده صفر؛ PostgreSQL موقت اعلان‌ها متوقف و مسیر اختصاصی آن پس از کنترل مسیر پاک شد. build نهایی صفر warning/error و git diff --check موفق است.
+
+SignalR و PostgreSQL طبق تأیید کاربر پیاده شدند: شروع/پایان مصاحبه (پایان→گزارش)، یادآوری۵/۲روزه پوشش مؤثر، اعتبار قابل استفاده<۲، REST صفحه‌بندی/شمارنده/read-unread فقط Owner همان سازمان. دمو طبق پاسخ صریح هیچ اعلانی ندارد. شروع/پایان اتمیک، invalidation فوری پس از ثبت، worker داخلی۶۰ثانیه و دوره ضدتکرار کمبود/تمدید؛ ساختار ساده، بدون صف یا Redis. [قرارداد](NOTIFICATIONS_API.md) و [راهنمای فرانت](NOTIFICATIONS_FRONTEND_PROMPT.md).
+
+build صفرwarning/error؛ اجرای گسترده۱۲۴سناریو،۱۲۳Pass و یک fixture نام تکراری داشت؛ همان مورد اصلاح و در اجرای نهایی۶/۶ شامل WebSocket واقعی TestServer، جداسازی سازمان، read/unread، پایان دستی و خودکار، دمو، مرز اعتبار۲ وشارژدوباره، rollback ذخیره و تحمل شکست ارسال موفق شد. تست مستقل محافظDown نیز۱/۱Pass؛ در مجموع۱۲۶سناریوی یکتای مرتبط در این اجراها Pass شده‌اند، نه یک اجرای سراسری تازه. PostgreSQL18 اختصاصی loopback55557، provider/OTP/storage مصنوعی؛ EF بدون pending changes و diff-check موفق. migration20261020143537_AddDashboardNotifications در fixture اعمال و guard تاریخچه آزموده شد؛ SQL delta در artifacts/notifications-migrations.sql. Angular، migration مقصد، push/deploy/production انجام نشده‌اند.
+
 ## مدیریت مشتریان و ورود خصوصی فروش — 2026-10-20 / ADR-077 و ADR-078: تأیید محلی
 
 بک‌اند فهرست/جستجو/فیلتر/آمار/صفحه‌بندی Ownerها و لیدهای موجود، جزئیات چهار تب، XLSX واقعی، ویرایش هویت با ابطال نشست، تغییر/حذف فروشنده با حفظ پورسانت قبلی، اصلاح دستی بازه/روز/توقف و هدیه تعدادی با audit immutable انجام شد. طبق پاسخ صریح کاربر «مشتری جدید» حذف است. تمدید پولی از سفارش/تأیید واقعی و پورسانت موجود است؛ هدیه و اصلاح دستی پول/فاکتور/پورسانت ندارند. [قرارداد مدیریت مشتریان](ADMIN_CUSTOMERS_API.md) و [پرامپت فرانت](ADMIN_CUSTOMERS_FRONTEND_PROMPT.md) آماده‌اند. migration20261020133348_AddCustomerAdministration روی مقصد اجرا نشده و قبل از API لازم است.
