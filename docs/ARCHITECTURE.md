@@ -1,3 +1,7 @@
+## اصلاح دامنه اعلان‌ها — 2026-10-20 / ADR-080
+
+طبق درخواست جدید کاربر، اعلان‌ها برای همه سازمان‌ها شامل دمو، تریال و بدون اشتراک فعال تولید می‌شوند؛ گیرنده همچنان Owner فعال و تأییدشده همان سازمان است. شرط اشتراک از شروع/پایان مصاحبه و کمبود اعتبار حذف شد. انقضا فقط با پایان پوشش مؤثر آینده و همان آستانه‌های۵/۲روز؛ dedup، scope و حفظ تاریخچه برقرارند. این تصمیم جایگزین محدودیت دمو/تریال ADR-079 است. قرارداد و راهنمای فرانت به‌روز شدند؛ migration جدید لازم نیست. انتشار و تغییر Angular انجام نشده‌اند.
+
 ## ADR-079 — اعلان ماندگار و SignalR ساده، مخصوص اشتراک غیر‌دمو (2026-10-20)
 
 کاربر ابتدا تأیید تکنولوژی خواست و سپس SignalR+PostgreSQL را تأیید کرد؛ بدون overengineering. Domain.Notification مستقل است؛ Application.NotificationService با EF abstraction و DTO مجزا مدیریت فهرست/شمارنده/read/unread و افزودن رخداد دارد. INotificationRecipients پیاده‌سازی Infrastructure دارد تا Identity در Application نباشد؛ INotificationPublisher در Api با IHubContext پیاده می‌شود. Repository، event bus، CQRS، outbox، broker و سرویس مستقل اضافه نشده است.

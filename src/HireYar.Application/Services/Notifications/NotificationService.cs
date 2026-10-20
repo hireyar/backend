@@ -7,13 +7,11 @@ using Microsoft.Extensions.Logging;
 namespace HireYar.Application.Notifications;
 
 public sealed class NotificationService(IApplicationDbContext db, ICurrentUser user, TimeProvider time,
-    HireYar.Application.Subscriptions.SubscriptionService subscriptions, INotificationRecipients recipients, INotificationPublisher publisher, ILogger<NotificationService> logger)
+    INotificationRecipients recipients, INotificationPublisher publisher, ILogger<NotificationService> logger)
 {
     // Joins the caller's transaction/save; publishing happens only after commit.
     public async Task<Notification?> AddInterviewAsync(InterviewSession session, string candidateName, bool completed, CancellationToken ct)
     {
-        var state = await subscriptions.StateAsync(session.OrganizationId, ct);
-        if (!state.HasActiveSubscription || state.IsTrial) return null;
         var recipient = await recipients.OwnerAsync(session.OrganizationId, ct);
         if (recipient is null) return null;
         return await AddAsync(session.OrganizationId, recipient.Value,

@@ -165,7 +165,19 @@ public sealed partial class InterviewFlowTests
     }
 
     [PostgresFact]
-    public async Task Demo_has_no_notifications_and_database_rejects_cross_organization_recipient()
+    public async Task Notifications_include_organizations_without_subscription()
+    {
+        var owner = await f.RegisterOwner(provisionMembership: false);
+        Guid org = default;
+        await f.Db(async db => org = (await db.Users.SingleAsync(u => u.Id == owner.Id)).OrganizationId);
+        await Remind(org); await Remind(org);
+        var items = (await Notifications(owner)).Items;
+        Assert.Single(items, n => n.Type == "InterviewCreditsLow");
+        Assert.DoesNotContain(items, n => n.Type == "SubscriptionExpiring");
+    }
+
+    [PostgresFact]
+    public async Task Trial_receives_notifications_and_database_rejects_cross_organization_recipient()
     {
         var demo = await f.RegisterOwner(explicitSignup: true, provisionMembership: false);
         var (hr, invite) = await Invite(demo);
@@ -175,7 +187,12 @@ public sealed partial class InterviewFlowTests
         Guid demoOrg = default;
         await f.Db(async db => demoOrg = (await db.Users.SingleAsync(u => u.Id == hr.Id)).OrganizationId);
         await Remind(demoOrg);
-        Assert.Empty((await Notifications(hr)).Items);
+        await Remind(demoOrg);
+        var items = (await Notifications(hr)).Items;
+        Assert.Single(items, n => n.Type == "InterviewStarted");
+        Assert.Single(items, n => n.Type == "InterviewCompleted" && n.Target == "InterviewReport");
+        Assert.Single(items, n => n.Type == "SubscriptionExpiring");
+        Assert.Single(items, n => n.Type == "InterviewCreditsLow");
         var other = await f.RegisterOwner();
         await f.Db(async db =>
         {
