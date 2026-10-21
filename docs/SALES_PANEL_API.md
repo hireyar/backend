@@ -1,5 +1,15 @@
 # پنل فروش و پورسانت — قرارداد API
 
+## اصلاح جستجو و خطای انتساب — 2026-10-21
+
+`GET /api/sales/leads` و `GET /api/admin/sales/leads` پارامتر اختیاری `search` (حداکثر۲۰۰کاراکتر) دارند؛ فاصله ابتدا/انتها حذف می‌شود و تطبیق بخشی از `customerName` یا `mobile` پیش از شمارش و صفحه‌بندی انجام می‌شود. مقدار خالی/فقطفاصله فیلتر ندارد. search با status و agentId مدیریت ترکیب می‌شود؛ در پنل فروش، agentId ارسالی همچنان scope هویت سرور را عوض نمی‌کند.
+
+اگر لید شماره به فروشنده دیگری منتسب باشد، `POST /api/sales/leads` با409 و `code=lead_already_claimed` و `title=این شماره توسط کارشناس فروش دیگری ثبت شده است` رد می‌شود؛ همین خطا حتی پس از خرید/فعال‌شدن اشتراک اولویت دارد. تکرار ثبت همان فروشنده/لید بدون فروشنده رفتار قبلی دارد.
+
+طبق پاسخ نهایی کاربر، مشتری بدون انتساب دارای هدیه/تریال فعال یا اشتراک منقضی قابل افزودن است. فقط اشتراک پولی **مؤثر و فعال در اکنون** (از CurrentAsync موجود، با OrderId) مانع است:409، `code=customer_has_active_subscription` و `title=این شماره قبلا ثبت شده و اشتراک فعال دارد`. سفارش Pending یا اشتراک زمان‌بندی‌شده آینده به‌تنهایی اشتراک فعال نیست؛ override اداری و سفارش‌های excluded طبق قواعد سرویس جاری لحاظ می‌شوند. قفل موبایل سپس ردیف سازمان سپس قفل فروش، بررسی و ثبت را با تأیید خرید/اصلاح اشتراک سریالی می‌کند. هیچ حساب، هدیه یا اشتراک تازه‌ای از POST leads ساخته نمی‌شود.
+
+شماره جدید با Waiting، مشتری صرفاً ثبت‌نام‌شده/هدیه/تریال بدون خرید تأییدشده با Registered و مشتری دارای سابقه خرید منقضی با Won وارد فهرست می‌شود؛ Won سابقه خرید است و وضعیت انقضای اشتراک نیست. افزودن مشتری به‌تنهایی پورسانت قبلی ایجاد نمی‌کند؛ تأیید خرید/تمدید بعدی با نرخ DB و snapshot فعلی، ردیف مستقل در «پورسانت من» می‌سازد. migration جدید لازم نیست. [پرامپت اصلاحات فرانت](SALES_CUSTOMER_FIXES_FRONTEND_PROMPT.md).
+
 ## تغییر ورود خصوصی فروش — 2026-10-20 / ADR-078
 
 مسیر فرانت اکنون `/salesadmin/{randomkey}` است، مطابق درخواست صریح کاربر و ساختار ورودی سوپرادمین؛ **کپچا ندارد**. مسیر قدیمی /sales/login مرجع معتبر نیست و نباید در فرانت باقی بماند. بک‌اند این ریپو Angular را serve نمی‌کند؛ قرارداد guard و API آماده است و تغییر router در ریپوی فرانت انجام می‌شود.
@@ -26,14 +36,14 @@
 | روش و مسیر /api/sales | ورودی/خروجی |
 |---|---|
 | GET dashboard | CallsLast30Days/Waiting/Registered/Won/Dead/CurrentMonthCommissionRial و PendingPayouts؛ ActiveAgents فقط مدیریت و در این نما صفر |
-| GET leads | page/pageSize/status=Waiting\|Registered\|Won\|Dead → Page<SalesLeadDto> |
+| GET leads | page/pageSize/status=Waiting\|Registered\|Won\|Dead/search → Page<SalesLeadDto> |
 | POST leads | `{mobile,customerName,note}`؛ نامmax200 و note اختیاریmax2000 → SalesLeadDto |
 | PUT leads/{id}/follow-up | `{note,followUpAtUtc}` →204؛ زمان nullable، ثبت تماس دوباره و بازگشت Dead به Waiting |
 | GET commissions | page/pageSize/status و registeredFromUtc/registeredToUtc و leadId/payoutId اختیاری → SalesCommissionPage |
 | GET payouts | page/pageSize → Page<SalesPayoutDto> |
 | POST payouts | `{requestId,commissionIds:[...]}`، UUID غیرخالی و۱تا۱۰۰شناسه یکتا → SalesPayoutDto |
 
-هر شماره فقط یک لید دارد و حذف نمی‌شود؛ اولین ثبت‌کننده برنده است، حتی برای لید Dead. تکرار409/lead_already_claimed و رخداد ثبت‌شده برای ادمین دارد؛ اطلاعات فروشنده دیگر افشا نمی‌شود. شماره مشتری Owner ازپیش‌ثبت‌شده هم قابل ادعاست اگر سازمانش مالک فروش نداشته باشد؛ تاریخ ثبت‌نام واقعی او حفظ می‌شود. شماره عضو Recruiter قابل ادعا نیست. ثبت تماس جدید خرید قبلی را عطف‌به‌ماسبق پورسانت نمی‌دهد.
+هر شماره فقط یک لید دارد و حذف نمی‌شود؛ اولین ثبت‌کننده برنده است، حتی برای لید Dead. تکرار409/lead_already_claimed و رخداد ثبت‌شده برای ادمین دارد؛ اطلاعات هویتی فروشنده دیگر افشا نمی‌شود. شماره مشتری Owner ازپیش‌ثبت‌شده هم قابل ادعاست اگر سازمانش مالک فروش نداشته و اشتراک پولی فعال نداشته باشد؛ هدیه/تریال فعال و اشتراک منقضی مانع نیستند و تاریخ ثبت‌نام واقعی او حفظ می‌شود. شماره عضو Recruiter قابل ادعا نیست. ثبت تماس جدید خرید قبلی را عطف‌به‌ماسبق پورسانت نمی‌دهد.
 
 وضعیت لید: Waiting تا پیش از ثبت‌نام؛ Dead پس از۳۰روز از آخرین تماس بدون ثبت‌نام؛ Registered پس از ثبت‌نام بدون خرید اشتراک تأییدشده؛ Won پس از خرید اشتراک. وضعیت‌ها محاسبه می‌شوند، GET write ندارد. تماس دوباره لید ثبت‌نام‌شده یا خریدکرده وضعیت قطعی را عقب نمی‌برد. FollowUpAtUtc فقط یادآور در فهرست است؛ ارسال پیامک/اعلان خودکار اضافه نشده است.
 
@@ -65,7 +75,7 @@ Bearer فعلی SystemAdmin با کپچا و entry flow موجود؛ فروشن�
 | PUT agents/{id} | همان فیلدها؛ تغییر درصد برای فروش آینده؛ ابطال نشست‌ها |
 | POST agents/{id}/reset-password | رمز تصادفی تازه و ابطال نشست/قفل؛ `{agent,password}` |
 | POST agents/{id}/transfer | `{targetAgentId,includeCustomers,reason}` → تعداد منتقل‌شده؛ مقصد فعال، مبدأ متفاوت |
-| GET leads | page/pageSize/status/agentId اختیاری |
+| GET leads | page/pageSize/status/agentId/search اختیاری |
 | GET commissions | همان فیلتر تاریخ ثبت‌نام/وضعیت/leadId/payoutId، agentId اختیاری |
 | GET payouts | page/pageSize/agentId اختیاری |
 | POST payouts/{id}/review | `{paid:true\|false,note}`؛ توضیح/مرجع رسیدmax1000 اجباری؛ نتیجه Paid یا Returned |
