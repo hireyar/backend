@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace HireYar.Api.Controllers;
 
-[ApiController, Route("api/notifications"), Authorize(Roles = "Owner")]
+[ApiController, Route("api/notifications"), Authorize(Roles = "Owner,Recruiter")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class NotificationsController(NotificationService service) : ControllerBase
 {

@@ -2,7 +2,7 @@ namespace HireYar.Application.Notifications;
 
 public interface INotificationRecipients
 {
-    Task<Guid?> OwnerAsync(Guid organizationId, CancellationToken ct);
+    Task<List<Guid>> ActiveMembersAsync(Guid organizationId, CancellationToken ct);
 }
 public interface INotificationPublisher
 {

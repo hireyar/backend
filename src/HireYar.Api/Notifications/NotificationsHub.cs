@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace HireYar.Api.Notifications;
 
-[Authorize(Roles = "Owner")]
+[Authorize(Roles = "Owner,Recruiter")]
 public sealed class NotificationsHub : Hub
 {
     public const string Path = "/hubs/notifications";

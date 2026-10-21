@@ -26,13 +26,13 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
     public async Task<CandidateInterviewDto> StartAsync(Guid id, CancellationToken ct)
     {
         var s = await Load(id, ct);
-        HireYar.Domain.Notifications.Notification? notification = null;
+        List<HireYar.Domain.Notifications.Notification> notification = [];
         await db.WithOrganizationLockAsync(s.OrganizationId, async () =>
         {
             await db.ReloadInterviewAsync(s, ct); CheckAccess(s);
             return await StartLockedAsync();
         }, ct);
-        if (notification is not null) await notifications.PublishAsync(notification.OrganizationId, notification.RecipientUserId);
+        await notifications.PublishAsync(notification);
         return await Map(s, true, ct);
 
         async Task<bool> StartLockedAsync()
@@ -243,7 +243,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                 result.Correctness, result.AssessmentConfidence);
             var sourceName = result.UsedFallback ? "Fallback" : "AI";
             answer.SetDiagnostics(result.UsedFallback ? "Evaluating" : null, result.UsedFallback ? failureCode ?? "decision_invalid" : null, sourceName);
-            HireYar.Domain.Notifications.Notification? completedNotification = null;
+            List<HireYar.Domain.Notifications.Notification> completedNotification = [];
             var completion = policy.GetCompletionReason(s, time.GetUtcNow());
             if (completion is { } reason)
             {
@@ -268,7 +268,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
             InterviewTrace.Stage("SavingResult", "ذخیره نتیجه پاسخ و وضعیت سؤال بعدی یا پایان مصاحبه");
             s.ReleaseLease(lease, time.GetUtcNow());
             await db.SaveChangesAsync(ct);
-            if (completedNotification is not null) await notifications.PublishAsync(completedNotification.OrganizationId, completedNotification.RecipientUserId);
+            await notifications.PublishAsync(completedNotification);
             if (s.Status == InterviewStatus.Completed) InterviewMetrics.Completed.Add(1);
             InterviewMetrics.Selection.Add(1, new KeyValuePair<string, object?>("source", sourceName));
             logger.LogInformation("Interview question selection interviewId={InterviewId} answerId={AnswerId} selectionSource={SelectionSource} failureCode={FailureCode}", s.Id, answer.Id, sourceName, answer.FailureCode);
@@ -279,7 +279,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
     public async Task<CandidateInterviewDto> CompleteAsync(Guid id, CancellationToken ct)
     {
         var s = await Load(id, ct);
-        HireYar.Domain.Notifications.Notification? completedNotification = null;
+        List<HireYar.Domain.Notifications.Notification> completedNotification = [];
         await db.WithOrganizationLockAsync(s.OrganizationId, async () => {
             await db.ReloadInterviewAsync(s, ct);
             if (s.Status == InterviewStatus.Completed) return true;
@@ -291,7 +291,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
             completedNotification = await notifications.AddInterviewAsync(s, $"{application.FirstName} {application.LastName}".Trim(), true, ct);
             return true;
         }, ct);
-        if (completedNotification is not null) await notifications.PublishAsync(completedNotification.OrganizationId, completedNotification.RecipientUserId);
+        await notifications.PublishAsync(completedNotification);
         InterviewMetrics.Completed.Add(1); return await Map(s, false, ct);
     }
     public async Task<Stream> OpenQuestionAudioAsync(Guid id, Guid questionId, CancellationToken ct)
