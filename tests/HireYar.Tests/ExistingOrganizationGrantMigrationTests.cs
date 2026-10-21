@@ -40,7 +40,10 @@ public sealed class ExistingOrganizationGrantMigrationTests
                 {
                     await db.Database.ExecuteSqlRawAsync("SET TIME ZONE 'Asia/Tehran'");
                     var sql = db.GetService<IMigrator>().GenerateScript(f.MigrationTarget, null, MigrationsSqlGenerationOptions.Idempotent);
-                    await db.Database.ExecuteSqlRawAsync(sql); await db.Database.ExecuteSqlRawAsync(sql);
+                    // Generated SQL can contain literal JSON braces; execute without EF format parsing.
+                    await using var command = db.Database.GetDbConnection().CreateCommand();
+                    command.CommandText = sql;
+                    await command.ExecuteNonQueryAsync(); await command.ExecuteNonQueryAsync();
                 }
                 finally { await db.Database.CloseConnectionAsync(); }
                 db.ChangeTracker.Clear();

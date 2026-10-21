@@ -290,18 +290,38 @@ public sealed partial class CountBasedSubscriptionTests : IAsyncLifetime
     }
 
     [PostgresFact]
-    public async Task Paid_subscription_bought_during_trial_starts_after_the_free_period()
+    public async Task Paid_subscription_during_trial_activates_immediately_preserves_gift_and_three_month_renewal()
     {
         var o = await f.RegisterOwner(explicitSignup: true, provisionMembership: false);
         var trial = await State(o);
-        var order = await Order(o, new("subscription")); await Confirm(order);
+        var order = await Order(o, new("subscription", TeamUsers: 8));
+        Assert.True((await State(o)).IsTrial); // Pending purchases do not activate paid access.
+        await Confirm(order);
         var state = await State(o);
-        Assert.True(state.IsTrial); Assert.Equal(trial.StartedAtUtc, state.StartedAtUtc);
+        Assert.False(state.IsTrial); Assert.True(state.HasActiveSubscription);
+        Assert.Equal(8, state.TeamCapacity);
+        var confirmed = await Read<SubscriptionOrderDto>(await o.Client.Send(HttpMethod.Get, $"/api/subscriptions/orders/{order.Id}"));
+        Assert.Equal(confirmed.ConfirmedAtUtc, state.StartedAtUtc);
         Assert.Equal(trial.ExpiresAtUtc!.Value.AddMonths(1), state.ExpiresAtUtc);
         await f.Db(async db => Assert.Equal(trial.ExpiresAtUtc,
             (await db.OrganizationMemberships.SingleAsync(m => m.OrderId == order.Id)).StartedAtUtc));
+        await Confirm(order); // Confirmation replay cannot add the trial days again.
+        Assert.Equal(state.ExpiresAtUtc, (await State(o)).ExpiresAtUtc);
+        await Subscribe(o, users: 12, months: 3);
+        var renewed = await State(o);
+        Assert.False(renewed.IsTrial); Assert.Equal(state.ExpiresAtUtc!.Value.AddMonths(3), renewed.ExpiresAtUtc);
+        Assert.Equal(state.StartedAtUtc, renewed.StartedAtUtc); Assert.Equal(8, renewed.TeamCapacity);
+        var dashboard = await Read<HireYar.Application.Dashboard.DashboardDto>(await o.Client.Send(HttpMethod.Get, "/api/dashboard"));
+        Assert.Equal(renewed, dashboard.Subscription);
+        var other = await f.RegisterOwner(explicitSignup: true, provisionMembership: false);
+        Assert.True((await State(other)).IsTrial);
         f.Clock.Offset = trial.ExpiresAtUtc.Value - DateTimeOffset.UtcNow;
         Assert.True((await State(o)).HasActiveSubscription); Assert.False((await State(o)).IsTrial);
+        Assert.Equal(2, (await State(o)).AvailableInterviews);
+        f.Clock.Offset = state.ExpiresAtUtc.Value - DateTimeOffset.UtcNow;
+        Assert.Equal(12, (await State(o)).TeamCapacity);
+        f.Clock.Offset = renewed.ExpiresAtUtc!.Value - DateTimeOffset.UtcNow;
+        Assert.False((await State(o)).HasActiveSubscription);
         Assert.Equal(2, (await State(o)).AvailableInterviews);
     }
 

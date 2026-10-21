@@ -57,7 +57,7 @@ public sealed partial class AdminCustomers(AppDbContext db, UserManager<Applicat
         }
         if(filter.AgentId is not null) rows=rows.Where(x=>x.AgentId==filter.AgentId);
         if(filter.HasSeller is not null) rows=rows.Where(x=>(x.AgentId!=null)==filter.HasSeller);
-        var paid=db.OrganizationMemberships.Where(m=>!db.CustomerSubscriptionOverrides.Any(c=>c.OrganizationId==m.OrganizationId && c.ExcludedOrderIds.Contains(m.OrderId)));
+        var paid=subscriptions.EffectiveMemberships().Where(m=>!db.CustomerSubscriptionOverrides.Any(c=>c.OrganizationId==m.OrganizationId && c.ExcludedOrderIds.Contains(m.OrderId)));
         return from r in rows
             join c in db.CustomerSubscriptionOverrides.AsNoTracking() on r.OrganizationId equals (Guid?)c.OrganizationId into replacements from c in replacements.DefaultIfEmpty()
             select new CustomerReadRow {Customer=r,

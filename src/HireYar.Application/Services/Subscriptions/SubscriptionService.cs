@@ -5,13 +5,33 @@ namespace HireYar.Application.Subscriptions;
 
 public sealed class SubscriptionService(IApplicationDbContext db, TimeProvider time, IOrganizationTeamUsage team)
 {
+    // Keep the immutable purchased calendar period; include the remaining signup gift
+    // in paid access from confirmation, including purchases made before this change.
+    public IQueryable<OrganizationMembership> EffectiveMemberships() =>
+        from membership in db.OrganizationMemberships.AsNoTracking()
+        join order in db.SubscriptionOrders on membership.OrderId equals order.Id
+        join trial in db.SignupTrials on membership.OrganizationId equals trial.OrganizationId into trials
+        from trial in trials.DefaultIfEmpty()
+        select new OrganizationMembership
+        {
+            Id = membership.Id, OrganizationId = membership.OrganizationId, OrderId = membership.OrderId,
+            StartedAtUtc = trial != null && order.OrganizationId == membership.OrganizationId &&
+                order.Status == "Confirmed" && order.Product == "subscription" &&
+                order.ConfirmedAtUtc >= trial.StartedAtUtc && order.ConfirmedAtUtc < trial.ExpiresAtUtc &&
+                membership.StartedAtUtc == trial.ExpiresAtUtc &&
+                !db.CustomerSubscriptionOverrides.Any(x => x.OrganizationId == membership.OrganizationId)
+                ? order.ConfirmedAtUtc!.Value : membership.StartedAtUtc,
+            ExpiresAtUtc = membership.ExpiresAtUtc, TeamUsers = membership.TeamUsers,
+            UnlimitedTeam = membership.UnlimitedTeam, RetentionDays = membership.RetentionDays
+        };
+
     public async Task<OrganizationMembership?> CurrentAsync(Guid org, CancellationToken ct) => (await CurrentStateAsync(org, ct)).Membership;
     private async Task<(OrganizationMembership? Membership, bool IsTrial)> CurrentStateAsync(Guid org, CancellationToken ct)
     {
         var now = time.GetUtcNow();
         var replacement = await db.CustomerSubscriptionOverrides.AsNoTracking().SingleOrDefaultAsync(x => x.OrganizationId == org, ct);
         var excluded = replacement?.ExcludedOrderIds ?? [];
-        var paid = await db.OrganizationMemberships.AsNoTracking().Where(m => !excluded.Contains(m.OrderId) && m.OrganizationId == org && m.StartedAtUtc <= now && m.ExpiresAtUtc > now)
+        var paid = await EffectiveMemberships().Where(m => !excluded.Contains(m.OrderId) && m.OrganizationId == org && m.StartedAtUtc <= now && m.ExpiresAtUtc > now)
             .OrderByDescending(m => m.StartedAtUtc).FirstOrDefaultAsync(ct);
         if (paid is not null) return (paid, false);
         if (replacement is not null) return replacement.IsStopped || replacement.StartedAtUtc > now || replacement.ExpiresAtUtc <= now ? (null, false) :
