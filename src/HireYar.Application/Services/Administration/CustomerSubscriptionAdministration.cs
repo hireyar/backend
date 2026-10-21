@@ -47,7 +47,7 @@ public sealed class CustomerSubscriptionAdministration(IApplicationDbContext db,
         if(!state.HasActiveSubscription && r.Days<0) throw AppException.Invalid("no_active_subscription");
         var replacement=await db.CustomerSubscriptionOverrides.AsNoTracking().SingleOrDefaultAsync(x=>x.OrganizationId==org,ct);
         var excluded=replacement?.ExcludedOrderIds ?? [];
-        var futureStart=await db.OrganizationMemberships.Where(x=>x.OrganizationId==org && !excluded.Contains(x.OrderId) && x.StartedAtUtc>now)
+        var futureStart=await subscriptions.EffectiveMemberships().Where(x=>x.OrganizationId==org && !excluded.Contains(x.OrderId) && x.StartedAtUtc>now)
             .Select(x=>(DateTimeOffset?)x.StartedAtUtc).MinAsync(ct);
         var start=state.StartedAtUtc ?? new[] {futureStart,replacement is {IsStopped:false} && replacement.ExpiresAtUtc>now ? (DateTimeOffset?)replacement.StartedAtUtc : null}.Min() ?? now;
         return (start,(state.ExpiresAtUtc ?? now).AddDays(r.Days),false);

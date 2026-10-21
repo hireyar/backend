@@ -51,7 +51,7 @@ public sealed class AdminCustomerTests : IAsyncLifetime
         Assert.Equal(owner.Id,Assert.Single((await Read<AdminCustomerPage>(await a.Client.Send(HttpMethod.Get,Route+"?search="+Uri.EscapeDataString(fa)))).Rows.Items).Id);
         Assert.Equal(lead.Id,Assert.Single((await Read<AdminCustomerPage>(await a.Client.Send(HttpMethod.Get,Route+"?status=Waiting"))).Rows.Items).Id);
         Assert.False((await Detail(lead.Id)).CanManageSubscription);
-        await Buy(owner);detail=await Detail(owner.Id);Assert.Equal("Won",detail.Customer.RegistrationStatus);Assert.Equal("Trial",detail.Customer.SubscriptionStatus);
+        await Buy(owner);detail=await Detail(owner.Id);Assert.Equal("Won",detail.Customer.RegistrationStatus);Assert.Equal("Active",detail.Customer.SubscriptionStatus);
         Assert.Equal(HttpStatusCode.BadRequest,(await a.Client.Send(HttpMethod.Get,Route+"?page=0")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,(await a.Client.Send(HttpMethod.Get,Route+"?status=Invalid")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,(await a.Client.Send(HttpMethod.Get,Route+"/"+Guid.NewGuid())).StatusCode);
