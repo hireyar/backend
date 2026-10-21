@@ -37,6 +37,100 @@ public sealed partial class InterviewFlowTests
     private static async Task<NotificationListDto> Notifications(Account a, string query = "") =>
         (await (await a.Client.Send(HttpMethod.Get, "/api/notifications" + query)).Content.ReadFromJsonAsync<NotificationListDto>(TestJson.Options))!;
 
+    private async Task<Account> NotificationMember(Account owner)
+    {
+        var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
+        var sent = await owner.Client.Send(HttpMethod.Post, "/api/team/invitations",
+            new HireYar.Application.Organizations.InviteTeamMemberRequest(mobile, "نام", "آزمایشی"));
+        Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
+        var invitation = (await sent.Content.ReadFromJsonAsync<HireYar.Application.Organizations.TeamInvitationDto>(TestJson.Options))!;
+        var browser = f.Browser();
+        Assert.Equal(HttpStatusCode.OK, (await browser.Send(HttpMethod.Post, "/api/auth/otp/request",
+            new HireYar.Application.Auth.RequestOtpRequest(mobile))).StatusCode);
+        var accepted = await browser.Send(HttpMethod.Post, $"/api/auth/team-invitations/{invitation.Id}/accept",
+            new HireYar.Application.Auth.VerifyOtpRequest(mobile, f.PhoneOtp.Codes[mobile]));
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        browser.AccessToken = (await accepted.Content.ReadFromJsonAsync<HireYar.Application.Auth.AccessResponse>())!.AccessToken;
+        Guid id = default;
+        await f.Db(async db => id = (await db.Users.SingleAsync(u => u.PhoneNumber == mobile)).Id);
+        return new(browser, mobile, id);
+    }
+
+    [PostgresFact]
+    public async Task Notifications_reach_team_members_with_independent_reads_and_live_updates()
+    {
+        var (owner, invite) = await Invite();
+        var member = await NotificationMember(owner);
+        var second = await NotificationMember(owner);
+        var other = await f.RegisterOwner();
+        using var ownerSocket = await NotificationSocket(owner.Client.AccessToken!);
+        using var memberSocket = await NotificationSocket(member.Client.AccessToken!);
+        using var candidate = Candidate(invite);
+        await Start(candidate, invite.InterviewId);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await NotificationChanged(ownerSocket, timeout.Token);
+        await NotificationChanged(memberSocket, timeout.Token);
+        var own = Assert.Single((await Notifications(owner)).Items);
+        var mine = Assert.Single((await Notifications(member)).Items);
+        Assert.Equal(own.Title, mine.Title); Assert.NotEqual(own.Id, mine.Id);
+        Assert.Single((await Notifications(second)).Items);
+        Assert.Empty((await Notifications(other)).Items);
+        Assert.Equal(HttpStatusCode.NotFound, (await member.Client.Send(HttpMethod.Put,
+            $"/api/notifications/{own.Id}/read", new NotificationReadRequest(true))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Put,
+            $"/api/notifications/{mine.Id}/read", new NotificationReadRequest(true))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await member.Client.Send(HttpMethod.Put,
+            $"/api/notifications/{mine.Id}/read", new NotificationReadRequest(true))).StatusCode);
+        await NotificationChanged(memberSocket, timeout.Token);
+        Assert.Equal(0, (await Notifications(member)).UnreadCount);
+        Assert.Equal(1, (await Notifications(owner)).UnreadCount);
+        Assert.Equal(1, (await Notifications(second)).UnreadCount);
+        Assert.Equal(0, (await (await member.Client.Send(HttpMethod.Get, "/api/notifications/unread-count"))
+            .Content.ReadFromJsonAsync<NotificationCountDto>())!.UnreadCount);
+        await Start(candidate, invite.InterviewId);
+        Assert.Single((await Notifications(member)).Items);
+        Assert.Equal(HttpStatusCode.OK, (await candidate.PostAsync($"/api/candidate/interviews/{invite.InterviewId}/complete", null)).StatusCode);
+        await NotificationChanged(memberSocket, timeout.Token);
+        Assert.Single((await Notifications(member)).Items, n => n.Type == "InterviewCompleted" && n.Target == "InterviewReport");
+        Assert.Equal(2, (await Notifications(second)).Items.Count);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.Client.Send(HttpMethod.Post, $"/api/team/members/{member.Id}/deactivate")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await member.Client.Send(HttpMethod.Get, "/api/notifications")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await member.Client.Send(HttpMethod.Post, "/hubs/notifications/negotiate?negotiateVersion=1")).StatusCode);
+    }
+
+    [PostgresFact]
+    public async Task Reminders_reach_active_members_only_and_deduplicate_per_recipient()
+    {
+        var owner = await f.RegisterOwner(explicitSignup: true, provisionMembership: false);
+        var member = await NotificationMember(owner);
+        var inactive = await NotificationMember(owner);
+        var unconfirmed = await NotificationMember(owner);
+        Guid org = default;
+        await f.Db(async db =>
+        {
+            org = (await db.Users.SingleAsync(u => u.Id == owner.Id)).OrganizationId;
+            (await db.Users.SingleAsync(u => u.Id == inactive.Id)).IsActive = false;
+            (await db.Users.SingleAsync(u => u.Id == unconfirmed.Id)).PhoneNumberConfirmed = false;
+            await db.SaveChangesAsync();
+        });
+        var (hr, invite) = await Invite(owner);
+        using var candidate = Candidate(invite);
+        await Start(candidate, invite.InterviewId);
+        using var memberSocket = await NotificationSocket(member.Client.AccessToken!);
+        await Remind(org); await Remind(org);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await NotificationChanged(memberSocket, timeout.Token);
+        foreach (var account in new[] { hr, member })
+        {
+            var items = (await Notifications(account)).Items;
+            Assert.Single(items, n => n.Type == "InterviewStarted");
+            Assert.Single(items, n => n.Type == "SubscriptionExpiring");
+            Assert.Single(items, n => n.Type == "InterviewCreditsLow");
+        }
+        await f.Db(async db => Assert.False(await db.Notifications.AnyAsync(n =>
+            n.RecipientUserId == inactive.Id || n.RecipientUserId == unconfirmed.Id)));
+    }
+
     [PostgresFact]
     public async Task Notifications_push_over_websocket_and_rest_is_scoped_with_read_filters()
     {
@@ -89,7 +183,7 @@ public sealed partial class InterviewFlowTests
     }
     private sealed class FailingNotificationRecipients : INotificationRecipients
     {
-        public Task<Guid?> OwnerAsync(Guid org, CancellationToken ct) => throw new InvalidOperationException("Synthetic persistence failure");
+        public Task<List<Guid>> ActiveMembersAsync(Guid org, CancellationToken ct) => throw new InvalidOperationException("Synthetic persistence failure");
     }
     [PostgresFact]
     public async Task Notification_save_rolls_back_with_start_but_delivery_failure_preserves_committed_start()
@@ -134,15 +228,18 @@ public sealed partial class InterviewFlowTests
         var original = f.Clock.Offset;
         try
         {
-            f.Clock.Offset = end - DateTimeOffset.UtcNow - TimeSpan.FromDays(5.5);
+            f.Clock.Offset = end - DateTimeOffset.UtcNow - TimeSpan.FromDays(7.5);
             await Remind(org);
             await f.Db(async db => Assert.False(await db.Notifications.AnyAsync(n => n.OrganizationId == org && n.Type == "SubscriptionExpiring")));
-            f.Clock.Offset = end - DateTimeOffset.UtcNow - TimeSpan.FromDays(4.5);
+            f.Clock.Offset = end - DateTimeOffset.UtcNow - TimeSpan.FromDays(6.5);
             await Remind(org); await Remind(org);
             await f.Db(async db => Assert.Single(await db.Notifications.Where(n => n.OrganizationId == org && n.Type == "SubscriptionExpiring").ToListAsync()));
-            f.Clock.Offset = end - DateTimeOffset.UtcNow - TimeSpan.FromDays(1.5);
+            f.Clock.Offset = end - DateTimeOffset.UtcNow - TimeSpan.FromDays(2.5);
             await Remind(org); await Remind(org);
             await f.Db(async db => Assert.Equal(2, await db.Notifications.CountAsync(n => n.OrganizationId == org && n.Type == "SubscriptionExpiring")));
+            f.Clock.Offset = end - DateTimeOffset.UtcNow - TimeSpan.FromDays(0.5);
+            await Remind(org); await Remind(org);
+            await f.Db(async db => Assert.Equal(3, await db.Notifications.CountAsync(n => n.OrganizationId == org && n.Type == "SubscriptionExpiring")));
         }
         finally { f.Clock.Offset = original; }
         var empty = await f.RegisterOwner(provisionMembership: false);
@@ -162,6 +259,67 @@ public sealed partial class InterviewFlowTests
         await Remind(emptyOrg); await Remind(emptyOrg);
         Assert.Equal(2, (await Notifications(empty)).Items.Count(n => n.Type == "InterviewCreditsLow"));
 
+    }
+
+    [PostgresFact]
+    public async Task Expiry_reminders_use_seven_three_one_day_windows_for_each_member_without_catchup()
+    {
+        var owner = await f.RegisterOwner();
+        var member = await NotificationMember(owner);
+        var late = await f.RegisterOwner();
+        Guid org = default, lateOrg = default;
+        DateTimeOffset end = default, lateEnd = default;
+        await f.Db(async db =>
+        {
+            org = (await db.Users.SingleAsync(u => u.Id == owner.Id)).OrganizationId;
+            lateOrg = (await db.Users.SingleAsync(u => u.Id == late.Id)).OrganizationId;
+            end = (await db.OrganizationMemberships.SingleAsync(m => m.OrganizationId == org)).ExpiresAtUtc;
+            lateEnd = (await db.OrganizationMemberships.SingleAsync(m => m.OrganizationId == lateOrg)).ExpiresAtUtc;
+        });
+        var original = f.Clock.Offset;
+        try
+        {
+            // One-minute margins avoid wall-clock drift at the exact threshold.
+            foreach (var (remaining, expectedCount, expectedThreshold) in new[]
+            {
+                (TimeSpan.FromDays(7).Add(TimeSpan.FromMinutes(1)), 0, 0),
+                (TimeSpan.FromDays(7).Subtract(TimeSpan.FromMinutes(1)), 1, 7),
+                (TimeSpan.FromDays(3).Add(TimeSpan.FromMinutes(1)), 1, 7),
+                (TimeSpan.FromDays(3).Subtract(TimeSpan.FromMinutes(1)), 2, 3),
+                (TimeSpan.FromDays(1).Add(TimeSpan.FromMinutes(1)), 2, 3),
+                (TimeSpan.FromDays(1).Subtract(TimeSpan.FromMinutes(1)), 3, 1),
+                (TimeSpan.FromMinutes(-1), 3, 1)
+            })
+            {
+                f.Clock.Offset = end - DateTimeOffset.UtcNow - remaining;
+                await Remind(org); await Remind(org);
+                await f.Db(async db =>
+                {
+                    foreach (var recipient in new[] { owner.Id, member.Id })
+                    {
+                        var notices = await db.Notifications.Where(n => n.OrganizationId == org &&
+                            n.RecipientUserId == recipient && n.Type == "SubscriptionExpiring").ToListAsync();
+                        Assert.Equal(expectedCount, notices.Count);
+                        if (expectedCount > 0)
+                        {
+                            var latest = notices.OrderByDescending(n => n.CreatedAtUtc).First();
+                            Assert.Equal($"{end.ToUnixTimeSeconds()}:{expectedThreshold}", latest.SourceKey);
+                            Assert.Contains($"{expectedThreshold} روز", latest.Title);
+                            Assert.Equal("Subscription", latest.Target);
+                        }
+                    }
+                });
+            }
+            f.Clock.Offset = lateEnd - DateTimeOffset.UtcNow - TimeSpan.FromHours(12);
+            await Remind(lateOrg); await Remind(lateOrg);
+            await f.Db(async db =>
+            {
+                var notice = Assert.Single(await db.Notifications.Where(n => n.OrganizationId == lateOrg &&
+                    n.Type == "SubscriptionExpiring").ToListAsync());
+                Assert.Equal($"{lateEnd.ToUnixTimeSeconds()}:1", notice.SourceKey);
+            });
+        }
+        finally { f.Clock.Offset = original; }
     }
 
     [PostgresFact]

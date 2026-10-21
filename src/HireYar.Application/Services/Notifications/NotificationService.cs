@@ -10,14 +10,24 @@ public sealed class NotificationService(IApplicationDbContext db, ICurrentUser u
     INotificationRecipients recipients, INotificationPublisher publisher, ILogger<NotificationService> logger)
 {
     // Joins the caller's transaction/save; publishing happens only after commit.
-    public async Task<Notification?> AddInterviewAsync(InterviewSession session, string candidateName, bool completed, CancellationToken ct)
+    public async Task<List<Notification>> AddInterviewAsync(InterviewSession session, string candidateName, bool completed, CancellationToken ct)
     {
-        var recipient = await recipients.OwnerAsync(session.OrganizationId, ct);
-        if (recipient is null) return null;
-        return await AddAsync(session.OrganizationId, recipient.Value,
-            completed ? "InterviewCompleted" : "InterviewStarted", session.Id.ToString("N"),
-            completed ? $"مصاحبه {candidateName} پایان یافت" : $"مصاحبه {candidateName} شروع شد",
-            completed ? "InterviewReport" : "Interview", session.Id, ct);
+        var added = new List<Notification>();
+        foreach (var recipient in await recipients.ActiveMembersAsync(session.OrganizationId, ct))
+        {
+            var notification = await AddAsync(session.OrganizationId, recipient,
+                completed ? "InterviewCompleted" : "InterviewStarted", session.Id.ToString("N"),
+                completed ? $"مصاحبه {candidateName} پایان یافت" : $"مصاحبه {candidateName} شروع شد",
+                completed ? "InterviewReport" : "Interview", session.Id, ct);
+            if (notification is not null) added.Add(notification);
+        }
+        return added;
+    }
+
+    public async Task PublishAsync(IEnumerable<Notification> added)
+    {
+        foreach (var notification in added.DistinctBy(n => (n.OrganizationId, n.RecipientUserId)))
+            await PublishAsync(notification.OrganizationId, notification.RecipientUserId);
     }
 
     internal async Task<Notification?> AddAsync(Guid org, Guid recipient, string type, string key, string title,

@@ -7,7 +7,7 @@ namespace HireYar.Infrastructure.Notifications;
 
 public sealed class NotificationRecipients(AppDbContext db) : INotificationRecipients
 {
-    public Task<Guid?> OwnerAsync(Guid organizationId, CancellationToken ct) => db.Users.AsNoTracking()
-        .Where(u => u.OrganizationId == organizationId && u.Role == OrganizationRole.Owner && u.IsActive && u.PhoneNumberConfirmed)
-        .Select(u => (Guid?)u.Id).SingleOrDefaultAsync(ct);
+    public Task<List<Guid>> ActiveMembersAsync(Guid organizationId, CancellationToken ct) => db.Users.AsNoTracking()
+        .Where(u => u.OrganizationId == organizationId && (u.Role == OrganizationRole.Owner || u.Role == OrganizationRole.Recruiter) && u.IsActive && u.PhoneNumberConfirmed)
+        .Select(u => u.Id).ToListAsync(ct);
 }
