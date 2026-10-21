@@ -40,6 +40,98 @@ public sealed class SalesTests : IAsyncLifetime
     }
     private async Task<SalesCommissionPage> Commissions(Browser b,string query="")=>await Read<SalesCommissionPage>(await b.Send(HttpMethod.Get,"/api/sales/commissions"+query));
     [PostgresFact]
+    public async Task Lead_search_matches_name_and_mobile_before_paging_and_preserves_agent_scope() {
+        var seller=await Agent(); var other=await Agent(); var a=await Admin();
+        async Task<SalesLeadDto> Lead(Browser b,string name)=>await Read<SalesLeadDto>(await b.Send(HttpMethod.Post,"/api/sales/leads",
+            new SalesLeadRequest("09"+Random.Shared.NextInt64(100_000_000,1_000_000_000),name)));
+        var first=await Lead(seller.Client,"مشتری جستجو یک"); await Lead(seller.Client,"مشتری جستجو دو");
+        var foreign=await Lead(other.Client,"مشتری جستجو سه"); await Lead(seller.Client,"متفاوت");
+        var query="?search="+Uri.EscapeDataString("  مشتری جستجو  ")+"&pageSize=1";
+        var own=await Read<Page<SalesLeadDto>>(await seller.Client.Send(HttpMethod.Get,"/api/sales/leads"+query+"&agentId="+other.Credentials.Agent.Id));
+        Assert.Equal(2,own.Total); Assert.Single(own.Items); Assert.All(own.Items,x=>Assert.Equal(seller.Credentials.Agent.Id,x.AgentId));
+        var all=await Read<Page<SalesLeadDto>>(await a.Client.Send(HttpMethod.Get,"/api/admin/sales/leads"+query));
+        Assert.Equal(3,all.Total); Assert.Single(all.Items);
+        var selected=await Read<Page<SalesLeadDto>>(await a.Client.Send(HttpMethod.Get,"/api/admin/sales/leads"+query+"&agentId="+other.Credentials.Agent.Id));
+        Assert.Equal(foreign.Id,Assert.Single(selected.Items).Id);
+        var mobile=await Read<Page<SalesLeadDto>>(await seller.Client.Send(HttpMethod.Get,"/api/sales/leads?search="+first.Mobile[2..]));
+        Assert.Equal(first.Id,Assert.Single(mobile.Items).Id);
+        Assert.Empty((await Read<Page<SalesLeadDto>>(await seller.Client.Send(HttpMethod.Get,"/api/sales/leads?search="+foreign.Mobile))).Items);
+        Assert.Empty((await Read<Page<SalesLeadDto>>(await seller.Client.Send(HttpMethod.Get,"/api/sales/leads"+query+"&status=Registered"))).Items);
+        Assert.Equal(3,(await Read<Page<SalesLeadDto>>(await seller.Client.Send(HttpMethod.Get,"/api/sales/leads?search=%20%20"))).Total);
+        foreach(var path in new[]{"/api/sales/leads","/api/admin/sales/leads"}) {
+            var client=path.StartsWith("/api/admin/") ? a.Client : seller.Client;
+            Assert.Equal(HttpStatusCode.BadRequest,(await client.Send(HttpMethod.Get,path+"?search="+new string('x',201))).StatusCode);
+        }
+        var document=await Read<JsonElement>(await f.Browser().Send(HttpMethod.Get,"/openapi/v1.json"));
+        foreach(var path in new[]{"/api/sales/leads","/api/admin/sales/leads"})
+            Assert.Contains(document.GetProperty("paths").GetProperty(path).GetProperty("get").GetProperty("parameters").EnumerateArray(),
+                p=>string.Equals(p.GetProperty("name").GetString(),"Search",StringComparison.OrdinalIgnoreCase));
+    }
+    [PostgresFact]
+    public async Task Active_paid_subscription_blocks_claim_without_side_effects_but_expired_customer_can_be_claimed() {
+        var seller=await Agent(); var a=await Admin(); var active=await f.RegisterOwner();
+        var response=await seller.Client.Send(HttpMethod.Post,"/api/sales/leads",new SalesLeadRequest(active.Mobile,"اشتراک فعال"));
+        Assert.Equal(HttpStatusCode.Conflict,response.StatusCode);
+        var problem=(await response.Content.ReadFromJsonAsync<JsonElement>())!;
+        Assert.Equal("customer_has_active_subscription",problem.GetProperty("code").GetString());
+        Assert.Equal("این شماره قبلا ثبت شده و اشتراک فعال دارد",problem.GetProperty("title").GetString());
+        await f.Db(async db=>Assert.False(await db.SalesLeads.AnyAsync(x=>x.Mobile==active.Mobile)));
+        Assert.Empty((await Commissions(seller.Client)).Rows.Items);
+
+        var expired=await f.RegisterOwner(provisionMembership:false);
+        // Confirm a real purchase in the past without changing immutable membership rows.
+        f.Clock.Offset=TimeSpan.FromDays(-40); await Buy(expired); f.Clock.Offset=TimeSpan.Zero;
+        Assert.False((await Read<SubscriptionStateDto>(await expired.Client.Send(HttpMethod.Get,"/api/subscriptions/current"))).HasActiveSubscription);
+        var lead=await Read<SalesLeadDto>(await seller.Client.Send(HttpMethod.Post,"/api/sales/leads",new SalesLeadRequest(expired.Mobile,"اشتراک منقضی")));
+        Assert.Equal("Won",lead.Status); Assert.Empty((await Commissions(seller.Client)).Rows.Items);
+        await Buy(expired);
+        var commission=Assert.Single((await Commissions(seller.Client)).Rows.Items);
+        Assert.Equal("Renewal",commission.Kind); Assert.Equal(seller.Credentials.Agent.RenewalPercent,commission.Percent);
+    }
+    [PostgresFact]
+    public async Task Active_trial_and_gift_customers_can_be_claimed_and_first_purchase_uses_database_rate() {
+        var seller=await Agent(); var a=await Admin();
+        var trial=await f.RegisterOwner(explicitSignup:true,provisionMembership:false);
+        Assert.True((await Read<SubscriptionStateDto>(await trial.Client.Send(HttpMethod.Get,"/api/subscriptions/current"))).IsTrial);
+        var claimed=await Read<SalesLeadDto>(await seller.Client.Send(HttpMethod.Post,"/api/sales/leads",new SalesLeadRequest(trial.Mobile,"مشتری تریال")));
+        Assert.Equal("Registered",claimed.Status);
+        var gift=await f.RegisterOwner(provisionMembership:false);
+        await f.Db(async db=> {
+            var org=await db.Users.Where(x=>x.Id==gift.Id).Select(x=>x.OrganizationId).SingleAsync(); var now=f.Clock.GetUtcNow();
+            var start=now.AddMinutes(-1);
+            db.ExistingOrganizationGrants.Add(new() { OrganizationId=org,CreatedAtUtc=now,StartedAtUtc=start,ExpiresAtUtc=start.AddMonths(1),TeamUsers=5,RetentionDays=60 });
+            await db.SaveChangesAsync();
+        });
+        var state=await Read<SubscriptionStateDto>(await gift.Client.Send(HttpMethod.Get,"/api/subscriptions/current"));
+        Assert.True(state.HasActiveSubscription); Assert.False(state.IsTrial);
+        Assert.Equal("Registered",(await Read<SalesLeadDto>(await seller.Client.Send(HttpMethod.Post,"/api/sales/leads",new SalesLeadRequest(gift.Mobile,"مشتری هدیه")))).Status);
+        Assert.Empty((await Commissions(seller.Client)).Rows.Items);
+        var agent=seller.Credentials.Agent;
+        await Read<SalesAgentDto>(await a.Client.Send(HttpMethod.Put,$"/api/admin/sales/agents/{agent.Id}",new SalesAgentRequest(agent.FullName,agent.Mobile,27.5m,6.25m)));
+        seller.Client.AccessToken=(await Read<SalesSessionDto>(await seller.Client.Send(HttpMethod.Post,"/api/sales/auth/login",new SalesLoginRequest(agent.Mobile,seller.Credentials.Password)))).AccessToken;
+        var purchase=await Buy(trial); await Buy(trial);
+        var rows=(await Commissions(seller.Client)).Rows.Items;
+        var first=Assert.Single(rows,x=>x.Kind=="FirstSale"); Assert.Equal(27.5m,first.Percent); Assert.Equal((long)decimal.Floor(purchase.AmountRial*0.275m),first.AmountRial);
+        Assert.Equal(6.25m,Assert.Single(rows,x=>x.Kind=="Renewal").Percent);
+        Assert.Equal("Won",(await Read<Page<SalesLeadDto>>(await seller.Client.Send(HttpMethod.Get,"/api/sales/leads?search="+trial.Mobile))).Items.Single().Status);
+    }
+    [PostgresFact]
+    public async Task Another_agents_claim_error_has_priority_even_after_customer_purchases() {
+        var seller=await Agent(); var other=await Agent();
+        var owner=await f.RegisterOwner(provisionMembership:false);
+        await Read<SalesLeadDto>(await seller.Client.Send(HttpMethod.Post,"/api/sales/leads",new SalesLeadRequest(owner.Mobile,"مشتری")));
+        async Task Rejected() {
+            var response=await other.Client.Send(HttpMethod.Post,"/api/sales/leads",new SalesLeadRequest(owner.Mobile,"مشتری"));
+            Assert.Equal(HttpStatusCode.Conflict,response.StatusCode);
+            var problem=(await response.Content.ReadFromJsonAsync<JsonElement>())!;
+            Assert.Equal("lead_already_claimed",problem.GetProperty("code").GetString());
+            Assert.Equal("این شماره توسط کارشناس فروش دیگری ثبت شده است",problem.GetProperty("title").GetString());
+        }
+        await Rejected(); await Buy(owner); await Rejected();
+        Assert.Empty((await Commissions(other.Client)).Rows.Items);
+        Assert.Single((await Commissions(seller.Client)).Rows.Items);
+    }
+    [PostgresFact]
     public async Task Signup_attribution_purchase_hold_filtered_totals_payout_race_and_renewal_are_atomic() {
         var seller=await Agent(); var second=await Agent(); var a=await Admin();
         var mobile="09"+Random.Shared.NextInt64(100_000_000,1_000_000_000).ToString();
@@ -52,6 +144,7 @@ public sealed class SalesTests : IAsyncLifetime
         Assert.Equal(lead.Id,Assert.Single(registered.Items).Id); Assert.NotNull(registered.Items[0].RegisteredAtUtc);
         var trial=await Read<SubscriptionStateDto>(await b.Send(HttpMethod.Get,"/api/subscriptions/current")); Assert.True(trial.IsTrial); Assert.Equal(2,trial.AvailableInterviews);
         var order=await Buy(customer); await Buy(customer,"interviews");
+        Assert.Equal(lead.Id,Assert.Single((await Read<Page<SalesLeadDto>>(await seller.Client.Send(HttpMethod.Get,"/api/sales/leads?status=Won"))).Items).Id);
         var rows=await Commissions(seller.Client); var first=Assert.Single(rows.Rows.Items); Assert.Equal(18_000_000,first.AmountRial); Assert.Equal("Holding",first.Status);
         Assert.Equal(0,(await Commissions(second.Client)).Rows.Total);
         Assert.Equal(HttpStatusCode.Conflict,(await seller.Client.Send(HttpMethod.Post,"/api/sales/payouts",new SalesPayoutRequest(Guid.NewGuid(),[first.Id]))).StatusCode);

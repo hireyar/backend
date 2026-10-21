@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using HireYar.Application.Common;
 using HireYar.Application.Sales;
+using HireYar.Application.Subscriptions;
 using HireYar.Domain.Sales;
 using HireYar.Infrastructure.Auth;
 using HireYar.Infrastructure.Persistence;
@@ -82,24 +83,32 @@ public sealed class SalesAccounts(AppDbContext db, IOptions<SecurityOptions> sec
     },ct);
 }
 
-public sealed class SalesLeads(AppDbContext db, TimeProvider time) : ISalesLeads
+public sealed class SalesLeads(AppDbContext db, TimeProvider time, SubscriptionService subscriptions) : ISalesLeads
 {
     public async Task<SalesLeadDto> CreateAsync(Guid agent,SalesLeadRequest r,CancellationToken ct) {
         SalesService.Text(r.CustomerName,200); SalesService.Text(r.Note,2000,false);
         await using var tx=await db.Database.BeginTransactionAsync(ct);
         await TeamMembershipLocks.LockMobileAsync(db,r.Mobile,ct);
+        var customer=await db.Users.AsNoTracking().SingleOrDefaultAsync(x=>x.PhoneNumber==r.Mobile,ct);
+        // Match order confirmation's organization -> sales lock order so purchase and claim cannot interleave.
+        if (customer is not null)
+            await db.Organizations.FromSqlInterpolated($"SELECT * FROM \"Organizations\" WHERE \"Id\"={customer.OrganizationId} FOR UPDATE").AsNoTracking().LoadAsync(ct);
+        var claimedByOtherAgent=false;
         var result=await db.WithSalesLockAsync(async () => {
             if (!await db.SalesAgents.AnyAsync(x=>x.Id==agent && x.IsActive,ct)) throw AppException.Unauthorized();
-            var existingLead = await db.SalesLeads.Where(x=>x.Mobile==r.Mobile).Select(x=>(Guid?)x.Id).SingleOrDefaultAsync(ct);
+            var existingLead = await db.SalesLeads.SingleOrDefaultAsync(x=>x.Mobile==r.Mobile,ct);
             if (existingLead is not null) {
-                db.SalesAudits.Add(new() { ActorId=agent, LeadId=existingLead, Action="DuplicateClaimRejected",CreatedAtUtc=time.GetUtcNow() });
+                claimedByOtherAgent=existingLead.AgentId is not null && existingLead.AgentId!=agent;
+                db.SalesAudits.Add(new() { ActorId=agent, LeadId=existingLead.Id, Action="DuplicateClaimRejected",CreatedAtUtc=time.GetUtcNow() });
                 return (SalesLeadDto?)null;
             }
-            var customer=await db.Users.AsNoTracking().SingleOrDefaultAsync(x=>x.PhoneNumber==r.Mobile,ct);
             if (customer is not null && customer.Role != HireYar.Domain.Organizations.OrganizationRole.Owner)
                 throw new AppException(409,"lead_unavailable","Mobile cannot be attributed.");
             if (customer is not null && await db.SalesLeads.AnyAsync(x=>x.OrganizationId==customer.OrganizationId,ct))
                 throw new AppException(409,"lead_unavailable","Customer already attributed.");
+            // Gift/trial memberships have no paid order; expired or excluded purchases are not active.
+            if (customer is not null && await subscriptions.CurrentAsync(customer.OrganizationId,ct) is { OrderId: var orderId } && orderId!=Guid.Empty)
+                throw new AppException(409,"customer_has_active_subscription","این شماره قبلا ثبت شده و اشتراک فعال دارد");
             var lead=new SalesLead { AgentId=agent,Mobile=r.Mobile,CustomerName=r.CustomerName.Trim(),Note=r.Note.Trim(),
                 CreatedAtUtc=time.GetUtcNow(),LastContactAtUtc=time.GetUtcNow(),OrganizationId=customer?.OrganizationId,RegisteredAtUtc=customer?.CreatedAtUtc };
             db.SalesLeads.Add(lead);
@@ -108,6 +117,6 @@ public sealed class SalesLeads(AppDbContext db, TimeProvider time) : ISalesLeads
             return SalesService.MapLead(lead,won,time.GetUtcNow());
         },ct);
         await tx.CommitAsync(ct);
-        return result ?? throw new AppException(409,"lead_already_claimed","Mobile already claimed.");
+        return result ?? throw new AppException(409,"lead_already_claimed",claimedByOtherAgent ? "این شماره توسط کارشناس فروش دیگری ثبت شده است" : "Mobile already claimed.");
     }
 }

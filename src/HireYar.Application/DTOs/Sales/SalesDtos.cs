@@ -19,6 +19,7 @@ public sealed record SalesLeadDto(Guid Id, Guid? AgentId, string CustomerName, s
 public sealed class SalesLeadFilter
 {
     public Guid? AgentId { get; set; }
+    [StringLength(200)] public string? Search { get; set; }
     [RegularExpression("^(Waiting|Registered|Won|Dead)$")] public string? Status { get; set; }
 }
 public sealed class SalesCommissionFilter

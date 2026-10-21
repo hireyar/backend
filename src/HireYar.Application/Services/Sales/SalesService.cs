@@ -18,6 +18,10 @@ public sealed class SalesService(IApplicationDbContext db, TimeProvider time)
     public async Task<Page<SalesLeadDto>> LeadsAsync(Guid? agent,SalesLeadFilter filter,PageQuery page,CancellationToken ct) {
         var now=time.GetUtcNow(); var cutoff=now.AddDays(-30);
         var q=db.SalesLeads.AsNoTracking().Where(x=>agent==null || x.AgentId==agent);
+        if (!string.IsNullOrWhiteSpace(filter.Search)) {
+            var search=filter.Search.Trim();
+            q=q.Where(x=>x.CustomerName.Contains(search) || x.Mobile.Contains(search));
+        }
         var orders=db.SubscriptionOrders.Where(o=>o.Status=="Confirmed" && o.Product=="subscription");
         if(filter.Status=="Won") q=q.Where(x=>orders.Any(o=>o.OrganizationId==x.OrganizationId));
         if(filter.Status=="Registered") q=q.Where(x=>x.RegisteredAtUtc!=null && !orders.Any(o=>o.OrganizationId==x.OrganizationId));
