@@ -205,13 +205,22 @@ public sealed class AiCapabilityRoutingTests
 
     [Theory]
     [InlineData("{\"error_code\":429,\"error_message\":\"sensitive\"}", "stt_http_429")]
-    [InlineData("{\"finished\":true}", "stt_invalid_response")]
     [InlineData("{\"tokens\":{}}", "stt_invalid_response")]
     public async Task Soniox_rejects_errors_empty_and_malformed_results(string message, string code)
     {
         using var socket = new Socket(message); using var audio = new MemoryStream([1]);
         var error = await Assert.ThrowsAsync<InterviewProviderException>(() => SonioxSpeechToTextService.TranscribeSessionAsync(socket, audio, new(), default));
         Assert.Equal(code, error.Code); Assert.DoesNotContain("sensitive", error.Message);
+    }
+
+    [Fact]
+    public async Task Soniox_completed_silence_is_valid_empty_transcription_for_microphone_check()
+    {
+        using var socket = new Socket("""{"tokens":[],"finished":true}""");
+        using var audio = new MemoryStream([1]);
+        var result = await SonioxSpeechToTextService.TranscribeSessionAsync(socket, audio, new() { Model = "stt-test" }, default);
+        Assert.Equal(string.Empty, result.Text);
+        Assert.Equal("Soniox", result.Provider);
     }
 
     [Fact]

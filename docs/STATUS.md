@@ -1,3 +1,13 @@
+اعتبارسنجی این اصلاح:۲۱/۲۱تست پروتکل Soniox/انتخاب پروایدر/قالب ایمیل با۰Fail/۰Skip موفق (soniox-email-rtl.trx و artifacts/soniox-email-rtl-tests.log). build نهایی solution با۰Warning/۰Error و git diff --check موفق (artifacts/soniox-email-final-build.log). git diff فایل appsettings.json خالی است؛ هیچ توکن یا تنظیمی تغییر نکرد. تست HTTP/PostgreSQL در این اصلاح اجرا نشده؛ مسیر HTTP no-speech موجود است و تغییر محدود به adapter و HTML است. پیش‌نمایش HTML تولید شد؛ بررسی بصری با ابزار مرورگر به علت مسدودبودن پروتکل file انجام نشد و نمایش در Gmail/Outlook واقعی تأیید نشده است.
+
+## ایمیل Tahoma/RTL و تشخیص خطای Soniox — 2026-10-22
+
+قالب دعوت تیم برای ایمیل‌خوان‌ها جهت rtl، text-align:right و فونت Tahoma/Arial را روی body، جدول/سلول اصلی، متن، کارت نقش و دکمه به‌صورت inline تکرار می‌کند؛ لینک خام تنها بخش LTR است. متن۱۴px با line-height۲۸، عنوان۲۰، نقش۱۵ و توضیحات۱۲ است. encoding محتوای کاربر و plain text محفوظ‌اند. پیش‌نمایش مصنوعی artifacts/team-invitation-preview.html است؛ ارسال ایمیل واقعی انجام نشد.
+
+Soniox: finished=true با متن خالی پاسخ معتبرِ بدون گفتار است؛ قبلاً stt_invalid_response و سپس503 می‌شد. اکنون متن خالی به قرارداد موجود audio-check می‌رسد تا speechRecognized=false برگردد؛ مسیر پاسخ مصاحبه همچنان متن خالی را جدا رد می‌کند. خطاهای واقعی provider همچنان503 هستند. لاگ و InterviewTrace به‌جای stt_failure عمومی، failureCode دقیق کنترل‌شده مانند stt_http_401/429، stt_timeout یا stt_invalid_response می‌دهند؛ متن خام provider، صوت، transcript، هدر و کلید لاگ نمی‌شوند.
+
+با اجازه صریح کاربر و همان توکن appsettings، اتصال واقعی Soniox/stt-rt-v5 با سکوت WAV یک‌ثانیه‌ای تا finished=true/بدون token و گفتار مصنوعی تا token و finished=true موفق بود. توکن‌ها/تنظیمات تغییر نکردند. علت دقیق درخواست503 گزارش‌شده با لاگ قدیمی قابل اثبات نیست؛ ایراد متن خالی قابل بازتولید رفع شد، نه ادعای رفع هر خطای محیط مقصد. مرجع پروتکل: https://soniox.com/docs/api-reference/stt/websocket-api . قرارداد API، DB و migration تغییر نکرده‌اند؛ انتشار انجام نشده است.
+
 ## اعتبارسنجی نهایی ظرفیت و ایمیل — 2026-10-22
 
 build نهایی Release موفق با۰Warning/۰Error (artifacts/team-capacity-final-build.log)، مدل EF بدون pending changes و git diff --check موفق. اجرای گسترده۱۱۳تست:۱۱۰Pass و۳مورد اصلاح‌شده شامل fixture قدیمیِ بدون ایمیل، LINQ داخل تست savepoint و required نبودن ایمیل در OpenAPI. بازاجرای۱۱/۱۱Pass با۰Fail/۰Skip؛ مجموع۱۱۳سناریوی یکتای مرتبط در نتیجه نهایی موفق‌اند. شواهد: artifacts/team-capacity-email-tests.log، artifacts/team-capacity-final.log و team-capacity-email.trx / team-capacity-final.trx در tests/HireYar.Tests/TestResults. ایمیل در JSON و OpenAPI نیز required شد؛ null/خالی/نامعتبر همچنان400.
