@@ -22,7 +22,7 @@ public sealed class TeamInvitationEmail(AppDbContext db, IOptions<InvitationNoti
         var role = await db.AccessRoles.AsNoTracking().Where(x => x.Code == invite.AccessRoleCode).Select(x => x.Name).SingleAsync(ct);
         var url = security.Value.FrontendUrl.TrimEnd('/') + "/team-invitations/" + invite.Id;
         try {
-            using var mail = new MailMessage { From = new(o.FromAddress, o.FromName), Subject = invite.Language == "en" ? "You're invited to your team | HireYar" : invite.Language == "ar" ? "دعوة للانضمام إلى الفريق | HireYar" : "دعوت به تیم شما | هایریار", SubjectEncoding = Encoding.UTF8, BodyEncoding = Encoding.UTF8 };
+            using var mail = new MailMessage { From = new(o.FromAddress, o.FromName), Subject = "دعوت به تیم شما | هایریار", SubjectEncoding = Encoding.UTF8, BodyEncoding = Encoding.UTF8 };
             mail.To.Add(new MailAddress(invite.Email));
             var content = Render(invite, org, role, url);
             mail.Body = content.Text;
@@ -37,17 +37,15 @@ public sealed class TeamInvitationEmail(AppDbContext db, IOptions<InvitationNoti
     public static (string Html, string Text) Render(MobileTeamInvitation i, string organization, string role, string url)
     {
         static string E(string? s) => WebUtility.HtmlEncode(s ?? "");
-        var en = i.Language == "en"; var ar = i.Language == "ar";
-        var title = en ? "Your next chapter starts here." : ar ? "خطوتك التالية تبدأ هنا." : "همکاری تازه از اینجا شروع می‌شود.";
-        var intro = en ? "You have been invited to join" : ar ? "أنت مدعو للانضمام إلى" : "برای پیوستن به تیم دعوت شده‌اید";
-        var label = en ? "Your access level" : ar ? "مستوى الوصول" : "سطح دسترسی شما";
-        var button = en ? "Accept invitation" : ar ? "قبول الدعوة" : "پذیرش دعوت و ورود";
-        var note = en ? "Sign in with the mobile number provided to your team administrator. A verification code will be sent to that number. This invitation is valid for 72 hours from creation." : ar ? "سجّل الدخول باستخدام رقم الهاتف المسجّل لدى مسؤول الفريق. سيُرسل رمز تحقق إلى الرقم نفسه. الدعوة صالحة لمدة ٧٢ ساعة من إنشائها." : "با شماره موبایلی که برای دعوت شما ثبت شده وارد شوید. کد تأیید به همان شماره ارسال می‌شود. این دعوت از زمان ایجاد تا ۷۲ ساعت معتبر است.";
-        var ignore = en ? "If you weren't expecting this invitation, you can ignore this email." : ar ? "إذا لم تكن تتوقع هذه الدعوة، يمكنك تجاهل الرسالة." : "اگر منتظر این دعوت نبودید، می‌توانید این ایمیل را نادیده بگیرید.";
-        var dir = en ? "ltr" : "rtl";
+        const string title = "همکاری تازه از اینجا شروع می‌شود.";
+        const string intro = "برای پیوستن به تیم دعوت شده‌اید";
+        const string label = "سطح دسترسی شما";
+        const string button = "پذیرش دعوت و ورود";
+        const string note = "با شماره موبایلی که برای دعوت شما ثبت شده وارد شوید. کد تأیید به همان شماره ارسال می‌شود. این دعوت از زمان ایجاد تا ۷۲ ساعت معتبر است.";
+        const string ignore = "اگر منتظر این دعوت نبودید، می‌توانید این ایمیل را نادیده بگیرید.";
         var message = string.IsNullOrWhiteSpace(i.Message) ? "" : $"""<div style="margin:24px 0;padding:16px;border-right:3px solid #14b8a6;background:#101f30;color:#cbd5e1;line-height:2">{E(i.Message).Replace("\n", "<br>")}</div>""";
         var html = $"""
-<!doctype html><html lang="{E(i.Language)}" dir="{dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"></head>
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"></head>
 <body style="margin:0;background:#070e18;font-family:Tahoma,Arial,sans-serif;color:#e7eefb"><div style="display:none;max-height:0;overflow:hidden">{E(organization)} · {E(role)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#070e18"><tr><td align="center" style="padding:40px 16px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#0e1a2b;border:1px solid #263449;border-radius:20px;overflow:hidden"><tr><td style="height:4px;background:#14b8a6"></td></tr>

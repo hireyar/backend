@@ -32,7 +32,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         if (template.JobPositionId != job.Id)
         {
             template = new InterviewTemplate { OrganizationId = user.OrganizationId, JobPositionId = job.Id,
-                UseTopicQuestions = template.UseTopicQuestions, Title = template.Title, InterviewType = template.InterviewType, Language = template.Language,
+                UseTopicQuestions = template.UseTopicQuestions, Title = template.Title, InterviewType = template.InterviewType, Language = "fa-IR",
                 WelcomeMessage = template.WelcomeMessage, GoodbyeMessage = template.GoodbyeMessage,
                 CandidateIntroductionEnabled = template.CandidateIntroductionEnabled, CandidateIntroductionMessage = template.CandidateIntroductionMessage,
                 CompanyIntroductionEnabled = template.CompanyIntroductionEnabled, CompanyIntroductionMessage = template.CompanyIntroductionMessage,
@@ -60,7 +60,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
         session.SetInterviewType(type);
         session.SetInteractionLimit(2);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
-        session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, extracted, template.Language,
+        session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, extracted, "fa-IR",
             template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
         var token = IssueCode(session);
         var saved = await storage.SaveAsync(new MemoryStream(file.Bytes), "resumes", application.Id, ResumeUploadValidator.MaxBytes, ct);
@@ -133,7 +133,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             fresh.SetPanelSnapshot(session.PositionTitleSnapshot ?? job.Title, session.PositionDescriptionSnapshot ?? job.Description,
                 session.TemplateTitleSnapshot ?? template.Title, session.WelcomeMessage ?? template.WelcomeMessage, session.GoodbyeMessage ?? template.GoodbyeMessage);
             fresh.SetAiSnapshot(session.MasterPromptSnapshot ?? InterviewDecisionPrompt.Master, session.MasterPromptVersion ?? InterviewDecisionPrompt.Version,
-                session.ResumeTextSnapshot, session.Language, session.CandidateIntroductionEnabled, session.CandidateIntroductionMessage ?? "",
+                session.ResumeTextSnapshot, "fa-IR", session.CandidateIntroductionEnabled, session.CandidateIntroductionMessage ?? "",
                 session.CompanyIntroductionEnabled, session.CompanyIntroductionMessage ?? "");
             var code = IssueCode(fresh, invitationSecurity.Unprotect(session.Id, session.ProtectedAccessCode));
             await quota.ReleaseLockedAsync(session, ct);

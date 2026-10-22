@@ -56,7 +56,7 @@ public sealed class TeamMembers(AppDbContext db, ICurrentUser user, UserManager<
         if (existing is not null) await ProtectAdministrator(existing.AccessRoleCode, ct);
         await subscriptions.RequireTeamCapacityLockedAsync(user.OrganizationId, false, ct);
         var now = Now;
-        var invitation = new MobileTeamInvitation { OrganizationId = user.OrganizationId, Mobile = request.Mobile, FirstName = request.FirstName.Trim(), LastName = request.LastName.Trim(), AccessRoleCode = selectedRole.Code, Email = request.Email?.Trim(), Language = request.Language, Message = request.Message?.Trim(), CreatedAtUtc = now, ExpiresAtUtc = now.AddDays(3) };
+        var invitation = new MobileTeamInvitation { OrganizationId = user.OrganizationId, Mobile = request.Mobile, FirstName = request.FirstName.Trim(), LastName = request.LastName.Trim(), AccessRoleCode = selectedRole.Code, Email = request.Email?.Trim(), Language = "fa", Message = request.Message?.Trim(), CreatedAtUtc = now, ExpiresAtUtc = now.AddDays(3) };
         db.MobileTeamInvitations.Add(invitation);
         Audit("InvitationCreated", invitation.Id, selectedRole.Code);
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);

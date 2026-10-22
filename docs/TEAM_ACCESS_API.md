@@ -32,7 +32,7 @@ endpointهای زیر نیازمند مجوز team مربوط هستند و هم
 - `GET /api/team/access-roles`: نقش‌های فعال برای selector و کارت توضیح.
 - `GET /api/team/access-sections`: برچسب/شرح قابل تنظیم بخش‌ها برای ماتریس.
 - `GET /api/team/members` و `/invitations`: pagination قبلی. اعضا accessRoleCode دارند؛ دعوت‌ها accessRoleCode/email/language دارند. مالک با accessRoleCode=admin نمایش داده می‌شود اما ownership مستقل است.
-- `POST /api/team/invitations`: `{mobile,firstName,lastName,accessRoleCode,email?,language?,message?}`. mobile حتماً `09` و۹رقم ASCII دیگر؛ نام و نام خانوادگی هرکدام الزامی و۱۰۰کاراکتر، مجموع۲۰۰. accessRoleCode نقش فعال و ترجیحاً در UI انتخاب صریح؛ پیش‌فرض سازگاری سرور interview_manager است. email اختیاری/معتبر/۲۵۶کاراکتر، language یکی از fa/en/ar و پیش‌فرضfa، message حداکثر۲۰۰۰.
+- `POST /api/team/invitations`: `{mobile,firstName,lastName,accessRoleCode,email?,language?,message?}`. mobile حتماً `09` و۹رقم ASCII دیگر؛ نام و نام خانوادگی هرکدام الزامی و۱۰۰کاراکتر، مجموع۲۰۰. accessRoleCode نقش فعال و ترجیحاً در UI انتخاب صریح؛ پیش‌فرض سازگاری سرور interview_manager است. email اختیاری/معتبر/۲۵۶کاراکتر، انتخاب زبان حذف شده؛ language فقط برای سازگاری اختیاری و فقطfa قابل قبول است و نباید در فرم نمایش داده شود، message حداکثر۲۰۰۰.
 - موفقیت201؛ پاسخ شامل `emailDelivery: Sent | Failed | NotConfigured | NotRequested`. نبود ایمیل NotRequested؛ SMTP غیرفعال/ناقص NotConfigured. شکست ارسال، دعوت ذخیره‌شده را حذف نمی‌کند. در GETهای بعدی این فیلد وضعیت ارسال تاریخی نیست؛ نتیجه ارسال فقط پاسخ عملیات است.
 - `POST /api/team/invitations/batch`: `{invitations:[همان بدنه دعوت]}`،۱تا۵۰عضو. هر ورودی موبایل خودش را دارد؛ ایمیل تنها کافی نیست. اعتبارسنجی ساختار پیش از عملیات؛ نتیجه هر آیتم `{mobile,invitation,status,errorCode}`. هر آیتم تراکنش مستقل دارد؛ شکست یک آیتم موارد موفق را برنمی‌گرداند. پس از timeout ابتدا لیست را بخوانید و همه موارد موفق را دوباره ارسال نکنید.
 - `POST /api/team/invitations/{id}/resend`: ارسال مجدد ایمیل فقط برای دعوت دارای ایمیل و در انتظار/منقضی‌نشده. مهلت اصلی تمدید نمی‌شود؛ لغو/پذیرفته‌شده/منقضی409. نتیجه ارسال در emailDelivery.
@@ -52,7 +52,7 @@ endpointهای زیر نیازمند مجوز team مربوط هستند و هم
 
 توکن OTP برای همان شماره، یک‌بارمصرف و با محدودیت تلاش موجود است؛ دعوت۷۲ساعت از زمان ایجاد اعتبار دارد، یک‌بار پذیرفته می‌شود و پس از لغو/انقضا قابل پذیرش نیست. نقش هنگام پذیرش باید هنوز فعال باشد. لینک هیچ OTPای در خود ندارد.
 
-SMTP از تنظیمات موجود `InterviewNotifications:Email` استفاده می‌کند؛ سرویس یا رمز جدید لازم نیست. پیکربندی Enabled/Host/Port/EnableSsl/Username/Password/FromAddress/FromName/TimeoutSeconds همان قبلی است. بدون SMTP فعال، دعوت ساخته می‌شود و NotConfigured برمی‌گردد. قالب team مجزا، جدول‌محور، راست‌به‌چپ برای fa/ar و چپ‌به‌راست برای en، متن ساده جایگزین، رنگ تیره/فیروزه‌ای و HTML encoding نام/سازمان/نقش/پیام است. ارسال واقعی به کاربران در تست انجام نمی‌شود.
+SMTP از تنظیمات موجود `InterviewNotifications:Email` استفاده می‌کند؛ سرویس یا رمز جدید لازم نیست. پیکربندی Enabled/Host/Port/EnableSsl/Username/Password/FromAddress/FromName/TimeoutSeconds همان قبلی است. بدون SMTP فعال، دعوت ساخته می‌شود و NotConfigured برمی‌گردد. قالب team مجزا، جدول‌محور، فقط فارسی و راست‌به‌چپ، متن ساده جایگزین، رنگ تیره/فیروزه‌ای و HTML encoding نام/سازمان/نقش/پیام است. ارسال واقعی به کاربران در تست انجام نمی‌شود.
 
 ## اتصال فرانت و انتشار
 

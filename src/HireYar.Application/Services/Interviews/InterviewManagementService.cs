@@ -98,7 +98,7 @@ public sealed class InterviewManagementService(IApplicationDbContext db, ICurren
         session.SetInteractionLimit(template.MaxFollowUpQuestionsPerQuestion);
         var job = await db.JobPositions.AsNoTracking().SingleAsync(x => x.Id == jobId && x.OrganizationId == user.OrganizationId, ct);
         session.SetPanelSnapshot(job.Title, job.Description, template.Title, template.WelcomeMessage, template.GoodbyeMessage);
-        session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, null, template.Language,
+        session.SetAiSnapshot(InterviewDecisionPrompt.Master, InterviewDecisionPrompt.Version, null, "fa-IR",
             template.CandidateIntroductionEnabled, template.CandidateIntroductionMessage, template.CompanyIntroductionEnabled, template.CompanyIntroductionMessage);
         var encrypted = invitationSecurity.Protect(session.Id, token);
         session.SetProtectedAccessCode(encrypted, InterviewTokens.Hash(encrypted)); db.InterviewSessions.Add(session);
