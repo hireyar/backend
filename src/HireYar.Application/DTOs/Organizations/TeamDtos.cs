@@ -7,7 +7,8 @@ public sealed record InviteTeamMemberRequest(
     [Required, StringLength(100)] string FirstName,
     [Required, StringLength(100)] string LastName,
     [Required, StringLength(64)] string AccessRoleCode = "interview_manager",
-    [EmailAddress, StringLength(256)] string? Email = null,
+    [Required, EmailAddress, StringLength(256)]
+    [property: System.Text.Json.Serialization.JsonRequired] string? Email = null,
     [RegularExpression("^fa$")] string Language = "fa",
     [StringLength(2000)] string? Message = null) : IValidatableObject
 {
@@ -25,3 +26,6 @@ public sealed record TeamMemberDto(Guid Id, string FullName, string? Mobile, Org
 
 public sealed record BatchTeamInvitationsRequest([Required, MinLength(1), MaxLength(50)] IReadOnlyList<InviteTeamMemberRequest> Invitations);
 public sealed record BatchTeamInvitationResult(string Mobile, TeamInvitationDto? Invitation, int Status, string? ErrorCode);
+
+public sealed record TeamInvitationCapacityDto(bool HasActiveSubscription, int? TeamLimit, int ActiveMembers,
+    int PendingInvitations, int OccupiedSlots, int? AvailableSlots, bool UnlimitedTeam, int MaxBatchSize);

@@ -62,6 +62,7 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
     private async Task<SessionResult> VerifyAsync(VerifyOtpRequest r, Guid? invitationId, RegisterRequest? registration, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        if (invitationId is not null) await HireYar.Infrastructure.Organizations.AccessCatalogLocks.SharedAsync(db, ct);
         await TeamMembershipLocks.LockMobileAsync(db, r.Mobile, ct);
         var challenge = await db.OtpChallenges.FromSqlInterpolated($"SELECT * FROM \"OtpChallenges\" WHERE \"Mobile\" = {r.Mobile} FOR UPDATE").SingleOrDefaultAsync(ct);
         if (challenge is null || !challenge.Delivered || challenge.ConsumedAtUtc.HasValue || challenge.ExpiresAtUtc <= Now || challenge.FailedAttempts >= 5)

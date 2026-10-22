@@ -174,11 +174,11 @@ public sealed partial class CountBasedSubscriptionTests : IAsyncLifetime
     {
         var o=await Owner();await Subscribe(o);
         for(var i=0;i<4;i++)Assert.Equal(HttpStatusCode.Created,(await o.Client.Send(HttpMethod.Post,"/api/team/invitations",
-            new InviteTeamMemberRequest("09"+Random.Shared.NextInt64(100_000_000,1_000_000_000),"Synthetic","Member"))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict,(await o.Client.Send(HttpMethod.Post,"/api/team/invitations",new InviteTeamMemberRequest("09"+Random.Shared.NextInt64(100_000_000,1_000_000_000),"Over","Capacity"))).StatusCode);
+            new InviteTeamMemberRequest("09"+Random.Shared.NextInt64(100_000_000,1_000_000_000),"Synthetic","Member", Email: "invite@example.test"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,(await o.Client.Send(HttpMethod.Post,"/api/team/invitations",new InviteTeamMemberRequest("09"+Random.Shared.NextInt64(100_000_000,1_000_000_000),"Over","Capacity", Email: "invite@example.test"))).StatusCode);
         var unlimited=await Owner();await Subscribe(unlimited,31);
         Assert.True((await State(unlimited)).UnlimitedTeam);Assert.Null((await State(unlimited)).TeamCapacity);
-        for(var i=0;i<6;i++)Assert.Equal(HttpStatusCode.Created,(await unlimited.Client.Send(HttpMethod.Post,"/api/team/invitations",new InviteTeamMemberRequest("09"+Random.Shared.NextInt64(100_000_000,1_000_000_000),"Synthetic","Unlimited"))).StatusCode);
+        for(var i=0;i<6;i++)Assert.Equal(HttpStatusCode.Created,(await unlimited.Client.Send(HttpMethod.Post,"/api/team/invitations",new InviteTeamMemberRequest("09"+Random.Shared.NextInt64(100_000_000,1_000_000_000),"Synthetic","Unlimited", Email: "invite@example.test"))).StatusCode);
     }
 
     [PostgresFact]

@@ -35,7 +35,7 @@ public sealed class PackagingRemovalTests(ApiFixture f)
         {
             var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
             Assert.Equal(HttpStatusCode.Created, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations",
-                new InviteTeamMemberRequest(mobile, "Synthetic", "Member"))).StatusCode);
+                new InviteTeamMemberRequest(mobile, "Synthetic", "Member", Email: "invite@example.test"))).StatusCode);
         }
         Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.Send(HttpMethod.Get, "/api/admin/pricing/packages")).StatusCode);
         var api = await f.CreateClient().GetFromJsonAsync<JsonElement>("/openapi/v1.json");

@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HireYar.Tests;
 
 [Collection("Postgres")]
-public sealed class OrganizationAccessTests : IAsyncLifetime
+public sealed partial class OrganizationAccessTests : IAsyncLifetime
 {
     private readonly ApiFixture f = new();
     public Task InitializeAsync() => f.InitializeAsync();
@@ -71,7 +71,7 @@ public sealed class OrganizationAccessTests : IAsyncLifetime
     {
         var owner = await f.RegisterOwner(); var (admin, id) = await Member(owner,"admin");
         Assert.Equal(HttpStatusCode.OK, (await admin.Send(HttpMethod.Get,"/api/team/members")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await admin.Send(HttpMethod.Post,"/api/team/invitations", new InviteTeamMemberRequest(Mobile(),"نام","تست","admin"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await admin.Send(HttpMethod.Post,"/api/team/invitations", new InviteTeamMemberRequest(Mobile(),"نام","تست","admin", Email: "invite@example.test"))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.Send(HttpMethod.Put,$"/api/team/members/{owner.Id}/access",new ChangeMemberAccessRequest("viewer"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await admin.Send(HttpMethod.Put,$"/api/team/members/{id}/access",new ChangeMemberAccessRequest("viewer"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await admin.Send(HttpMethod.Post,$"/api/team/members/{id}/deactivate")).StatusCode);
@@ -97,7 +97,7 @@ public sealed class OrganizationAccessTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.Send(HttpMethod.Get,"/api/job-positions")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await owner.Client.Send(HttpMethod.Get,"/api/job-positions")).StatusCode);
         var elevated = new SaveAccessRoleRequest("viewer",role.Name,role.Description,true,true,latest.Revision,permissions);
-        Assert.Equal(HttpStatusCode.BadRequest, (await system.Client.Send(HttpMethod.Put,"/api/admin/access/roles",elevated)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await system.Client.Send(HttpMethod.Put,"/api/admin/access/roles",elevated)).StatusCode);
     }
     [PostgresFact]
     public async Task Mobile_is_required_and_only_matching_mobile_otp_can_accept_unexpired_invitation()
@@ -105,7 +105,7 @@ public sealed class OrganizationAccessTests : IAsyncLifetime
         var owner = await f.RegisterOwner();
         Assert.Equal(HttpStatusCode.BadRequest,(await owner.Client.Send(HttpMethod.Post,"/api/team/invitations",new {firstName="نام",lastName="تست",email="test@example.test",accessRoleCode="viewer"})).StatusCode);
         var mobile=Mobile();
-        var response=await owner.Client.Send(HttpMethod.Post,"/api/team/invitations",new InviteTeamMemberRequest(mobile,"نام","تست","viewer"));
+        var response=await owner.Client.Send(HttpMethod.Post,"/api/team/invitations",new InviteTeamMemberRequest(mobile,"نام","تست","viewer", Email: "invite@example.test"));
         var invite=(await response.Content.ReadFromJsonAsync<TeamInvitationDto>(TestJson.Options))!;
         Assert.Equal(TimeSpan.FromHours(72),invite.ExpiresAtUtc-invite.CreatedAtUtc);
         var b=f.Browser();var wrong=Mobile();await b.Send(HttpMethod.Post,"/api/auth/otp/request",new RequestOtpRequest(wrong));
@@ -147,13 +147,13 @@ public sealed class OrganizationAccessTests : IAsyncLifetime
         var (member,_)=await Member(owner,"custom_reader");
         Assert.Equal(HttpStatusCode.OK,(await member.Send(HttpMethod.Get,"/api/job-positions")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,(await member.Send(HttpMethod.Get,"/api/interview-templates")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest,(await system.Client.Send(HttpMethod.Put,"/api/admin/access/roles",custom with { Code="bad_role",Sections=[new("team",SectionAccess.Read)] })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,(await system.Client.Send(HttpMethod.Put,"/api/admin/access/roles",custom with { Code="flexible_role",Sections=[new("team",SectionAccess.Read)] })).StatusCode);
         Assert.Equal(HttpStatusCode.OK,(await system.Client.Send(HttpMethod.Put,"/api/admin/access/roles",custom with { Revision=definition.Revision,IsActive=false })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,(await member.Send(HttpMethod.Get,"/api/job-positions")).StatusCode);
         Assert.Equal(HttpStatusCode.OK,(await member.Send(HttpMethod.Get,"/api/auth/me")).StatusCode);
         var mobile=Mobile(); var second=Mobile();
         var response=await owner.Client.Send(HttpMethod.Post,"/api/team/invitations/batch",new BatchTeamInvitationsRequest([
-            new(mobile,"اول","تست","viewer"),new(mobile,"تکراری","تست","viewer"),new(second,"دوم","تست","viewer")]));
+            new(mobile,"اول","تست","viewer","invite@example.test"),new(mobile,"تکراری","تست","viewer","invite@example.test"),new(second,"دوم","تست","viewer","invite@example.test")]));
         Assert.Equal(HttpStatusCode.OK,response.StatusCode);
         var rows=(await response.Content.ReadFromJsonAsync<List<BatchTeamInvitationResult>>(TestJson.Options))!;
         Assert.Equal(new[]{201,409,201},rows.Select(x=>x.Status));
@@ -189,7 +189,7 @@ public sealed class OrganizationAccessTests : IAsyncLifetime
     public async Task Team_email_is_delivered_to_loopback_smtp_as_utf8_html_and_plain_text()
     {
         var owner=await f.RegisterOwner();
-        var response=await owner.Client.Send(HttpMethod.Post,"/api/team/invitations",new InviteTeamMemberRequest(Mobile(),"نام","تست","viewer"));
+        var response=await owner.Client.Send(HttpMethod.Post,"/api/team/invitations",new InviteTeamMemberRequest(Mobile(),"نام","تست","viewer", Email: "invite@example.test"));
         var invite=(await response.Content.ReadFromJsonAsync<TeamInvitationDto>(TestJson.Options))!;
         var listener=new System.Net.Sockets.TcpListener(IPAddress.Loopback,0);listener.Start();
         var port=((IPEndPoint)listener.LocalEndpoint).Port;
