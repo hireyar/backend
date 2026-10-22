@@ -15,7 +15,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
         socket.Options.SetRequestHeader("Authorization", "Bearer " + connection.ApiKey);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(route.TimeoutSeconds));
-        var watch = Stopwatch.StartNew(); var outcome = "success";
+        var watch = Stopwatch.StartNew(); var outcome = "success"; string? failureCode = null;
         var operationId = Guid.NewGuid().ToString("N");
         InterviewTrace.Emit("provider", "stt", "started", "تبدیل فایل صوتی به متن", operationId, "WebSocket", "transcribe-websocket", "Soniox", route.Model);
         try
@@ -23,19 +23,19 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
             await socket.ConnectAsync(new Uri(connection.WebSocketUrl), timeout.Token);
             return await TranscribeSessionAsync(socket, audio, route, timeout.Token);
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { outcome = "timeout"; throw new InterviewProviderException("stt_timeout"); }
-        catch (OperationCanceledException) { outcome = "cancelled"; throw; }
-        catch (Exception e) when (e is WebSocketException or HttpRequestException or IOException) { outcome = "network_failure"; throw new InterviewProviderException("stt_unavailable"); }
-        catch (JsonException) { outcome = "failure"; throw new InterviewProviderException("stt_invalid_response"); }
-        catch (InterviewProviderException) { outcome = "failure"; throw; }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { outcome = "timeout"; failureCode = "stt_timeout"; throw new InterviewProviderException(failureCode); }
+        catch (OperationCanceledException) { outcome = "cancelled"; failureCode = "stt_cancelled"; throw; }
+        catch (Exception e) when (e is WebSocketException or HttpRequestException or IOException) { outcome = "network_failure"; failureCode = "stt_unavailable"; throw new InterviewProviderException(failureCode); }
+        catch (JsonException) { outcome = "failure"; failureCode = "stt_invalid_response"; throw new InterviewProviderException(failureCode); }
+        catch (InterviewProviderException e) { outcome = "failure"; failureCode = e.Code; throw; }
         finally
         {
             socket.Abort();
             InterviewMetrics.SttDuration.Record(watch.Elapsed.TotalMilliseconds, new KeyValuePair<string, object?>("provider", "Soniox"));
             if (outcome != "success") InterviewMetrics.SttFailure.Add(1);
             InterviewTrace.Emit("provider", "stt", outcome, "تبدیل فایل صوتی به متن", operationId, "WebSocket", "transcribe-websocket", "Soniox", route.Model,
-                watch.Elapsed.TotalMilliseconds, null, outcome == "success" ? null : "stt_" + outcome);
-            logger.LogInformation("Interview provider operation=stt provider=Soniox model={Model} status={Status} durationMs={DurationMs}", route.Model, outcome, watch.Elapsed.TotalMilliseconds);
+                watch.Elapsed.TotalMilliseconds, null, failureCode);
+            logger.LogInformation("Interview provider operation=stt provider=Soniox model={Model} status={Status} failureCode={FailureCode} durationMs={DurationMs}", route.Model, outcome, failureCode, watch.Elapsed.TotalMilliseconds);
         }
     }
 
@@ -106,7 +106,8 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
             }
             if (root.TryGetProperty("finished", out var finished) && finished.ValueKind == JsonValueKind.True)
             {
-                if (string.IsNullOrWhiteSpace(transcript.ToString())) throw new InterviewProviderException("stt_invalid_response");
+                // A valid completed session may contain no speech (for example a muted microphone).
+                // Audio-check returns its existing no-speech result; answer processing validates text separately.
                 return transcript.ToString();
             }
         }

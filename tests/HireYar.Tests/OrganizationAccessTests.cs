@@ -240,6 +240,10 @@ public sealed class TeamInvitationEmailTests
         Assert.Contains("https://example.test/team-invitations/123",html);Assert.Contains("https://example.test/team-invitations/123",text);
         Assert.Contains("شماره موبایل",text);
         Assert.Contains("lang=\"fa\" dir=\"rtl\"",html);
+        Assert.Contains("<body dir=\"rtl\"", html);
+        Assert.Contains("<td dir=\"rtl\" align=\"right\"", html);
+        Assert.Contains("font-family:Tahoma,Arial,sans-serif;font-size:14px;line-height:28px", html);
+        Assert.Contains("<a dir=\"rtl\"", html);
         Assert.DoesNotContain("Accept invitation",html);
     }
 }
