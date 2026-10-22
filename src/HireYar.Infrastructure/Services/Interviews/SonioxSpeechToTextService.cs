@@ -15,7 +15,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
         socket.Options.SetRequestHeader("Authorization", "Bearer " + connection.ApiKey);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(route.TimeoutSeconds));
-        var watch = Stopwatch.StartNew(); var outcome = "success"; string? failureCode = null;
+        var watch = Stopwatch.StartNew(); var outcome = "success"; string? failureCode = null; string? failureReason = null;
         var operationId = Guid.NewGuid().ToString("N");
         InterviewTrace.Emit("provider", "stt", "started", "تبدیل فایل صوتی به متن", operationId, "WebSocket", "transcribe-websocket", "Soniox", route.Model);
         try
@@ -27,7 +27,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
         catch (OperationCanceledException) { outcome = "cancelled"; failureCode = "stt_cancelled"; throw; }
         catch (Exception e) when (e is WebSocketException or HttpRequestException or IOException) { outcome = "network_failure"; failureCode = "stt_unavailable"; throw new InterviewProviderException(failureCode); }
         catch (JsonException) { outcome = "failure"; failureCode = "stt_invalid_response"; throw new InterviewProviderException(failureCode); }
-        catch (InterviewProviderException e) { outcome = "failure"; failureCode = e.Code; throw; }
+        catch (InterviewProviderException e) { outcome = "failure"; failureCode = e.Code; failureReason = e.Reason; throw; }
         finally
         {
             socket.Abort();
@@ -35,7 +35,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
             if (outcome != "success") InterviewMetrics.SttFailure.Add(1);
             InterviewTrace.Emit("provider", "stt", outcome, "تبدیل فایل صوتی به متن", operationId, "WebSocket", "transcribe-websocket", "Soniox", route.Model,
                 watch.Elapsed.TotalMilliseconds, null, failureCode);
-            logger.LogInformation("Interview provider operation=stt provider=Soniox model={Model} status={Status} failureCode={FailureCode} durationMs={DurationMs}", route.Model, outcome, failureCode, watch.Elapsed.TotalMilliseconds);
+            logger.LogInformation("Interview provider operation=stt provider=Soniox model={Model} status={Status} failureCode={FailureCode} failureReason={FailureReason} audioFormat={AudioFormat} traceId={TraceId} durationMs={DurationMs}", route.Model, outcome, failureCode, failureReason, AudioFormat(contentType), Activity.Current?.Id, watch.Elapsed.TotalMilliseconds);
         }
     }
 
@@ -59,6 +59,29 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
             try { await send; } catch { /* Preserve the receive error; always observe and stop the sender. */ }
             try { await receive; } catch { /* Observe both tasks without masking the original failure. */ }
         }
+    }
+
+    private static string AudioFormat(string contentType) => contentType.Split(';')[0].Trim().ToLowerInvariant() switch {
+        "audio/webm" or "video/webm" => "webm", "audio/wav" or "audio/x-wav" => "wav",
+        "audio/mpeg" or "audio/mp3" => "mp3", "audio/mp4" or "audio/x-m4a" => "m4a",
+        "audio/ogg" or "application/ogg" => "ogg", _ => "unknown"
+    };
+
+    private static string ErrorReason(JsonElement root)
+    {
+        // Never log provider text: it can echo keys, user content or arbitrary configuration.
+        // Match documented diagnostics to a fixed vocabulary; unknown messages stay unclassified.
+        if (root.TryGetProperty("error_type", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "model_not_available")
+            return "model_not_available";
+        if (root.TryGetProperty("error_message", out var message) && message.ValueKind == JsonValueKind.String) {
+            var value = message.GetString() ?? "";
+            if (value.StartsWith("Audio decode error", StringComparison.OrdinalIgnoreCase)) return "audio_decode_error";
+            if (value.StartsWith("Audio data channels must be specified", StringComparison.OrdinalIgnoreCase)) return "audio_channels_required";
+            if (value.StartsWith("Audio data sample rate must be specified", StringComparison.OrdinalIgnoreCase)) return "audio_sample_rate_required";
+            if (value.StartsWith("Audio frame is not valid base64", StringComparison.OrdinalIgnoreCase)) return "audio_frame_invalid";
+            if (value.StartsWith("Audio is too long", StringComparison.OrdinalIgnoreCase)) return "audio_too_long";
+        }
+        return "provider_request_rejected";
     }
 
     private static async Task SendAudioAsync(WebSocket socket, Stream audio, CancellationToken ct)
@@ -88,7 +111,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
             var root = json.RootElement;
             if (root.ValueKind != JsonValueKind.Object) throw new InterviewProviderException("stt_invalid_response");
             if (root.TryGetProperty("error_code", out var error))
-                throw new InterviewProviderException(error.ValueKind == JsonValueKind.Number && error.TryGetInt32(out var status) && status is >= 400 and <= 599 ? $"stt_http_{status}" : "stt_invalid_response");
+                throw new InterviewProviderException(error.ValueKind == JsonValueKind.Number && error.TryGetInt32(out var status) && status is >= 400 and <= 599 ? $"stt_http_{status}" : "stt_invalid_response", ErrorReason(root));
             if (root.TryGetProperty("tokens", out var tokens))
             {
                 if (tokens.ValueKind != JsonValueKind.Array) throw new InterviewProviderException("stt_invalid_response");
