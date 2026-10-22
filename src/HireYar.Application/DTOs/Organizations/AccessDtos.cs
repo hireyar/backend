@@ -3,7 +3,7 @@ using HireYar.Domain.Organizations;
 namespace HireYar.Application.Organizations;
 
 public sealed record SectionPermission(string Code, SectionAccess Access);
-public sealed record AccessRoleDto(string Code, string Name, string Description, bool IsActive, bool IsAdministrator, Guid Revision, IReadOnlyList<SectionPermission> Sections);
+public sealed record AccessRoleDto(string Code, string Name, string Description, bool IsActive, bool IsAdministrator, Guid Revision, IReadOnlyList<SectionPermission> Sections, bool RequiresOwnerAssignment = false);
 public sealed record AccessSectionDto(string Code, string Name, string Description, bool IsActive, Guid Revision);
 public sealed record SaveAccessRoleRequest(
     [Required, RegularExpression("^[a-z][a-z0-9_]{1,63}$")] string Code,

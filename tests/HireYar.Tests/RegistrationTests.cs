@@ -118,7 +118,7 @@ public sealed class RegistrationTests : IAsyncLifetime
     public async Task Pending_invitation_cannot_be_bypassed_by_explicit_registration()
     {
         var owner = await f.RegisterOwner(); var mobile = Mobile();
-        Assert.Equal(HttpStatusCode.Created, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new { mobile, firstName="نام", lastName="عضو" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new { mobile, firstName="نام", lastName="عضو", email="invite@example.test" })).StatusCode);
         var b = f.Browser(); var r = await Request(b,mobile);
         var response = await b.Send(HttpMethod.Post, "/api/auth/register",r);
         Assert.Equal(HttpStatusCode.Conflict,response.StatusCode); Assert.Equal("team_invitation_pending",await Code(response));

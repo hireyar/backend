@@ -8,7 +8,7 @@ namespace HireYar.Infrastructure.Organizations;
 public sealed class AccessControl(AppDbContext db, TimeProvider time) : IAccessControl
 {
     private static AccessRoleDto Map(AccessRole r) => new(r.Code, r.Name, r.Description, r.IsActive, r.IsAdministrator, r.Revision,
-        r.Sections.OrderBy(x => x.SectionCode).Select(x => new SectionPermission(x.SectionCode, x.Access)).ToArray());
+        r.Sections.OrderBy(x => x.SectionCode).Select(x => new SectionPermission(x.SectionCode, x.Access)).ToArray(), AccessRoleRules.RequiresOwnerAssignment(r));
     public async Task<AccessRoleDto?> RoleAsync(Guid userId, CancellationToken ct)
     {
         var u = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == userId && x.IsActive && x.PhoneNumberConfirmed, ct);
@@ -41,18 +41,14 @@ public sealed class AccessControl(AppDbContext db, TimeProvider time) : IAccessC
             throw AppException.Invalid("invalid_access_role");
         var known = await db.AccessSections.Select(x => x.Code).ToListAsync(ct);
         if (q.Sections.Any(x => !known.Contains(x.Code))) throw AppException.Invalid("unknown_access_section");
-        // Any role that can administer members or subscriptions is privileged for owner-only assignment.
-        if (!q.IsAdministrator && q.Sections.Any(x => x.Access != SectionAccess.None && (x.Code == "team" || x.Code == "settings" || x.Code == "subscriptions")))
-            throw AppException.Invalid("administrator_role_required");
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await AccessCatalogLocks.ExclusiveAsync(db, ct);
         var role = await db.AccessRoles.Include(x => x.Sections).SingleOrDefaultAsync(x => x.Code == q.Code, ct);
         if (role is null) {
             if (q.Revision is not null) throw AppException.NotFound();
             role = new() { Code = q.Code }; db.AccessRoles.Add(role);
         } else {
             if (q.Revision != role.Revision) throw new AppException(409, "access_revision_conflict", "Refresh the access catalog.");
-            // Privilege classification is stable after creation, so existing assignments cannot silently become administrators.
-            if (role.IsAdministrator != q.IsAdministrator) throw AppException.Invalid("access_classification_immutable");
         }
         var before = Map(role);
         role.Name = q.Name.Trim(); role.Description = q.Description.Trim(); role.IsActive = q.IsActive; role.IsAdministrator = q.IsAdministrator;
@@ -68,12 +64,14 @@ public sealed class AccessControl(AppDbContext db, TimeProvider time) : IAccessC
     public async Task<AccessSectionDto> SaveSectionAsync(Guid actor, string code, UpdateAccessSectionRequest q, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(q.Name) || string.IsNullOrWhiteSpace(q.Description)) throw AppException.Invalid("invalid_access_section");
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await AccessCatalogLocks.ExclusiveAsync(db, ct);
         var s = await db.AccessSections.SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw AppException.NotFound();
         if (s.Revision != q.Revision) throw new AppException(409, "access_revision_conflict", "Refresh the access catalog.");
         var before = new AccessSectionDto(s.Code, s.Name, s.Description, s.IsActive, s.Revision);
         s.Name = q.Name.Trim(); s.Description = q.Description.Trim(); s.IsActive = q.IsActive; s.Revision = Guid.NewGuid();
         var after = new AccessSectionDto(s.Code, s.Name, s.Description, s.IsActive, s.Revision);
         db.AccessAudits.Add(new() { ActorId = actor, Action = "SectionSaved", Detail = System.Text.Json.JsonSerializer.Serialize(new { Before = before, After = after }), CreatedAtUtc = time.GetUtcNow() });
-        await db.SaveChangesAsync(ct); return after;
+        await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return after;
     }
 }

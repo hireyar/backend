@@ -23,7 +23,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
     private static string Mobile() => "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
     private async Task<TeamInvitationDto> Invite(Account owner, string mobile, string firstName = "نام", string lastName = "آزمایشی")
     {
-        var r = await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, firstName, lastName));
+        var r = await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, firstName, lastName, Email: "invite@example.test"));
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);
         return (await r.Content.ReadFromJsonAsync<TeamInvitationDto>(TestJson.Options))!;
     }
@@ -59,7 +59,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Put, "/api/organization", new OrganizationRequest("Forbidden"))).StatusCode);
         foreach (var path in new[] { "/api/team/members", "/api/team/invitations", "/api/subscriptions/usage", $"/api/subscriptions/usage/{Guid.NewGuid()}" })
             Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Get, path)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(Mobile(), "نام", "آزمایشی"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(Mobile(), "نام", "آزمایشی", Email: "invite@example.test"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await member.Send(HttpMethod.Post, $"/api/team/members/{owner.Id}/deactivate")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await member.Send(HttpMethod.Post, "/api/billing/subscription/purchases", new { packagePeriodId = Guid.NewGuid() })).StatusCode);
         var randomId = Guid.NewGuid();
@@ -155,11 +155,11 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
     public async Task Cancel_expiry_duplicate_and_existing_other_tenant_mobile_are_safe()
     {
         var owner = await f.RegisterOwner(); var other = await f.RegisterOwner(); var invitation = await Invite(owner, Mobile());
-        Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(invitation.Mobile, "نام", "آزمایشی"))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(other.Mobile, "نام", "آزمایشی"))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(owner.Mobile, "نام", "آزمایشی"))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new { mobile = Mobile(), firstName = "نام", lastName = "آزمایشی", role = "Owner" })).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest("123", "نام", "آزمایشی"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(invitation.Mobile, "نام", "آزمایشی", Email: "invite@example.test"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(other.Mobile, "نام", "آزمایشی", Email: "invite@example.test"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(owner.Mobile, "نام", "آزمایشی", Email: "invite@example.test"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new { mobile = Mobile(), firstName = "نام", lastName = "آزمایشی", email = "invite@example.test", role = "Owner" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest("123", "نام", "آزمایشی", Email: "invite@example.test"))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.Send(HttpMethod.Delete, $"/api/team/invitations/{invitation.Id}")).StatusCode);
         var otherInvites = (await (await other.Client.Send(HttpMethod.Get, "/api/team/invitations")).Content.ReadFromJsonAsync<Page<TeamInvitationDto>>(TestJson.Options))!;
         Assert.Empty(otherInvites.Items);
@@ -178,7 +178,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
     public async Task Concurrent_invites_and_acceptance_have_only_one_winner()
     {
         var owner = await f.RegisterOwner(); var other = await f.RegisterOwner(); var mobile = Mobile();
-        var results = await Task.WhenAll(owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی")), other.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی")));
+        var results = await Task.WhenAll(owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی", Email: "invite@example.test")), other.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی", Email: "invite@example.test")));
         var winner = Assert.Single(results, x => x.StatusCode == HttpStatusCode.Created); Assert.Single(results, x => x.StatusCode == HttpStatusCode.Conflict);
         var invitation = (await winner.Content.ReadFromJsonAsync<TeamInvitationDto>(TestJson.Options))!;
         var b = f.Browser(); var c = f.Browser(); await b.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile));
@@ -193,7 +193,7 @@ public sealed partial class MobileTeamTests : IAsyncLifetime
     {
         var owner = await f.RegisterOwner(); var mobile = Mobile(); var browser = f.Browser();
         await browser.Send(HttpMethod.Post, "/api/auth/otp/request", new RequestOtpRequest(mobile));
-        var results = await Task.WhenAll(owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی")),
+        var results = await Task.WhenAll(owner.Client.Send(HttpMethod.Post, "/api/team/invitations", new InviteTeamMemberRequest(mobile, "نام", "آزمایشی", Email: "invite@example.test")),
             browser.Send(HttpMethod.Post, "/api/auth/register", ApiFixture.Registration(mobile, f.PhoneOtp.Codes[mobile])));
         Assert.Equal(1, results.Count(r => r.StatusCode == HttpStatusCode.Conflict));
         Assert.Equal(1, results.Count(r => r.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK));

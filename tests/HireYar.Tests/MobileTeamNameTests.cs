@@ -42,12 +42,12 @@ public sealed partial class MobileTeamTests
     {
         var owner = await f.RegisterOwner(); var mobile = Mobile();
         var invalid = new object[] {
-            new { mobile }, new { mobile, firstName = "سارا" }, new { mobile, lastName = "آزمایشی" },
-            new { mobile, firstName = (string?)null, lastName = "نام" },
-            new { mobile, firstName = "", lastName = "نام" }, new { mobile, firstName = "نام", lastName = "\t  " },
-            new { mobile, firstName = new string('a', 101), lastName = "نام" },
-            new { mobile, firstName = "نام", lastName = new string('b', 101) },
-            new { mobile, firstName = new string('a', 100), lastName = new string('b', 100) }
+            new { email = "invite@example.test", mobile }, new { email = "invite@example.test", mobile, firstName = "سارا" }, new { email = "invite@example.test", mobile, lastName = "آزمایشی" },
+            new { email = "invite@example.test", mobile, firstName = (string?)null, lastName = "نام" },
+            new { email = "invite@example.test", mobile, firstName = "", lastName = "نام" }, new { email = "invite@example.test", mobile, firstName = "نام", lastName = "\t  " },
+            new { email = "invite@example.test", mobile, firstName = new string('a', 101), lastName = "نام" },
+            new { email = "invite@example.test", mobile, firstName = "نام", lastName = new string('b', 101) },
+            new { email = "invite@example.test", mobile, firstName = new string('a', 100), lastName = new string('b', 100) }
         };
         foreach (var request in invalid)
             Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.Send(HttpMethod.Post, "/api/team/invitations", request)).StatusCode);
@@ -58,7 +58,7 @@ public sealed partial class MobileTeamTests
         var schema = doc.GetProperty("paths").GetProperty("/api/team/invitations").GetProperty("post").GetProperty("requestBody").GetProperty("content").GetProperty("application/json").GetProperty("schema");
         if (schema.TryGetProperty("$ref", out var reference)) schema = doc.GetProperty("components").GetProperty("schemas").GetProperty(reference.GetString()!.Split('/').Last());
         var required = schema.GetProperty("required").EnumerateArray().Select(x => x.GetString()).ToArray();
-        Assert.Contains("firstName", required); Assert.Contains("lastName", required); Assert.Contains("mobile", required);
+        Assert.Contains("firstName", required); Assert.Contains("lastName", required); Assert.Contains("mobile", required); Assert.Contains("email", required);
     }
 
     [PostgresFact]

@@ -211,7 +211,7 @@ public sealed class TicketTests : IAsyncLifetime
         var owner = await f.RegisterOwner(explicitSignup: true);
         var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
         var invitation = await owner.Client.Send(HttpMethod.Post, "/api/team/invitations",
-            new HireYar.Application.Organizations.InviteTeamMemberRequest(mobile, "عضو", "آزمایشی"));
+            new HireYar.Application.Organizations.InviteTeamMemberRequest(mobile, "عضو", "آزمایشی", Email: "invite@example.test"));
         Assert.Equal(HttpStatusCode.Created, invitation.StatusCode);
         var invite = (await invitation.Content.ReadFromJsonAsync<HireYar.Application.Organizations.TeamInvitationDto>(TestJson.Options))!;
         var member = f.Browser();

@@ -5,21 +5,14 @@ using Microsoft.AspNetCore.Mvc;
 namespace HireYar.Api.Controllers;
 
 [ApiController, Authorize, Route("api/team")]
-public sealed class TeamMembersController(ITeamMembers team, IAccessControl access, IServiceScopeFactory scopes) : ControllerBase
+public sealed class TeamMembersController(ITeamMembers team, IAccessControl access) : ControllerBase
 {
     [HttpGet("access-sections")]
     public Task<IReadOnlyList<AccessSectionDto>> Sections(CancellationToken ct) => access.SectionsAsync(ct);
+    [HttpGet("invitation-capacity"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<TeamInvitationCapacityDto> Capacity(CancellationToken ct) => team.InvitationCapacityAsync(ct);
     [HttpPost("invitations/batch"), Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
-    public async Task<IReadOnlyList<BatchTeamInvitationResult>> Batch(BatchTeamInvitationsRequest request, CancellationToken ct)
-    {
-        if (request.Invitations.Any(x => x is null)) throw AppException.Invalid("invalid_invitation_batch");
-        var results = new List<BatchTeamInvitationResult>();
-        foreach (var item in request.Invitations) {
-            try { await using var scope = scopes.CreateAsyncScope(); var scopedTeam = scope.ServiceProvider.GetRequiredService<ITeamMembers>(); results.Add(new(item.Mobile, await scopedTeam.InviteAsync(item, ct), 201, null)); }
-            catch (AppException e) when (e.Status is 400 or 403 or 404 or 409) { results.Add(new(item.Mobile, null, e.Status, e.Code)); }
-        }
-        return results;
-    }
+    public Task<IReadOnlyList<BatchTeamInvitationResult>> Batch(BatchTeamInvitationsRequest request, CancellationToken ct) => team.InviteBatchAsync(request, ct);
     [HttpGet("access-roles")]
     public Task<IReadOnlyList<AccessRoleDto>> Roles(CancellationToken ct) => access.RolesAsync(false, ct);
     [HttpPut("members/{id:guid}/access")]

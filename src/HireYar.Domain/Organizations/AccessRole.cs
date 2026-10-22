@@ -39,3 +39,10 @@ public static class AccessSections
 {
     public static readonly string[] Codes = ["dashboard", "jobs", "templates", "questions", "interviews", "reports", "settings", "subscriptions", "tickets", "team"];
 }
+
+// Privileged assignment follows permissions, even if an operator clears the optional administrator label.
+public static class AccessRoleRules
+{
+    public static bool RequiresOwnerAssignment(AccessRole role) => role.IsAdministrator || role.Sections.Any(x =>
+        x.Access != SectionAccess.None && x.SectionCode is "team" or "settings" or "subscriptions");
+}

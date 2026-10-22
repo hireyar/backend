@@ -41,7 +41,7 @@ public sealed partial class InterviewFlowTests
     {
         var mobile = "09" + Random.Shared.NextInt64(100_000_000, 1_000_000_000).ToString("D9");
         var sent = await owner.Client.Send(HttpMethod.Post, "/api/team/invitations",
-            new HireYar.Application.Organizations.InviteTeamMemberRequest(mobile, "نام", "آزمایشی"));
+            new HireYar.Application.Organizations.InviteTeamMemberRequest(mobile, "نام", "آزمایشی", Email: "invite@example.test"));
         Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
         var invitation = (await sent.Content.ReadFromJsonAsync<HireYar.Application.Organizations.TeamInvitationDto>(TestJson.Options))!;
         var browser = f.Browser();
