@@ -1,3 +1,13 @@
+## STT زنده وابسته به قابلیت پروایدر
+
+طبق درخواست کاربر، تبدیل هم‌زمان صحبت به متن با proxy WebSocket سمت بک‌اند اضافه شد. IRealtimeSpeechToTextService قابلیت اختیاری است؛ Soniox آن را دارد، providerهای دیگر و clientهای قدیمی مسیر batch موجود را حفظ می‌کنند. CandidateInterviewDto.speechCapabilities و GET speech/capabilities حالت انتخاب‌شده را می‌دهند؛ فرانت نباید از نام مدل/provider حدس بزند. کلید Soniox روی سرور می‌ماند. client با subprotocol غیر echo شده همان credential مصاحبه احراز می‌شود؛ querystring credential نداریم و Origin با FrontendUrl کنترل می‌شود. دسترسی/وضعیت/قفل/انقضا در جریان و قبل finalization از DB دوباره بررسی می‌شوند.
+
+یک اتصال برای یک purpose/turn/question فعال است؛ Channel محدود، backpressure، سقف frame64KiB، اندازه/زمان صوت و idle15s دارند. قفل اتصال فقط در process است و محدودیت سراسری چند replica ادعا نمی‌شود؛ محدودیت ingress و keys مشترک DataProtection برای استقرار چند replica لازم‌اند. متن interim/final به‌صورت snapshot به مرورگر برمی‌گردد؛ فقط final برای تصمیم/ارزیابی معتبر است. حین streaming، داده صوت در فایل/DB ذخیره نمی‌شود؛ مرورگر همان بایت‌ها را برای فایل نهایی نگه می‌دارد.
+
+completed شامل رسید encrypted/authenticated DataProtection با TTL15دقیقه است که سازمان/مصاحبه/purpose/سؤال/clientTurnId/نسخه نوبت و SHA256/طول بایت‌های صوت را به transcript/provenance نهایی وصل می‌کند. این رسید در upload قبلی audio-check/answers/introduction اختیاری است؛ فایل متفاوت یا رسید دستکاری‌شده رد می‌شود. نتیجه نهایی زیر همان قفل سازمان و idempotency قبلی اتمیک ذخیره و STT تکراری حذف می‌شود؛ معرفی همچنان بدون LLM و تست میکروفون همچنان گذراست. در قطع اتصال، فایل باقی و مسیر batch بدون receipt برای بازیابی در دسترس است. متن زنده پیش از upload ذخیره پایدار DB ندارد؛ receipt در حافظه کلاینت و فایل نهایی مبنای ادامه‌اند. migration/مدل DB و appsettings/توکن‌ها تغییر نکردند.
+
+قرارداد دقیق: REALTIME_STT_API.md. کاربر صریحاً خواست فرانت در قالب پرامپت تحویل شود؛ راهنمای مستقل کامل REALTIME_STT_FRONTEND_PROMPT.md آماده است. Angular در این مخزن نیست، UI/انتشار مقصد انجام نشده و نمایش زنده روی سایت فعلی هنوز نیازمند اجرای همین پرامپت در مخزن فرانت است. proxy مسیر جدید باید Upgrade/WSS و timeout متناسب با ضبط+finalization را عبور دهد؛ headerهای دارای credential در log نباشند.
+
 ## علت بازتولیدشده Soniox400: تکرار language_hints — 2026-10-22
 
 تست واقعی از دعوتِ موجود در پنل با اجازه کاربر انجام شد؛ فقط OTP ورود دعوت و تست گذرای صوت، بدون start/answers/complete. میکروفون Chromium فایل WAV گفتار مصنوعی را مصرف کرد و MediaRecorder فایل۶ثانیه‌ای WebM/Opus با header=1a45dfa3 و۷۵۰۱۴بایت ساخت. ارسال آن به audio-check واقعی اپ503 گرفت؛ همان بایت‌ها مستقیم در Soniox، هم یکجا و هم با قطعات۱۶KB، تا finished=true و token نهایی موفق بودند. بنابراین WebM این نمونه سالم است و تغییر اجباری به MP3 راه‌حل این ایراد نیست.

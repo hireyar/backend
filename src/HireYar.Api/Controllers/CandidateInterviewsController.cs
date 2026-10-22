@@ -8,11 +8,14 @@ namespace HireYar.Api.Controllers;
 
 public sealed class AudioCheckUpload
 {
+    [StringLength(180000)] public string? RealtimeReceipt { get; set; }
+    [StringLength(128)] public string? ClientTurnId { get; set; }
     [Required] public IFormFile Audio { get; set; } = null!;
     [Range(1, 30)] public int? DurationSeconds { get; set; }
 }
 public sealed class AnswerUpload
 {
+    [StringLength(180000)] public string? RealtimeReceipt { get; set; }
     public Guid QuestionId { get; set; }
     [Required] public IFormFile Audio { get; set; } = null!;
     public int? DurationSeconds { get; set; }
@@ -22,6 +25,7 @@ public sealed class AnswerUpload
 }
 public sealed class IntroductionUpload
 {
+    [StringLength(180000)] public string? RealtimeReceipt { get; set; }
     [Required] public IFormFile Audio { get; set; } = null!;
     public int? DurationSeconds { get; set; }
     [Required, StringLength(128, MinimumLength = 1)] public string ClientTurnId { get; set; } = "";
@@ -76,7 +80,7 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
     {
         await using var stream = upload.Audio.OpenReadStream();
         return await service.CheckAudioAsync(interviewId, stream, upload.Audio.FileName, upload.Audio.ContentType,
-            upload.Audio.Length, upload.DurationSeconds, ct);
+            upload.Audio.Length, upload.DurationSeconds, ct, upload.RealtimeReceipt, upload.ClientTurnId);
     }
     [HttpGet("current")] public Task<CandidateInterviewDto> Current(Guid interviewId, CancellationToken ct) => service.CurrentAsync(interviewId, ct);
     [HttpPost("stage/advance")] public Task<CandidateInterviewDto> AdvanceStage(Guid interviewId, AdvanceInterviewStageRequest r, CancellationToken ct) => service.AdvanceStageAsync(interviewId, r, ct);
@@ -87,7 +91,7 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
         await using var stream = upload.Audio.OpenReadStream();
         await using var video = upload.Video?.OpenReadStream();
         return await service.SubmitIntroductionAsync(interviewId, stream, upload.Audio.FileName, upload.Audio.ContentType, upload.Audio.Length,
-            upload.DurationSeconds, new(upload.ClientTurnId, upload.LastSpeechEndUtc, video, upload.Video?.FileName, upload.Video?.ContentType, upload.Video?.Length ?? 0), ct);
+            upload.DurationSeconds, new(upload.ClientTurnId, upload.LastSpeechEndUtc, video, upload.Video?.FileName, upload.Video?.ContentType, upload.Video?.Length ?? 0, upload.RealtimeReceipt), ct);
     }
     [HttpPost("introduction/{introductionId:guid}/retry")]
     public Task<CandidateInterviewDto> RetryIntroduction(Guid interviewId, Guid introductionId, CancellationToken ct) => service.RetryIntroductionAsync(interviewId, introductionId, ct);
@@ -99,7 +103,7 @@ public sealed class CandidateInterviewsController(CandidateInterviewService serv
         await using var stream = upload.Audio.OpenReadStream();
         await using var video = upload.Video?.OpenReadStream();
         return await service.SubmitAsync(interviewId, upload.QuestionId, stream, upload.Audio.FileName, upload.Audio.ContentType, upload.Audio.Length, upload.DurationSeconds, ct,
-            new(upload.ClientTurnId, upload.LastSpeechEndUtc, video, upload.Video?.FileName, upload.Video?.ContentType, upload.Video?.Length ?? 0));
+            new(upload.ClientTurnId, upload.LastSpeechEndUtc, video, upload.Video?.FileName, upload.Video?.ContentType, upload.Video?.Length ?? 0, upload.RealtimeReceipt));
     }
     [HttpPost("answers/{answerId:guid}/retry")] public Task<CandidateInterviewDto> Retry(Guid interviewId, Guid answerId, CancellationToken ct) => service.RetryAsync(interviewId, answerId, ct);
     [HttpPost("complete")] public Task<CandidateInterviewDto> Complete(Guid interviewId, CancellationToken ct) => service.CompleteAsync(interviewId, ct);

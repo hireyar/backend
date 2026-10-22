@@ -6,7 +6,7 @@ namespace HireYar.Application.Interviews;
 public sealed partial class CandidateInterviewService
 {
     public async Task<InterviewAudioCheckDto> CheckAudioAsync(Guid id, Stream stream, string fileName,
-        string contentType, long length, int? durationSeconds, CancellationToken ct)
+        string contentType, long length, int? durationSeconds, CancellationToken ct, string? realtimeReceipt = null, string? clientTurnId = null)
     {
         var session = await Load(id, ct);
         if (session.Status != InterviewStatus.Created)
@@ -20,7 +20,9 @@ public sealed partial class CandidateInterviewService
         try
         {
             // Do not forward a user-controlled file name to the provider.
-            result = await stt.TranscribeAsync(stream, "microphone-check" + AudioUploadValidator.Extension(mime), mime, ct);
+            if (realtimeReceipt is not null) result = await speechReceipts.VerifyAsync(realtimeReceipt,
+                await RealtimeContextAsync(id, "audioCheck", clientTurnId ?? "", null, ct), stream, ct);
+            else result = await stt.TranscribeAsync(stream, "microphone-check" + AudioUploadValidator.Extension(mime), mime, ct);
         }
         catch (InterviewProviderException)
         {

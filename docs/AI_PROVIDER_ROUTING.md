@@ -1,3 +1,7 @@
+## قابلیت زنده STT
+
+STT اکنون capability اختیاری realtime دارد؛ Soniox از IRealtimeSpeechToTextService و جریان incremental استفاده می‌کند، بقیه providerهای فعلی batch می‌مانند. timeout معمول batch سقف طول صحبت زنده نیست؛ live اتصال۱۰ثانیه‌ای و finalization طبق TimeoutSeconds دارد و API سقف ضبط/idle را اعمال می‌کند. کاتالوگ قابل مصرف فرانت و protocol: REALTIME_STT_API.md؛ راهنمای کامل Angular: REALTIME_STT_FRONTEND_PROMPT.md. credential پروایدر به مرورگر داده نمی‌شود. JSON language_hints همچنان یکتا است. تنظیمات فعلی/توکن‌ها تغییر نکردند.
+
 ## علت بازتولیدشده Soniox400: تکرار language_hints — 2026-10-22
 
 تست واقعی از دعوتِ موجود در پنل با اجازه کاربر انجام شد؛ فقط OTP ورود دعوت و تست گذرای صوت، بدون start/answers/complete. میکروفون Chromium فایل WAV گفتار مصنوعی را مصرف کرد و MediaRecorder فایل۶ثانیه‌ای WebM/Opus با header=1a45dfa3 و۷۵۰۱۴بایت ساخت. ارسال آن به audio-check واقعی اپ503 گرفت؛ همان بایت‌ها مستقیم در Soniox، هم یکجا و هم با قطعات۱۶KB، تا finished=true و token نهایی موفق بودند. بنابراین WebM این نمونه سالم است و تغییر اجباری به MP3 راه‌حل این ایراد نیست.

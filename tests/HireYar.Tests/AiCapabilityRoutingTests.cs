@@ -254,6 +254,18 @@ public sealed class AiCapabilityRoutingTests
     }
 
     [Fact]
+    public async Task Soniox_realtime_emits_interim_and_final_separately_without_persisting_interim_as_result()
+    {
+        using var socket=new Socket("""{"tokens":[{"text":"موقت","is_final":false}]}""",
+            """{"tokens":[{"text":"قطعی","is_final":true},{"text":" ادامه","is_final":false}]}""",
+            """{"tokens":[{"text":" نهایی","is_final":true}],"finished":true}""");
+        var updates=new List<SpeechTranscriptUpdate>();using var audio=new MemoryStream([1,2]);
+        var result=await SonioxSpeechToTextService.TranscribeSessionAsync(socket,audio,new(),default,(value,_)=>{updates.Add(value);return Task.CompletedTask;});
+        Assert.Equal("قطعی نهایی",result.Text);Assert.Equal(new SpeechTranscriptUpdate("","موقت"),updates[0]);
+        Assert.Equal(new SpeechTranscriptUpdate("قطعی"," ادامه"),updates[1]);Assert.Equal(new SpeechTranscriptUpdate("قطعی نهایی",""),updates[2]);
+    }
+
+    [Fact]
     public async Task Soniox_waiting_for_finished_obeys_cancellation()
     {
         using var socket = new Socket(); using var audio = new MemoryStream([1]);
