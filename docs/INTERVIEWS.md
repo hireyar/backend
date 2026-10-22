@@ -12,7 +12,7 @@
 
 ## تنظیمات
 
-نمونهٔ زیر را در تنظیمات **خارج Git** یا متغیرهای محیطی قرار دهید. فایل `appsettings.interviews.example.json` فقط مثال است و خودکار load نمی‌شود. در نبود `AI:Provider`، provider به طور پیش‌فرض Disabled است تا حساب‌های HR موجود بدون تنظیم AI همچنان بالا بیایند؛ کلید خالی با Provider=NetArz در startup خطای واضح می‌دهد. provider جعلی فقط از DI در تست ثبت می‌شود و گزینهٔ production نیست.
+نمونهٔ زیر را در تنظیمات **خارج Git** یا متغیرهای محیطی قرار دهید. فایل `appsettings.json` فقط مثال است و خودکار load نمی‌شود. در نبود `AI:Provider`، provider به طور پیش‌فرض Disabled است تا حساب‌های HR موجود بدون تنظیم AI همچنان بالا بیایند؛ کلید خالی با Provider=NetArz در startup خطای واضح می‌دهد. provider جعلی فقط از DI در تست ثبت می‌شود و گزینهٔ production نیست.
 
 ```json
 {

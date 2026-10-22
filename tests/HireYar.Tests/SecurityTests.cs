@@ -56,6 +56,8 @@ public sealed class SecurityTests(ApiFixture f)
             builder.UseEnvironment("Production");
             builder.UseSetting("SkipLocalSettings", "true");
             builder.UseSetting("AI:Provider", "Disabled");
+            foreach (var capability in HireYar.Infrastructure.Interviews.AiRoutingOptions.Capabilities)
+                builder.UseSetting($"AI:{capability}:Provider", "Disabled");
             builder.UseSetting("AnswerAssessments:WorkerEnabled", "false");
             builder.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
             builder.UseSetting("InterviewStorage:VideoProvider", "Local");
@@ -96,6 +98,8 @@ public sealed class SecurityTests(ApiFixture f)
             builder.UseEnvironment("Production");
             builder.UseSetting("SkipLocalSettings", "true");
             builder.UseSetting("AI:Provider", "Disabled");
+            foreach (var capability in HireYar.Infrastructure.Interviews.AiRoutingOptions.Capabilities)
+                builder.UseSetting($"AI:{capability}:Provider", "Disabled");
             builder.UseSetting("AnswerAssessments:WorkerEnabled", "false");
             builder.UseSetting("InterviewAudio:BackgroundRecoveryEnabled", "false");
             builder.UseSetting("InterviewStorage:VideoProvider", "Local");
