@@ -54,6 +54,12 @@ public sealed partial class CandidateInterviewService
         string? videoMime = null;
         if (capture.Video is { } video)
             videoMime = await VideoUploadValidator.ValidateAsync(video, capture.VideoFileName ?? "", capture.VideoContentType ?? "", capture.VideoLength, options, ct);
+        RealtimeSpeechContext? speechContext = null; SpeechTranscriptionResult? liveTranscript = null;
+        if (capture.RealtimeReceipt is { } proof) {
+            speechContext = await RealtimeContextAsync(id, "introduction", turnId, null, ct);
+            liveTranscript = await speechReceipts.VerifyAsync(proof, speechContext, source, ct);
+            if (string.IsNullOrWhiteSpace(liveTranscript.Text)) throw AppException.Invalid("realtime_no_speech");
+        }
         var saved = await storage.SaveAsync(source, "answers", id, options.MaxUploadBytes, ct);
         StoredAudio? savedVideo = null;
         InterviewIntroduction? introduction = null; Guid lease = default; bool replay = false;
@@ -69,12 +75,18 @@ public sealed partial class CandidateInterviewService
                     replay = true; return true;
                 }
                 RequireIntroductionStage(s);
+                if (speechContext is not null && speechContext != await RealtimeContextAsync(id, "introduction", turnId, null, ct))
+                    throw AppException.Conflict();
                 if (await db.InterviewAnswers.AnyAsync(x => x.InterviewSessionId == id && x.ClientTurnId == turnId, ct))
                     throw new AppException(409, "client_turn_id_conflict", "The turn identifier belongs to a question.");
                 introduction = new(s.OrganizationId, id, turnId, saved.Key, mime.Split(';')[0].Trim().ToLowerInvariant(), saved.SizeBytes,
                     receivedAt, durationSeconds, capture.LastSpeechEndUtc, savedVideo?.Key, videoMime, savedVideo?.SizeBytes);
                 db.InterviewIntroductions.Add(introduction);
                 lease = introduction.Claim(time.GetUtcNow(), options.LeaseSeconds, false);
+                if (liveTranscript is not null) {
+                    introduction.Complete(lease, liveTranscript.Text, liveTranscript.Provider, liveTranscript.Model, time.GetUtcNow());
+                    s.AdvanceStage(InterviewStage.CandidateIntroduction, liveTranscript.Text, time.GetUtcNow());
+                }
                 return true;
             }, ct);
         }
@@ -90,7 +102,7 @@ public sealed partial class CandidateInterviewService
             if (savedVideo is not null) await storage.DeleteAsync(savedVideo.Key, CancellationToken.None);
             return await Map(s, false, ct);
         }
-        await ProcessIntroduction(s, introduction!, lease, ct);
+        if (liveTranscript is null) await ProcessIntroduction(s, introduction!, lease, ct);
         return await Map(s, true, ct);
     }
 

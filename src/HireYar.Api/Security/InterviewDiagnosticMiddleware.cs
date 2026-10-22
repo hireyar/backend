@@ -13,7 +13,7 @@ public sealed class InterviewDiagnosticMiddleware(RequestDelegate next)
         if (!diagnostics.Enabled || context.Request.Path.Value?.EndsWith("/diagnostics", StringComparison.Ordinal) == true ||
             action is null || action.ActionName == "AccessStatus") { await next(context); return; }
         Guid organizationId, interviewId;
-        if (action.ControllerName == "CandidateInterviews")
+        if (action.ControllerName is "CandidateInterviews" or "CandidateRealtimeSpeech")
         {
             if (!Guid.TryParse(context.User.FindFirst("interview_organization")?.Value, out organizationId) ||
                 !Guid.TryParse(context.User.FindFirst("interview")?.Value, out interviewId)) { await next(context); return; }

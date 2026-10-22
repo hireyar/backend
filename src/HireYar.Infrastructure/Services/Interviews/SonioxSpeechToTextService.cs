@@ -7,21 +7,30 @@ using Microsoft.Extensions.Logging;
 
 namespace HireYar.Infrastructure.Interviews;
 
-public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, AiCapabilityOptions route, ILogger<SonioxSpeechToTextService> logger) : ISpeechToTextService
+public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, AiCapabilityOptions route, ILogger<SonioxSpeechToTextService> logger) : ISpeechToTextService, IRealtimeSpeechToTextService
 {
-    public async Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct)
+    public TimeSpan FinalizationTimeout => TimeSpan.FromSeconds(route.TimeoutSeconds);
+    public Task<SpeechTranscriptionResult> TranscribeAsync(Stream audio, string fileName, string contentType, CancellationToken ct) =>
+        TranscribeCoreAsync(audio, contentType, null, ct);
+    public Task<SpeechTranscriptionResult> TranscribeRealtimeAsync(Stream audio,
+        Func<SpeechTranscriptUpdate, CancellationToken, Task> update, CancellationToken ct) => TranscribeCoreAsync(audio, "audio/webm", update, ct);
+    private async Task<SpeechTranscriptionResult> TranscribeCoreAsync(Stream audio, string contentType,
+        Func<SpeechTranscriptUpdate, CancellationToken, Task>? update, CancellationToken ct)
     {
         using var socket = new ClientWebSocket();
         socket.Options.SetRequestHeader("Authorization", "Bearer " + connection.ApiKey);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(route.TimeoutSeconds));
+        if (update is null) timeout.CancelAfter(TimeSpan.FromSeconds(route.TimeoutSeconds));
         var watch = Stopwatch.StartNew(); var outcome = "success"; string? failureCode = null; string? failureReason = null;
         var operationId = Guid.NewGuid().ToString("N");
         InterviewTrace.Emit("provider", "stt", "started", "تبدیل فایل صوتی به متن", operationId, "WebSocket", "transcribe-websocket", "Soniox", route.Model);
         try
         {
-            await socket.ConnectAsync(new Uri(connection.WebSocketUrl), timeout.Token);
-            return await TranscribeSessionAsync(socket, audio, route, timeout.Token);
+            using (var connect = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token)) {
+                connect.CancelAfter(TimeSpan.FromSeconds(Math.Min(10, route.TimeoutSeconds)));
+                await socket.ConnectAsync(new Uri(connection.WebSocketUrl), connect.Token);
+            }
+            return await TranscribeSessionAsync(socket, audio, route, timeout.Token, update);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { outcome = "timeout"; failureCode = "stt_timeout"; throw new InterviewProviderException(failureCode); }
         catch (OperationCanceledException) { outcome = "cancelled"; failureCode = "stt_cancelled"; throw; }
@@ -39,7 +48,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
         }
     }
 
-    internal static async Task<SpeechTranscriptionResult> TranscribeSessionAsync(WebSocket socket, Stream audio, AiCapabilityOptions route, CancellationToken ct)
+    internal static async Task<SpeechTranscriptionResult> TranscribeSessionAsync(WebSocket socket, Stream audio, AiCapabilityOptions route, CancellationToken ct, Func<SpeechTranscriptUpdate, CancellationToken, Task>? update = null)
     {
         using var session = CancellationTokenSource.CreateLinkedTokenSource(ct);
         // Configuration binding appends configured hints to the initialized default ["fa"].
@@ -47,7 +56,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
         var config = JsonSerializer.SerializeToUtf8Bytes(new { model = route.Model, audio_format = "auto", language_hints = route.Options.LanguageHints.Distinct(StringComparer.Ordinal).ToArray() });
         await socket.SendAsync(config.AsMemory(), WebSocketMessageType.Text, true, session.Token);
         var send = SendAudioAsync(socket, audio, session.Token);
-        var receive = ReceiveTranscriptAsync(socket, session.Token);
+        var receive = ReceiveTranscriptAsync(socket, session.Token, update);
         try
         {
             if (await Task.WhenAny(send, receive) == send) await send;
@@ -96,7 +105,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
         await socket.SendAsync(ReadOnlyMemory<byte>.Empty, WebSocketMessageType.Text, true, ct);
     }
 
-    private static async Task<string> ReceiveTranscriptAsync(WebSocket socket, CancellationToken ct)
+    private static async Task<string> ReceiveTranscriptAsync(WebSocket socket, CancellationToken ct, Func<SpeechTranscriptUpdate, CancellationToken, Task>? update)
     {
         var transcript = new StringBuilder(); var buffer = new byte[8192];
         while (true)
@@ -115,6 +124,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
             if (root.ValueKind != JsonValueKind.Object) throw new InterviewProviderException("stt_invalid_response");
             if (root.TryGetProperty("error_code", out var error))
                 throw new InterviewProviderException(error.ValueKind == JsonValueKind.Number && error.TryGetInt32(out var status) && status is >= 400 and <= 599 ? $"stt_http_{status}" : "stt_invalid_response", ErrorReason(root));
+            var interim = new StringBuilder(); var changed = false;
             if (root.TryGetProperty("tokens", out var tokens))
             {
                 if (tokens.ValueKind != JsonValueKind.Array) throw new InterviewProviderException("stt_invalid_response");
@@ -122,14 +132,15 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
                 {
                     if (token.ValueKind != JsonValueKind.Object || !token.TryGetProperty("is_final", out var final) || final.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                         throw new InterviewProviderException("stt_invalid_response");
-                    if (!final.GetBoolean()) continue;
                     if (!token.TryGetProperty("text", out var value) || value.ValueKind != JsonValueKind.String) throw new InterviewProviderException("stt_invalid_response");
                     var text = value.GetString();
                     if (text is "<end>" or "<fin>") continue;
-                    transcript.Append(text);
-                    if (transcript.Length > 32000) throw new InterviewProviderException("stt_response_too_large");
+                    changed = true;
+                    if (final.GetBoolean()) transcript.Append(text); else interim.Append(text);
+                    if (transcript.Length > 32000 || interim.Length > 32000) throw new InterviewProviderException("stt_response_too_large");
                 }
             }
+            if (changed && update is not null) await update(new(transcript.ToString(), interim.ToString()), ct);
             if (root.TryGetProperty("finished", out var finished) && finished.ValueKind == JsonValueKind.True)
             {
                 // A valid completed session may contain no speech (for example a muted microphone).

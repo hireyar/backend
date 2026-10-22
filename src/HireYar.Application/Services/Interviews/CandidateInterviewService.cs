@@ -9,7 +9,7 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
     InterviewOptions options, InterviewPolicy policy, InterviewDecisionValidator validator, IInterviewAudioStorage storage,
     ISpeechToTextService stt, IInterviewDecisionService decisions, QuestionAudioService audio, ILogger<CandidateInterviewService> logger,
     IInterviewDiagnostics diagnostics, HireYar.Application.Subscriptions.InterviewQuotaService quota,
-    HireYar.Application.Notifications.NotificationService notifications)
+    HireYar.Application.Notifications.NotificationService notifications, IRealtimeSpeechReceipt speechReceipts)
 {
     private async Task<InterviewSession> Load(Guid id, CancellationToken ct)
     {
@@ -97,6 +97,12 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
         string? videoMime = null;
         if (capture?.Video is { } video)
             videoMime = await VideoUploadValidator.ValidateAsync(video, capture.VideoFileName ?? "", capture.VideoContentType ?? "", capture.VideoLength, options, ct);
+        RealtimeSpeechContext? speechContext = null; SpeechTranscriptionResult? liveTranscript = null;
+        if (capture?.RealtimeReceipt is { } proof) {
+            speechContext = await RealtimeContextAsync(id, "answer", turnId ?? "", questionId, ct);
+            liveTranscript = await speechReceipts.VerifyAsync(proof, speechContext, stream, ct);
+            if (string.IsNullOrWhiteSpace(liveTranscript.Text)) throw AppException.Invalid("realtime_no_speech");
+        }
         var saved = await storage.SaveAsync(stream, "answers", s.Id, options.MaxUploadBytes, ct);
         StoredAudio? savedVideo = null;
         InterviewAnswer? answer = null; Guid lease = default; bool replay = false;
@@ -114,9 +120,15 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                     answer = committed; replay = true; return true;
                 }
                 if (s.Status != InterviewStatus.WaitingForAnswer) throw AppException.Conflict();
+                if (speechContext is not null && speechContext != await RealtimeContextAsync(id, "answer", turnId!, questionId, ct))
+                    throw AppException.Conflict();
                 answer = s.SubmitAnswer(questionId, saved.Key, contentType.Split(';')[0].Trim().ToLowerInvariant(), saved.SizeBytes, receivedAt);
                 answer.SetCaptureMetadata(turnId, capture?.LastSpeechEndUtc, durationSeconds, savedVideo?.Key, videoMime, savedVideo?.SizeBytes);
                 lease = s.AcquireLease(answer.Id, time.GetUtcNow(), options.LeaseSeconds);
+                if (liveTranscript is not null) {
+                    s.BeginTranscription(answer.Id);
+                    s.SetTranscript(answer.Id, liveTranscript.Text, liveTranscript.Provider, liveTranscript.Model);
+                }
                 return true;
             }, ct);
         }
@@ -377,6 +389,6 @@ public sealed partial class CandidateInterviewService(IApplicationDbContext db, 
                 introCanRetry, introduction.FailureCode, introduction.RecoveryAttempts, introPending, introduction.SubmittedAtUtc,
                 introduction.LastSpeechEndUtc, introduction.DurationSeconds, introduction.VideoStorageKey is not null),
             processingState, processingMessage, answerPending ? s.NextRecoveryAtUtc : null,
-            diagnostics.Enabled, diagnostics.Enabled ? $"/api/candidate/interviews/{s.Id}/diagnostics" : null);
+            diagnostics.Enabled, diagnostics.Enabled ? $"/api/candidate/interviews/{s.Id}/diagnostics" : null, SpeechCapabilities(s.Id));
     }
 }

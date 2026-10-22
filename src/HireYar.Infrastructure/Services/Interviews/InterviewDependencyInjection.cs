@@ -15,6 +15,7 @@ public static class InterviewDependencyInjection
         services.AddOptions<SpeechEncodingOptions>().Bind(config.GetSection("SpeechEncoding"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.FfmpegPath) && o.TimeoutSeconds is >= 1 and <= 120, "Invalid speech encoder configuration.").ValidateOnStart();
         services.AddSingleton<IPcmSpeechEncoder, FfmpegPcmSpeechEncoder>();
+        services.AddScoped<IRealtimeSpeechReceipt, RealtimeSpeechReceipt>();
         var routing = AiRoutingOptions.IsConfigured(config) ? services.AddAiCapabilities(config) : null;
         var provider = routing is null ? config["AI:Provider"] ?? "Disabled" : "Disabled";
         if (provider is not ("NetArz" or "Liara" or "Disabled"))

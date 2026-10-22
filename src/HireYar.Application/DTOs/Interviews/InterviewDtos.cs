@@ -39,7 +39,7 @@ public sealed record CandidateInterviewDto(Guid InterviewId, string Status, bool
     bool CompanyIntroductionEnabled = false, int RecoveryAttempts = 0, bool BackgroundRetryPending = false,
     string? StageAudioUrl = null, CandidateIntroductionDto? Introduction = null,
     string ProcessingState = "idle", string? ProcessingMessage = null, DateTimeOffset? NextRecoveryAtUtc = null,
-    bool DiagnosticsEnabled = false, string? DiagnosticsUrl = null);
+    bool DiagnosticsEnabled = false, string? DiagnosticsUrl = null, SpeechCapabilitiesDto? SpeechCapabilities = null);
 public sealed record AdvanceInterviewStageRequest([Required] string Stage, [StringLength(32000)] string? Introduction = null);
 public sealed record HrAnswerDto(Guid Id, Guid QuestionId, string Status, string? Transcript, string? SelectionSource,
     string? FailureStage, string? FailureCode, string AudioUrl, string? VideoUrl = null,
@@ -60,4 +60,4 @@ public sealed record HrInterviewDto(Guid Id, Guid CandidateApplicationId, Guid J
     bool DiagnosticsEnabled = false, string? DiagnosticsUrl = null, bool DiagnosticPromptsEnabled = false);
 public interface ICurrentInterviewAccess { Guid InterviewId { get; } }
 public sealed record AnswerCapture(string? ClientTurnId, DateTimeOffset? LastSpeechEndUtc,
-    Stream? Video = null, string? VideoFileName = null, string? VideoContentType = null, long VideoLength = 0);
+    Stream? Video = null, string? VideoFileName = null, string? VideoContentType = null, long VideoLength = 0, string? RealtimeReceipt = null);

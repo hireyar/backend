@@ -18,6 +18,12 @@ public sealed class InterviewAuthenticationHandler(IOptionsMonitor<Authenticatio
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var header = Request.Headers.Authorization.ToString();
+        // Browsers cannot attach an Authorization header to WebSocket handshakes.
+        // Accept the same candidate credential only on this endpoint, in a non-echoed subprotocol.
+        if (string.IsNullOrEmpty(header) && Context.WebSockets.IsWebSocketRequest && Request.Path.Value!.EndsWith("/speech/stream", StringComparison.Ordinal)) {
+            var protocol = Context.WebSockets.WebSocketRequestedProtocols.FirstOrDefault(x => x.StartsWith("hireyar-interview.", StringComparison.Ordinal));
+            if (protocol is not null) header = "Bearer " + protocol["hireyar-interview.".Length..];
+        }
         if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return AuthenticateResult.NoResult();
         var token = header[7..];
         if (!(token.Length == 6 && token.All(char.IsAsciiDigit)) && !(token.Length == 64 && token.All(char.IsAsciiHexDigit)))
