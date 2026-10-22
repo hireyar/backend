@@ -1,3 +1,7 @@
+## اتصال Soniox از ورکر Cloudflare — 2026-10-23
+
+طبق درخواست صریح کاربر و کد ورکر ارسالی، AI:Providers:Soniox:WebSocketUrl در appsettings اصلی به wss://hireyar-soniox.farzad-sep.workers.dev/stt و ApiKey به credential پراکسی داده‌شده تنظیم شد؛ مقدار secret در مستندات/خروجی درج نمی‌شود. کلید واقعی Soniox در env ورکر است. پروایدر همچنان Soniox و مدل stt-rt-v5 است؛ timeout/LanguageHints و سایر تنظیمات تغییر نکردند. adapter فعلی Authorization: Bearer می‌فرستد و ورکر پس از اعتبارسنجی، آن را برای upstream با کلید Soniox خودش جایگزین می‌کند؛ نیاز به هدر جدید/کد محصول/DB/migration نیست. health عمومی configured=true بود؛ مسیر صوت /stt است، نه /health. تغییر فقط فایل محلی است؛ push/deploy انجام نشده. اگر environment مقصد AI__Providers__Soniox__ApiKey/WebSocketUrl را override کند، تنظیمات محیطی بر فایل تقدم دارند.
+
 ## قابلیت زنده STT
 
 STT اکنون capability اختیاری realtime دارد؛ Soniox از IRealtimeSpeechToTextService و جریان incremental استفاده می‌کند، بقیه providerهای فعلی batch می‌مانند. timeout معمول batch سقف طول صحبت زنده نیست؛ live اتصال۱۰ثانیه‌ای و finalization طبق TimeoutSeconds دارد و API سقف ضبط/idle را اعمال می‌کند. کاتالوگ قابل مصرف فرانت و protocol: REALTIME_STT_API.md؛ راهنمای کامل Angular: REALTIME_STT_FRONTEND_PROMPT.md. credential پروایدر به مرورگر داده نمی‌شود. JSON language_hints همچنان یکتا است. تنظیمات فعلی/توکن‌ها تغییر نکردند.
