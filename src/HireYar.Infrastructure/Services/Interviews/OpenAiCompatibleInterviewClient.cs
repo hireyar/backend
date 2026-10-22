@@ -6,7 +6,7 @@ using HireYar.Application.Interviews;
 using Microsoft.Extensions.Logging;
 namespace HireYar.Infrastructure.Interviews;
 
-public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiInterviewOptions config, ILogger logger, string providerName, IPcmSpeechEncoder? encoder = null)
+public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiInterviewOptions config, ILogger logger, string providerName, IPcmSpeechEncoder? encoder = null, string[]? languageHints = null)
     : ISpeechToTextService, IInterviewDecisionService, ITextToSpeechService, IQuestionSuggestionProvider, IAnswerAssessmentProvider, IReportNarrativeProvider
 {
     public async Task<AnswerAssessmentResponse> AssessAnswerAsync(AnswerAssessmentInput input, CancellationToken ct)
@@ -45,7 +45,7 @@ public abstract class OpenAiCompatibleInterviewClient(HttpClient http, IOpenAiIn
         using var form = new MultipartFormDataContent();
         var stream = new StreamContent(audio); stream.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         form.Add(stream, "file", Path.GetFileName(fileName)); form.Add(new StringContent(config.SttModel), "model");
-        form.Add(new StringContent("fa"), "language");
+        if ((languageHints ?? ["fa"]).FirstOrDefault() is { } language) form.Add(new StringContent(language), "language");
         form.Add(new StringContent("json"), "response_format");
         var bytes = await SendAsync("audio/transcriptions", form, "stt", config.SttModel, config.SttTimeoutSeconds, 128000, ct);
         var reason = "invalid_json";

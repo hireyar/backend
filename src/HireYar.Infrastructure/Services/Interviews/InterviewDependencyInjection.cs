@@ -15,7 +15,8 @@ public static class InterviewDependencyInjection
         services.AddOptions<SpeechEncodingOptions>().Bind(config.GetSection("SpeechEncoding"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.FfmpegPath) && o.TimeoutSeconds is >= 1 and <= 120, "Invalid speech encoder configuration.").ValidateOnStart();
         services.AddSingleton<IPcmSpeechEncoder, FfmpegPcmSpeechEncoder>();
-        var provider = config["AI:Provider"] ?? "Disabled";
+        var routing = AiRoutingOptions.IsConfigured(config) ? services.AddAiCapabilities(config) : null;
+        var provider = routing is null ? config["AI:Provider"] ?? "Disabled" : "Disabled";
         if (provider is not ("NetArz" or "Liara" or "Disabled"))
             throw new InvalidOperationException("AI:Provider must be NetArz, Liara or Disabled.");
         switch (provider)
@@ -33,8 +34,10 @@ public static class InterviewDependencyInjection
                 RegisterProvider<LiaraClient>(services);
                 break;
             default:
-                services.AddScoped<DisabledInterviewProvider>();
-                RegisterProvider<DisabledInterviewProvider>(services);
+                if (routing is null) {
+                    services.AddScoped<DisabledInterviewProvider>();
+                    RegisterProvider<DisabledInterviewProvider>(services);
+                }
                 break;
         }
         var timeoutSection = config.GetSection($"AI:{provider}");
@@ -44,7 +47,11 @@ public static class InterviewDependencyInjection
             .Validate(o => o.MaxRecoveryAttempts is >= 1 and <= 10 && o.RecoveryPollSeconds is >= 1 and <= 300, "Invalid recovery limits.")
             .Validate(o => o.HistoryCharacterBudget is >= 2000 and <= 128000, "Invalid interview history budget.")
             .Validate(o => provider == "Disabled" || o.LeaseSeconds > timeoutSection.GetValue("SttTimeoutSeconds", 60) + timeoutSection.GetValue("LlmTimeoutSeconds", 30) + 30,
-                "InterviewAudio:LeaseSeconds must exceed STT + LLM timeouts plus 30 seconds.").ValidateOnStart();
+                "InterviewAudio:LeaseSeconds must exceed STT + LLM timeouts plus 30 seconds.")
+            .Validate(o => routing is null || (routing.SpeechToText.Provider == "Disabled" && routing.InterviewDecision.Provider == "Disabled") ||
+                o.LeaseSeconds > (routing.SpeechToText.Provider == "Disabled" ? 0 : routing.SpeechToText.TimeoutSeconds) +
+                (routing.InterviewDecision.Provider == "Disabled" ? 0 : routing.InterviewDecision.TimeoutSeconds) + 30,
+                "InterviewAudio:LeaseSeconds must exceed selected STT + decision timeouts plus 30 seconds.").ValidateOnStart();
         services.AddSingleton(s => s.GetRequiredService<IOptions<InterviewOptions>>().Value);
         services.AddOptions<InterviewStorageOptions>().Bind(config.GetSection("InterviewStorage"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.RootPath) && !o.RootPath.Split('/', '\\').Contains("wwwroot", StringComparer.OrdinalIgnoreCase), "InterviewStorage must be private and outside wwwroot.").ValidateOnStart();
