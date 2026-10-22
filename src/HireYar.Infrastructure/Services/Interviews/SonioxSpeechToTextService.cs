@@ -42,7 +42,9 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
     internal static async Task<SpeechTranscriptionResult> TranscribeSessionAsync(WebSocket socket, Stream audio, AiCapabilityOptions route, CancellationToken ct)
     {
         using var session = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var config = JsonSerializer.SerializeToUtf8Bytes(new { model = route.Model, audio_format = "auto", language_hints = route.Options.LanguageHints });
+        // Configuration binding appends configured hints to the initialized default ["fa"].
+        // Soniox rejects duplicates with HTTP 400 ("Language hints must be unique.").
+        var config = JsonSerializer.SerializeToUtf8Bytes(new { model = route.Model, audio_format = "auto", language_hints = route.Options.LanguageHints.Distinct(StringComparer.Ordinal).ToArray() });
         await socket.SendAsync(config.AsMemory(), WebSocketMessageType.Text, true, session.Token);
         var send = SendAudioAsync(socket, audio, session.Token);
         var receive = ReceiveTranscriptAsync(socket, session.Token);
@@ -75,6 +77,7 @@ public sealed class SonioxSpeechToTextService(AiConnectionOptions connection, Ai
             return "model_not_available";
         if (root.TryGetProperty("error_message", out var message) && message.ValueKind == JsonValueKind.String) {
             var value = message.GetString() ?? "";
+            if (value.StartsWith("Language hints must be unique", StringComparison.OrdinalIgnoreCase)) return "language_hints_duplicate";
             if (value.StartsWith("Audio decode error", StringComparison.OrdinalIgnoreCase)) return "audio_decode_error";
             if (value.StartsWith("Audio data channels must be specified", StringComparison.OrdinalIgnoreCase)) return "audio_channels_required";
             if (value.StartsWith("Audio data sample rate must be specified", StringComparison.OrdinalIgnoreCase)) return "audio_sample_rate_required";

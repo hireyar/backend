@@ -1,3 +1,21 @@
+## علت بازتولیدشده Soniox400: تکرار language_hints — 2026-10-22
+
+تست واقعی از دعوتِ موجود در پنل با اجازه کاربر انجام شد؛ فقط OTP ورود دعوت و تست گذرای صوت، بدون start/answers/complete. میکروفون Chromium فایل WAV گفتار مصنوعی را مصرف کرد و MediaRecorder فایل۶ثانیه‌ای WebM/Opus با header=1a45dfa3 و۷۵۰۱۴بایت ساخت. ارسال آن به audio-check واقعی اپ503 گرفت؛ همان بایت‌ها مستقیم در Soniox، هم یکجا و هم با قطعات۱۶KB، تا finished=true و token نهایی موفق بودند. بنابراین WebM این نمونه سالم است و تغییر اجباری به MP3 راه‌حل این ایراد نیست.
+
+علت در binding واقعی .NET بازتولید شد: AiCapabilitySettings.LanguageHints پیش‌فرض [fa] دارد و ConfigurationBinder مقدار [fa] فایل را به آن اضافه می‌کند؛ آرایه [fa,fa] حاصل می‌شود. تست از DI واقعی قبل اصلاح FAIL با Actual=[fa,fa] و Expected=[fa] داشت (artifacts/soniox-hints-repro.log). ارسال واقعی همین تکرار به Soniox دقیقاً400 و پیام Language hints must be unique. داد؛ این پیام قبلاً provider_request_rejected شده بود. adapter اکنون فقط هنگام serialization درخواست Soniox، LanguageHints را با Ordinal.Distinct یکتا می‌کند؛ پیش‌فرض فارسی، تنظیمات و پروایدرهای دیگر عوض نمی‌شوند. همین خطا در diagnostics به language_hints_duplicate نگاشت می‌شود. توکن‌ها و appsettings دست‌نخورده‌اند؛ فرانت/codec/DB/migration تغییر نکرده‌اند.
+
+عبور کامل از UI ممکن نشد: چک‌باکس تأیید بلندگو در محیط headless غیرفعال ماند؛ پس تست ارسال با ضبط واقعی Chrome و endpoint واقعی اپ انجام شد، نه ادعای موفقیت کامل ویزارد UI. screenshot مرحله توقف و نتیجه درخواست/فایل مصنوعی در artifacts/soniox-app-* موجودند؛ شناسه دعوت/کد/توکن در گزارش درج نشده‌اند. نسخه مقصد هنوز اصلاح distinct را دریافت نکرده؛ تست پس از انتشار لازم است. این یافته جایگزین فرضیه‌های قبلی فرمت/احراز هویت در این مورد است. WebM در مرجع رسمی Soniox پشتیبانی می‌شود: https://soniox.com/docs/stt/rt/real-time-transcription#audio-formats .
+
+## تشخیص بدون انتشار مجدد API
+
+ابزار مستقل [soniox_diagnose.py](../tools/soniox_diagnose.py) را کنار appsettings.json سرور بگذارید و با **همان محیط سرویس API** اجرا کنید:
+
+```sh
+python3 soniox_diagnose.py ./appsettings.json
+```
+
+Python3 استاندارد کافی است؛ pip/SDK/تغییر توکن لازم نیست. ابزار یک ثانیه سکوت مصنوعی می‌فرستد و فقط نتیجه یا علت حذف‌کلیدشده provider را نشان می‌دهد. فایل محیط ASPNETCORE_ENVIRONMENT/DOTNET_ENVIRONMENT و AI__... لحاظ می‌شوند؛ هیچ تغییری در تنظیمات نمی‌دهد. توکن را در خط فرمان وارد نکنید. خروجی را ارسال کنید؛ فایل تنظیمات یا env را ارسال نکنید. موفقیت این probe صحت فایل ضبط‌شده اصلی را ثابت نمی‌کند. پروتکل و redaction آن۵تست دارند؛ آزمایش واقعی محلی با توکن فعلی موفق است، مقصد هنوز اجرا نشده.
+
 ## تشخیص خطای400 Soniox — 2026-10-22
 
 لاگ مقصد stt_http_400 تأیید می‌کند provider درخواست را رد می‌کند؛ هشدار cache آنتی‌فورجری علت شکست STT نیست. عدد400 به‌تنهایی decode صوت/پارامتر/مدل را تفکیک نمی‌کند و علت دقیق درخواست گزارش‌شده هنوز اثبات نشده است. SonioxSpeechToTextService اکنون failureReason را فقط از واژگان ثابت مستند (audio_decode_error، model_not_available، audio_channels_required، audio_sample_rate_required، audio_frame_invalid، audio_too_long، provider_request_rejected) ثبت می‌کند، همراه audioFormat کنترل‌شده و Activity traceId. پیام خام Soniox یا صوت/توکن ذخیره یا log نمی‌شود؛ Reason استثنا هم فقط همین مقدار ثابت است. قرارداد عمومی503 و کد stt_http_400 محفوظ‌اند. پارامترها/توکن/انتخاب مدل تغییر نکردند؛ migration و انتشار ندارد.

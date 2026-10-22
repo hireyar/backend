@@ -214,6 +214,7 @@ public sealed class AiCapabilityRoutingTests
     }
 
     [Theory]
+    [InlineData("{\"error_code\":400,\"error_message\":\"Language hints must be unique.\"}", "language_hints_duplicate")]
     [InlineData("{\"error_code\":400,\"error_message\":\"Audio decode error: sensitive\"}", "audio_decode_error")]
     [InlineData("{\"error_code\":400,\"error_type\":\"model_not_available\",\"error_message\":\"sensitive\"}", "model_not_available")]
     [InlineData("{\"error_code\":400,\"error_message\":\"Audio data sample rate must be specified for PCM formats\"}", "audio_sample_rate_required")]
@@ -237,6 +238,19 @@ public sealed class AiCapabilityRoutingTests
         var result = await SonioxSpeechToTextService.TranscribeSessionAsync(socket, audio, new() { Model = "stt-test" }, default);
         Assert.Equal(string.Empty, result.Text);
         Assert.Equal("Soniox", result.Provider);
+    }
+
+    [Fact]
+    public async Task Soniox_configuration_binding_does_not_send_duplicate_default_language_hint()
+    {
+        var settings = Settings(); settings["AI:SpeechToText:Options:LanguageHints:0"] = "fa";
+        using var services = Services(settings);
+        var route = services.GetRequiredService<IOptions<AiRoutingOptions>>().Value.SpeechToText;
+        using var socket = new Socket("""{"tokens":[],"finished":true}""");
+        using var audio = new MemoryStream([1]);
+        await SonioxSpeechToTextService.TranscribeSessionAsync(socket, audio, route, default);
+        using var config = JsonDocument.Parse(socket.Sent[0].Bytes);
+        Assert.Equal(new[] { "fa" }, config.RootElement.GetProperty("language_hints").EnumerateArray().Select(x => x.GetString()));
     }
 
     [Fact]
