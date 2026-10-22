@@ -1,3 +1,9 @@
+## تشخیص خطای400 Soniox — 2026-10-22
+
+لاگ مقصد stt_http_400 تأیید می‌کند provider درخواست را رد می‌کند؛ هشدار cache آنتی‌فورجری علت شکست STT نیست. عدد400 به‌تنهایی decode صوت/پارامتر/مدل را تفکیک نمی‌کند و علت دقیق درخواست گزارش‌شده هنوز اثبات نشده است. SonioxSpeechToTextService اکنون failureReason را فقط از واژگان ثابت مستند (audio_decode_error، model_not_available، audio_channels_required، audio_sample_rate_required، audio_frame_invalid، audio_too_long، provider_request_rejected) ثبت می‌کند، همراه audioFormat کنترل‌شده و Activity traceId. پیام خام Soniox یا صوت/توکن ذخیره یا log نمی‌شود؛ Reason استثنا هم فقط همین مقدار ثابت است. قرارداد عمومی503 و کد stt_http_400 محفوظ‌اند. پارامترها/توکن/انتخاب مدل تغییر نکردند؛ migration و انتشار ندارد.
+
+فرمت‌های auto در مرجع Soniox شامل webm/wav/ogg/mp3/aac هستند؛ M4A/MP4 مجاز در ورودی اپ، در این فهرست تصریح نشده‌اند. این صرفاً فرضیه بررسی فرمت است، نه اثبات علت خطای مقصد. تبدیل صوت یا تغییر مدلِ حدسی اعمال نشد. مرجع: https://soniox.com/docs/stt/rt/real-time-transcription#audio-formats و https://soniox.com/docs/api-reference/stt/websocket-api . برای تشخیص مقصد، لاگ جدید failureReason یا فایل صوتی بازتولید لازم است؛ هنوز از محیط مقصد در دسترس نیست.
+
 ## اصلاح تشخیص Soniox — 2026-10-22
 
 finished=true بدون token نهایی، متن خالی معتبر است؛ audio-check با speechRecognized=false راهنمای میکروفون می‌دهد و آن را خطای503 نمی‌کند. پاسخ مصاحبه همچنان شرط متن غیرخالی خود را دارد. خطای واقعی در لاگ و Trace با failureCode دقیق (مثل stt_http_401/402/429 یا stt_invalid_response) ثبت می‌شود؛ متن خام پاسخ و توکن ثبت نمی‌شوند. پاسخ HTTP عمومیِ شکست provider همچنان503 است. توکن تنظیم‌شده با اجازه کاربر، با سکوت و گفتار مصنوعی در Soniox واقعی موفق آزمایش شد؛ فایل appsettings تغییر نکرد.

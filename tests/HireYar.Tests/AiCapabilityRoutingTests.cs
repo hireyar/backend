@@ -213,6 +213,22 @@ public sealed class AiCapabilityRoutingTests
         Assert.Equal(code, error.Code); Assert.DoesNotContain("sensitive", error.Message);
     }
 
+    [Theory]
+    [InlineData("{\"error_code\":400,\"error_message\":\"Audio decode error: sensitive\"}", "audio_decode_error")]
+    [InlineData("{\"error_code\":400,\"error_type\":\"model_not_available\",\"error_message\":\"sensitive\"}", "model_not_available")]
+    [InlineData("{\"error_code\":400,\"error_message\":\"Audio data sample rate must be specified for PCM formats\"}", "audio_sample_rate_required")]
+    [InlineData("{\"error_code\":400,\"error_message\":\"Audio data channels must be specified for PCM formats\"}", "audio_channels_required")]
+    [InlineData("{\"error_code\":400,\"error_message\":\"Audio is too long.\"}", "audio_too_long")]
+    [InlineData("{\"error_code\":400,\"error_message\":\"sensitive token and user content\"}", "provider_request_rejected")]
+    [InlineData("{\"error_code\":400,\"error_message\":{\"unexpected\":\"sensitive\"}}", "provider_request_rejected")]
+    public async Task Soniox_bad_request_keeps_only_safe_fixed_diagnostic(string message, string reason)
+    {
+        using var socket = new Socket(message); using var audio = new MemoryStream([1]);
+        var error = await Assert.ThrowsAsync<InterviewProviderException>(() => SonioxSpeechToTextService.TranscribeSessionAsync(socket, audio, new(), default));
+        Assert.Equal("stt_http_400", error.Code); Assert.Equal(reason, error.Reason);
+        Assert.DoesNotContain("sensitive", error.ToString()); Assert.DoesNotContain("sensitive", error.Reason!);
+    }
+
     [Fact]
     public async Task Soniox_completed_silence_is_valid_empty_transcription_for_microphone_check()
     {

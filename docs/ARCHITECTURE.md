@@ -1,3 +1,9 @@
+## تشخیص خطای400 Soniox — 2026-10-22
+
+لاگ مقصد stt_http_400 تأیید می‌کند provider درخواست را رد می‌کند؛ هشدار cache آنتی‌فورجری علت شکست STT نیست. عدد400 به‌تنهایی decode صوت/پارامتر/مدل را تفکیک نمی‌کند و علت دقیق درخواست گزارش‌شده هنوز اثبات نشده است. SonioxSpeechToTextService اکنون failureReason را فقط از واژگان ثابت مستند (audio_decode_error، model_not_available، audio_channels_required، audio_sample_rate_required، audio_frame_invalid، audio_too_long، provider_request_rejected) ثبت می‌کند، همراه audioFormat کنترل‌شده و Activity traceId. پیام خام Soniox یا صوت/توکن ذخیره یا log نمی‌شود؛ Reason استثنا هم فقط همین مقدار ثابت است. قرارداد عمومی503 و کد stt_http_400 محفوظ‌اند. پارامترها/توکن/انتخاب مدل تغییر نکردند؛ migration و انتشار ندارد.
+
+فرمت‌های auto در مرجع Soniox شامل webm/wav/ogg/mp3/aac هستند؛ M4A/MP4 مجاز در ورودی اپ، در این فهرست تصریح نشده‌اند. این صرفاً فرضیه بررسی فرمت است، نه اثبات علت خطای مقصد. تبدیل صوت یا تغییر مدلِ حدسی اعمال نشد. مرجع: https://soniox.com/docs/stt/rt/real-time-transcription#audio-formats و https://soniox.com/docs/api-reference/stt/websocket-api . برای تشخیص مقصد، لاگ جدید failureReason یا فایل صوتی بازتولید لازم است؛ هنوز از محیط مقصد در دسترس نیست.
+
 ## ایمیل Tahoma/RTL و تشخیص خطای Soniox — 2026-10-22
 
 قالب دعوت تیم برای ایمیل‌خوان‌ها جهت rtl، text-align:right و فونت Tahoma/Arial را روی body، جدول/سلول اصلی، متن، کارت نقش و دکمه به‌صورت inline تکرار می‌کند؛ لینک خام تنها بخش LTR است. متن۱۴px با line-height۲۸، عنوان۲۰، نقش۱۵ و توضیحات۱۲ است. encoding محتوای کاربر و plain text محفوظ‌اند. پیش‌نمایش مصنوعی artifacts/team-invitation-preview.html است؛ ارسال ایمیل واقعی انجام نشد.
