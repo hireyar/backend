@@ -103,7 +103,7 @@ public sealed class TemplateService(IApplicationDbContext db, ICurrentUser user,
     }).ToList();
     private void Apply(InterviewTemplate row, TemplateRequest r)
     {
-        row.JobPositionId = r.JobPositionId; row.Title = r.Title.Trim(); row.Language = r.Language.Trim(); row.DurationMinutes = r.DurationMinutes;
+        row.JobPositionId = r.JobPositionId; row.Title = r.Title.Trim(); row.Language = "fa-IR"; row.DurationMinutes = r.DurationMinutes;
         row.MaxFollowUpQuestionsPerQuestion = r.MaxFollowUpQuestionsPerQuestion; row.IsArchived = r.IsArchived; row.UpdatedAtUtc = time.GetUtcNow();
         row.CandidateIntroductionEnabled = r.CandidateIntroductionEnabled; row.CandidateIntroductionMessage = r.CandidateIntroductionMessage?.Trim() ?? "";
         row.CompanyIntroductionEnabled = r.CompanyIntroductionEnabled; row.CompanyIntroductionMessage = r.CompanyIntroductionMessage?.Trim() ?? "";

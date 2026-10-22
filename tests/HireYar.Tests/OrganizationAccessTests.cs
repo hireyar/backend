@@ -238,6 +238,8 @@ public sealed class TeamInvitationEmailTests
         Assert.DoesNotContain("<script>",html); Assert.DoesNotContain("<img src=x",html);
         Assert.Contains("&lt;organization&gt;",html);Assert.Contains("#14b8a6",html);
         Assert.Contains("https://example.test/team-invitations/123",html);Assert.Contains("https://example.test/team-invitations/123",text);
-        Assert.Contains(lang=="en" ? "mobile number" : lang=="ar" ? "رقم الهاتف" : "شماره موبایل",text);
+        Assert.Contains("شماره موبایل",text);
+        Assert.Contains("lang=\"fa\" dir=\"rtl\"",html);
+        Assert.DoesNotContain("Accept invitation",html);
     }
 }

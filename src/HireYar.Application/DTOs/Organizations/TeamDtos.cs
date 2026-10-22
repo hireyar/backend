@@ -8,7 +8,7 @@ public sealed record InviteTeamMemberRequest(
     [Required, StringLength(100)] string LastName,
     [Required, StringLength(64)] string AccessRoleCode = "interview_manager",
     [EmailAddress, StringLength(256)] string? Email = null,
-    [RegularExpression("^(fa|en|ar)$")] string Language = "fa",
+    [RegularExpression("^fa$")] string Language = "fa",
     [StringLength(2000)] string? Message = null) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
