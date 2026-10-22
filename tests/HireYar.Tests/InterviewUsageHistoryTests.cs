@@ -113,9 +113,10 @@ public sealed partial class CountBasedSubscriptionTests
     public async Task Usage_migration_reconstructs_known_facts_once_and_preserves_live_completion_and_rollback()
     {
         const string previous = "20261019112006_AddSubscriptionPeriodDiscounts";
+        // Authenticate on the current schema, then seed historical facts on the old schema without invoking current identity handlers.
+        var owner = await f.RegisterOwner();
         await f.Db(async db => await db.GetService<IMigrator>().MigrateAsync(previous));
         // Seed pre-migration facts directly. Current entitlement handlers require newer administration tables.
-        var owner = await f.RegisterOwner();
         Guid historicalJobId=Guid.Empty, historicalTemplateId=Guid.Empty, historicalSessionId=Guid.Empty;
         await f.Db(async db => {
             var org=await db.Users.Where(x=>x.Id==owner.Id).Select(x=>x.OrganizationId).SingleAsync(); var now=f.Clock.GetUtcNow();

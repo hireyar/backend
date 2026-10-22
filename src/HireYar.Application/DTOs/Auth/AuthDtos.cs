@@ -4,7 +4,7 @@ namespace HireYar.Application.Auth;
 
 public sealed record NameRequest([Required, StringLength(200)] string FullName,
     [StringLength(200, MinimumLength = 1)] string? OrganizationName = null);
-public sealed record CurrentUserDto(Guid Id, string? Email, string? Mobile, string FullName, Guid OrganizationId, string OrganizationName, OrganizationRole Role);
+public sealed record CurrentUserDto(Guid Id, string? Email, string? Mobile, string FullName, Guid OrganizationId, string OrganizationName, OrganizationRole Role, HireYar.Application.Organizations.AccessRoleDto? AccessRole = null, IReadOnlyList<HireYar.Application.Organizations.SectionPermission>? Permissions = null);
 // Internal boundary result: controllers must return AccessResponse, never this refresh secret.
 public sealed record SessionResult(string AccessToken, DateTimeOffset AccessExpiresAtUtc, string RefreshToken, DateTimeOffset RefreshExpiresAtUtc);
 public sealed record AccessResponse(string AccessToken, DateTimeOffset ExpiresAtUtc);

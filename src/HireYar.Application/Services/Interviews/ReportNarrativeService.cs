@@ -21,7 +21,7 @@ public sealed class ReportNarrativeService(IApplicationDbContext db,ICurrentUser
     }
     public Task<ReportNarrative> GenerateAsync(Guid id,string fingerprint,CancellationToken ct)
     {
-        if(user.Role!=HireYar.Domain.Organizations.OrganizationRole.Owner) throw new AppException(403,"forbidden","Only the owner may generate report prose.");
+        if(!user.CanAccess("reports", true)) throw new AppException(403,"forbidden","Only the owner may generate report prose.");
         return GenerateCoreAsync(user.OrganizationId,id,fingerprint,ct);
     }
 

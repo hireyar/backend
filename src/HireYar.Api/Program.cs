@@ -54,7 +54,8 @@ builder.Services.AddScoped<ICurrentInterviewAccess, CurrentInterviewAccess>();
 builder.Services.AddScoped<PanelWizardService>();
 builder.Services.AddScoped<HireYar.Application.Support.TicketService>();
 builder.Services.AddScoped<JobService>(); builder.Services.AddScoped<TemplateService>(); builder.Services.AddScoped<OrganizationService>(); builder.Services.AddScoped<DashboardService>(); builder.Services.AddScoped<CsrfFilter>();
-builder.Services.AddControllers().AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
+builder.Services.AddScoped<SectionAccessFilter>();
+builder.Services.AddControllers(o => o.Filters.AddService<SectionAccessFilter>()).AddJsonOptions(o => { o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)); o.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow; });
 builder.Services.Configure<ApiBehaviorOptions>(o => o.InvalidModelStateResponseFactory = c =>
 {
     var problem = new ValidationProblemDetails(c.ModelState) { Status = 400, Title = "Request validation failed." };

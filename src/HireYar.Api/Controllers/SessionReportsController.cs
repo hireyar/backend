@@ -20,7 +20,7 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return Content(SessionReportPage.Render(report), "text/html; charset=utf-8");
     }
-    [Authorize(Roles = "Owner")]
+    [Authorize]
     [HttpPost("api/interviews/{id:guid}/report/answers/{answerId:guid}/assessment/retry")]
     [ProducesResponseType(typeof(RetryAnswerAssessmentResponse), StatusCodes.Status202Accepted)]
     public async Task<ActionResult<RetryAnswerAssessmentResponse>> RetryAssessment(Guid id, Guid answerId, CancellationToken ct)
@@ -30,7 +30,7 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
         var report = await reports.ReadAsync(id, ct);
         return Accepted($"/api/interviews/{id}/report", new RetryAnswerAssessmentResponse(id, answerId, report.Questions.Single(q => q.Answer?.AnswerId == answerId).Assessment));
     }
-    [Authorize(Roles = "Owner")]
+    [Authorize]
     [HttpPut("api/interviews/{id:guid}/report/policy")]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdatePolicy(Guid id, ReportPolicyRequest request, CancellationToken ct)
@@ -39,12 +39,12 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
         throw AppException.NotFound();
     }
 
-    [Authorize(Roles = "Owner")]
+    [Authorize]
     [HttpPost("api/interviews/{id:guid}/report/review")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> RecordDecision(Guid id, ReportDecisionRequest request, CancellationToken ct) => new JsonResult(SessionReportOutput.Public(await decisions.RecordAsync(id, request, ct)));
 
-    [Authorize(Roles = "Owner")]
+    [Authorize]
     [HttpPost("api/interviews/{id:guid}/report/answers/{answerId:guid}/dimensions/retry")]
     [ProducesResponseType(typeof(RetryAnswerAssessmentResponse),StatusCodes.Status200OK)]
     public async Task<ActionResult<RetryAnswerAssessmentResponse>> RepairDimensions(Guid id,Guid answerId,CancellationToken ct)
@@ -54,7 +54,7 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
         var report=await reports.ReadAsync(id,ct);
         return Ok(new RetryAnswerAssessmentResponse(id,answerId,report.Questions.Single(q=>q.Answer?.AnswerId==answerId).Assessment));
     }
-    [Authorize(Roles = "Owner")]
+    [Authorize]
     [HttpPost("api/interviews/{id:guid}/report/narrative")]
     [ProducesResponseType(typeof(ReportNarrative),StatusCodes.Status200OK)]
     public async Task<ActionResult<ReportNarrative>> GenerateNarrative(Guid id,GenerateReportNarrativeRequest request,CancellationToken ct) =>
@@ -69,7 +69,7 @@ public sealed class SessionReportsController(SessionReportService reports, IAppl
             throw AppException.NotFound();
         throw new AppException(410, "report_api_retired", "Use the new /report endpoint. The previous report system has been removed.");
     }
-    [Authorize(Roles = "Owner")]
+    [Authorize]
     [HttpPost("api/interviews/{id:guid}/evaluation-report")]
     [HttpPost("api/interviews/{id:guid}/evaluation-report/regenerate")]
     public Task<IActionResult> RetiredCommand(Guid id, CancellationToken ct) => Retired(id, ct);

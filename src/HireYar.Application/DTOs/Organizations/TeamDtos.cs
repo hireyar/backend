@@ -5,7 +5,11 @@ namespace HireYar.Application.Organizations;
 public sealed record InviteTeamMemberRequest(
     [Required, StringLength(11, MinimumLength = 11), RegularExpression("^09[0-9]{9}$")] string Mobile,
     [Required, StringLength(100)] string FirstName,
-    [Required, StringLength(100)] string LastName) : IValidatableObject
+    [Required, StringLength(100)] string LastName,
+    [Required, StringLength(64)] string AccessRoleCode = "interview_manager",
+    [EmailAddress, StringLength(256)] string? Email = null,
+    [RegularExpression("^(fa|en|ar)$")] string Language = "fa",
+    [StringLength(2000)] string? Message = null) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
     {
@@ -15,5 +19,9 @@ public sealed record InviteTeamMemberRequest(
     }
 }
 public sealed record TeamInvitationDto(Guid Id, string Mobile, DateTimeOffset CreatedAtUtc, DateTimeOffset ExpiresAtUtc,
-    string Status, string? FirstName = null, string? LastName = null);
-public sealed record TeamMemberDto(Guid Id, string FullName, string? Mobile, OrganizationRole Role, bool IsActive);
+    string Status, string? FirstName = null, string? LastName = null,
+    string AccessRoleCode = "interview_manager", string? Email = null, string Language = "fa", string EmailDelivery = "NotRequested");
+public sealed record TeamMemberDto(Guid Id, string FullName, string? Mobile, OrganizationRole Role, bool IsActive, string? AccessRoleCode = null);
+
+public sealed record BatchTeamInvitationsRequest([Required, MinLength(1), MaxLength(50)] IReadOnlyList<InviteTeamMemberRequest> Invitations);
+public sealed record BatchTeamInvitationResult(string Mobile, TeamInvitationDto? Invitation, int Status, string? ErrorCode);

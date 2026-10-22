@@ -4,6 +4,7 @@ namespace HireYar.Infrastructure.Auth;
 
 public sealed class ApplicationUser : IdentityUser<Guid>
 {
+    public string? AccessRoleCode { get; set; }
     public string FullName { get; set; } = "";
     // Captured at registration only; referral validation and rewards are a future feature.
     public string? ReferralCode { get; set; }

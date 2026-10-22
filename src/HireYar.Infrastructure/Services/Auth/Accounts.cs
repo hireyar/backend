@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 namespace HireYar.Infrastructure.Auth;
 
-public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger, HireYar.Application.Subscriptions.SubscriptionService subscriptions) : IAccounts
+public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users, IPhoneOtpSender sms, IOptions<SecurityOptions> options, IOptions<KavenegarOptions> otpOptions, TimeProvider time, ILogger<Accounts> logger, HireYar.Application.Subscriptions.SubscriptionService subscriptions, HireYar.Application.Organizations.IAccessControl access) : IAccounts
 {
     private SecurityOptions Settings => options.Value;
     private DateTimeOffset Now => time.GetUtcNow();
@@ -106,6 +106,10 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
             }
             if (invitation.ExpiresAtUtc <= Now)
                 throw new AppException(409, "invitation_unavailable", "Invitation is no longer available.");
+            var selectedRole = await db.AccessRoles.AsNoTracking().SingleOrDefaultAsync(x => x.Code == invitation.AccessRoleCode && x.IsActive, ct)
+                ?? throw new AppException(409, "invitation_role_unavailable", "Invitation access level is unavailable.");
+            u.AccessRoleCode = selectedRole.Code;
+            db.AccessAudits.Add(new() { ActorId = u.Id, OrganizationId = org.Id, SubjectId = u.Id, Action = "InvitationAccepted", Detail = selectedRole.Code, CreatedAtUtc = Now });
             invitation.AcceptedAtUtc = Now;
         }
         else if (registration is not null || u is null)
@@ -182,11 +186,14 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await LockUser(userId, ct); await Revoke(userId, null, ct); await tx.CommitAsync(ct);
     }
-    public async Task<CurrentUserDto> GetAsync(Guid userId, CancellationToken ct) => await
+    public async Task<CurrentUserDto> GetAsync(Guid userId, CancellationToken ct) {
+        var result = await
         (from u in db.Users.AsNoTracking()
          join o in db.Organizations.AsNoTracking() on u.OrganizationId equals o.Id
          where u.Id == userId
-         select new CurrentUserDto(u.Id, u.Email, u.PhoneNumber, u.FullName, u.OrganizationId, o.Name, u.Role)).SingleOrDefaultAsync(ct) ?? throw AppException.Unauthorized();
+         select new CurrentUserDto(u.Id, u.Email, u.PhoneNumber, u.FullName, u.OrganizationId, o.Name, u.Role, null, null)).SingleOrDefaultAsync(ct) ?? throw AppException.Unauthorized();
+        return result with { AccessRole = await access.RoleAsync(userId, ct), Permissions = await access.PermissionsAsync(userId, ct) };
+    }
     public async Task<CurrentUserDto> UpdateAsync(Guid userId, NameRequest r, CancellationToken ct)
     {
         if (r.OrganizationName is not null && string.IsNullOrWhiteSpace(r.OrganizationName))
@@ -195,7 +202,8 @@ public sealed class Accounts(AppDbContext db, UserManager<ApplicationUser> users
         var u = await LockUser(userId, ct) ?? throw AppException.Unauthorized();
         if (r.OrganizationName is not null)
         {
-            if (u.Role != OrganizationRole.Owner) throw new AppException(403, "forbidden", "Owner access required.");
+            if (!(await access.PermissionsAsync(u.Id, ct)).Any(x => x.Code == "settings" && x.Access == SectionAccess.Write))
+                throw new AppException(403, "forbidden", "شما به این بخش دسترسی ندارید");
             var org = await db.Organizations.SingleOrDefaultAsync(x => x.Id == u.OrganizationId, ct)
                 ?? throw new AppException(404, "not_found", "Organization not found.");
             org.Name = r.OrganizationName.Trim();

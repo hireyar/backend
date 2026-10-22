@@ -10,7 +10,7 @@ namespace HireYar.Application.Interviews;
 public sealed class SessionReportService(IApplicationDbContext db, ICurrentUser user, TimeProvider time, AnswerAssessmentOptions assessmentOptions, HireYar.Application.Subscriptions.InterviewQuotaService quota)
 {
     public Task<SessionReportDocument> ReadAsync(Guid id, CancellationToken ct) =>
-        ReadForOrganizationAsync(user.OrganizationId,id,user.Role==OrganizationRole.Owner,ct);
+        ReadForOrganizationAsync(user.OrganizationId,id,user.CanAccess("reports", true),ct);
 
     internal async Task<SessionReportDocument> ReadForOrganizationAsync(Guid org,Guid id,bool owner,CancellationToken ct)
     {

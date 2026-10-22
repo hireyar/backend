@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 namespace HireYar.Api.Security;
 
-public sealed class CurrentAccountValidation(AppDbContext db) : JwtBearerEvents
+public sealed class CurrentAccountValidation(AppDbContext db, HireYar.Application.Organizations.IAccessControl access) : JwtBearerEvents
 {
     public override Task MessageReceived(MessageReceivedContext context)
     {
@@ -24,6 +24,9 @@ public sealed class CurrentAccountValidation(AppDbContext db) : JwtBearerEvents
         var identity = (ClaimsIdentity)context.Principal!.Identity!;
         foreach (var claim in identity.FindAll("org").Concat(identity.FindAll("role")).Concat(identity.FindAll("system_admin")).ToArray()) identity.RemoveClaim(claim);
         identity.AddClaim(new("org", u.OrganizationId.ToString())); identity.AddClaim(new("role", u.Role.ToString()));
+        foreach (var claim in identity.FindAll("section_access").ToArray()) identity.RemoveClaim(claim);
+        foreach (var p in await access.PermissionsAsync(id, context.HttpContext.RequestAborted))
+            identity.AddClaim(new("section_access", $"{p.Code}:{p.Access}"));
         if (u.IsSystemAdmin) identity.AddClaim(new("system_admin", "true"));
     }
 }

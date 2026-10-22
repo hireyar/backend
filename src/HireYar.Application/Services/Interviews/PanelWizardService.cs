@@ -100,6 +100,7 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
 
     public async Task<InterviewAccessDetails> AccessAsync(Guid id, CancellationToken ct)
     {
+        if (!user.CanAccess("interviews", true)) throw new AppException(403, "forbidden", "شما به این بخش دسترسی ندارید");
         var s = await db.InterviewSessions.AsNoTracking().IgnoreAutoIncludes().SingleOrDefaultAsync(x => x.Id == id && x.OrganizationId == user.OrganizationId && x.DeletedAtUtc == null, ct)
             ?? throw AppException.NotFound();
         return new(s.Id, invitationSecurity.Link(s.Id), invitationSecurity.Unprotect(s.Id, s.ProtectedAccessCode), s.ExpiresAtUtc,
@@ -205,9 +206,10 @@ public sealed class PanelWizardService(IApplicationDbContext db, ICurrentUser us
             x.status, x.CreatedAtUtc, x.ExpiresAtUtc, x.StartedAtUtc, x.CompletedAtUtc, (int)(x.ExpiresAtUtc - x.CreatedAtUtc).TotalDays,
             x.status == "completed" && x.Score.HasValue ? decimal.Round(x.Score.Value * 100, 2) : null,
             $"/api/interviews/{x.Id}", x.ResumeStorageKey is null ? null : $"/api/interviews/{x.Id}/resume",
-            x.CanResend,
-            x.status is not ("completed" or "cancelled"), x.VideoAvailable, invitationSecurity.Link(x.Id),
-            invitationSecurity.Unprotect(x.Id, x.ProtectedAccessCode),
+            user.CanAccess("interviews", true) && x.CanResend,
+            user.CanAccess("interviews", true) && x.status is not ("completed" or "cancelled"), x.VideoAvailable,
+            user.CanAccess("interviews", true) ? invitationSecurity.Link(x.Id) : null,
+            user.CanAccess("interviews", true) ? invitationSecurity.Unprotect(x.Id, x.ProtectedAccessCode) : null,
             InterviewInvitationStatus.Get(x.SupersededByInterviewId, x.AccessRevokedAtUtc, x.InterviewStatus, x.ExpiresAtUtc, now).Status, x.humanDecision)).ToArray(), total, r.Page, r.PageSize);
     }
 }

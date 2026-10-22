@@ -73,6 +73,7 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseEnvironment(Production ? "Production" : "Development");
         b.UseSetting("SkipLocalSettings", "true");
         b.UseSetting("Notifications:Enabled", "false");
+        b.UseSetting("InterviewNotifications:Email:Enabled", "false");
         b.UseSetting("TicketStorage:AccessKey", "synthetic");
         b.UseSetting("TicketStorage:SecretKey", "synthetic");
         b.UseSetting("TicketStorage:Bucket", "hireyar-ticketing");
