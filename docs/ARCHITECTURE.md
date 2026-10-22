@@ -1,3 +1,7 @@
+## اتصال Soniox از ورکر Cloudflare — 2026-10-23
+
+طبق درخواست صریح کاربر و کد ورکر ارسالی، AI:Providers:Soniox:WebSocketUrl در appsettings اصلی به wss://hireyar-soniox.farzad-sep.workers.dev/stt و ApiKey به credential پراکسی داده‌شده تنظیم شد؛ مقدار secret در مستندات/خروجی درج نمی‌شود. کلید واقعی Soniox در env ورکر است. پروایدر همچنان Soniox و مدل stt-rt-v5 است؛ timeout/LanguageHints و سایر تنظیمات تغییر نکردند. adapter فعلی Authorization: Bearer می‌فرستد و ورکر پس از اعتبارسنجی، آن را برای upstream با کلید Soniox خودش جایگزین می‌کند؛ نیاز به هدر جدید/کد محصول/DB/migration نیست. health عمومی configured=true بود؛ مسیر صوت /stt است، نه /health. تغییر فقط فایل محلی است؛ push/deploy انجام نشده. اگر environment مقصد AI__Providers__Soniox__ApiKey/WebSocketUrl را override کند، تنظیمات محیطی بر فایل تقدم دارند.
+
 ## STT زنده وابسته به قابلیت پروایدر
 
 طبق درخواست کاربر، تبدیل هم‌زمان صحبت به متن با proxy WebSocket سمت بک‌اند اضافه شد. IRealtimeSpeechToTextService قابلیت اختیاری است؛ Soniox آن را دارد، providerهای دیگر و clientهای قدیمی مسیر batch موجود را حفظ می‌کنند. CandidateInterviewDto.speechCapabilities و GET speech/capabilities حالت انتخاب‌شده را می‌دهند؛ فرانت نباید از نام مدل/provider حدس بزند. کلید Soniox روی سرور می‌ماند. client با subprotocol غیر echo شده همان credential مصاحبه احراز می‌شود؛ querystring credential نداریم و Origin با FrontendUrl کنترل می‌شود. دسترسی/وضعیت/قفل/انقضا در جریان و قبل finalization از DB دوباره بررسی می‌شوند.
