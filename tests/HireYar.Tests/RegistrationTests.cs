@@ -55,7 +55,7 @@ public sealed class RegistrationTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.Send(HttpMethod.Post, "/api/auth/register", r)).StatusCode);
         await f.SignInAsync(b, r.Mobile);
         var later = (await (await b.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
-        Assert.Equal(me, later);
+        Assert.Equivalent(me, later, strict: true);
         Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Post, "/api/auth/refresh")).StatusCode);
     }
 

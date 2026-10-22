@@ -45,12 +45,14 @@ public static class DependencyInjection
         services.AddSingleton<IPhoneOtpSender>(s => new KavenegarOtpSender(
             new HttpClient { BaseAddress = new Uri("https://api.kavenegar.com/"), Timeout = TimeSpan.FromSeconds(10) },
             s.GetRequiredService<Microsoft.Extensions.Options.IOptions<KavenegarOptions>>()));
+        services.AddScoped<HireYar.Application.Organizations.IAccessControl, HireYar.Infrastructure.Organizations.AccessControl>();
         services.AddScoped<IAccounts, Accounts>();
         services.AddScoped<HireYar.Application.Administration.IAdminCustomers, HireYar.Infrastructure.Administration.AdminCustomers>();
         services.AddScoped<HireYar.Application.Administration.CustomerSubscriptionAdministration>();
         services.AddScoped<HireYar.Application.Sales.ISalesAccounts, HireYar.Infrastructure.Sales.SalesAccounts>();
         services.AddScoped<HireYar.Application.Sales.ISalesLeads, HireYar.Infrastructure.Sales.SalesLeads>();
         services.AddScoped<HireYar.Application.Sales.SalesService>();
+        services.AddScoped<HireYar.Infrastructure.Organizations.TeamInvitationEmail>();
         services.AddScoped<HireYar.Application.Organizations.ITeamMembers, HireYar.Infrastructure.Organizations.TeamMembers>();
         services.AddOptions<HireYar.Infrastructure.Support.TicketStorageOptions>().Bind(config.GetSection("TicketStorage"))
             .Validate(x => x.IsValid(), "TicketStorage requires a private dedicated ticket bucket, HTTPS service endpoint, region and credentials.");

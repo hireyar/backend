@@ -9,4 +9,5 @@ public interface ICurrentUser
     Guid UserId { get; }
     Guid OrganizationId { get; }
     OrganizationRole Role { get; }
+    bool CanAccess(string section, bool write = false) => Role == OrganizationRole.Owner;
 }

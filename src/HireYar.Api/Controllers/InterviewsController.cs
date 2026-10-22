@@ -18,7 +18,7 @@ public sealed class InterviewsController(InterviewManagementService service, IIn
         var media = await reviews.OpenSegmentAsync(id, number, ct);
         return PrivateVideo(media.Content, media.ContentType, $"recording-{id:N}-{number}", download, media.ContentHash);
     }
-    [Authorize(Roles = "Owner")]
+    [Authorize]
     [HttpPost("api/interviews/{id:guid}/decisions")]
     public Task<InterviewReviewEntryDto> Decide(Guid id, InterviewHumanDecisionRequest r, CancellationToken ct) => reviews.DecideAsync(id, r, ct);
     [HttpGet("api/interviews/{id:guid}/recording/video")]

@@ -32,6 +32,10 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<HireYar.Domain.Support.SupportTicket> SupportTickets => Set<HireYar.Domain.Support.SupportTicket>();
     public DbSet<HireYar.Domain.Support.TicketMessage> TicketMessages => Set<HireYar.Domain.Support.TicketMessage>();
     public DbSet<HireYar.Domain.Support.TicketAttachment> TicketAttachments => Set<HireYar.Domain.Support.TicketAttachment>();
+    public DbSet<AccessRole> AccessRoles => Set<AccessRole>();
+    public DbSet<AccessSection> AccessSections => Set<AccessSection>();
+    public DbSet<RoleSection> RoleSections => Set<RoleSection>();
+    public DbSet<AccessAudit> AccessAudits => Set<AccessAudit>();
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<JobPosition> JobPositions => Set<JobPosition>();
     public DbSet<InterviewTemplate> InterviewTemplates => Set<InterviewTemplate>();

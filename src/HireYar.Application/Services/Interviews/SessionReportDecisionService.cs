@@ -10,7 +10,7 @@ public sealed class SessionReportDecisionService(IApplicationDbContext db, ICurr
 {
     public async Task<ReportHumanReview> RecordAsync(Guid id, ReportDecisionRequest request, CancellationToken ct)
     {
-        if(user.Role!=OrganizationRole.Owner) throw new AppException(403,"forbidden","Only the owner may record a decision.");
+        if(!user.CanAccess("reports", true)) throw new AppException(403,"forbidden","Only the owner may record a decision.");
         if(request.RequestId==Guid.Empty || request.Decision is not ("advance" or "review" or "reject") || request.Note?.Length>2000 ||
             request.ReportFingerprint is null || request.ReportFingerprint.Length!=64 || !request.ReportFingerprint.All(Uri.IsHexDigit)) throw AppException.Invalid("report_decision_invalid");
         await db.WithOrganizationLockAsync(user.OrganizationId,async()=> {

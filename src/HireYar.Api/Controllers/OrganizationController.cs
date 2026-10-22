@@ -14,6 +14,6 @@ namespace HireYar.Api.Controllers;
 public sealed class OrganizationController(OrganizationService service) : ControllerBase
 {
     [HttpGet] public Task<OrganizationDto> Get(CancellationToken ct) => service.GetAsync(ct);
-    [Authorize(Roles = "Owner"), HttpPut] public Task<OrganizationDto> Update(OrganizationRequest r, CancellationToken ct) => service.UpdateAsync(r, ct);
+    [Authorize, HttpPut] public Task<OrganizationDto> Update(OrganizationRequest r, CancellationToken ct) => service.UpdateAsync(r, ct);
 }
 

@@ -10,7 +10,7 @@ public sealed class TicketService(IApplicationDbContext db, ICurrentUser user, T
     private const int MaxMessages = 200;
     private const long MaxTicketBytes = 100L * 1024 * 1024, MaxOrganizationBytes = 500L * 1024 * 1024;
     private IQueryable<SupportTicket> Scope(bool administrator) => administrator
-        ? db.SupportTickets : db.SupportTickets.Where(x => x.OrganizationId == user.OrganizationId);
+        ? db.SupportTickets : db.SupportTickets.Where(x => x.OrganizationId == user.OrganizationId && (user.CanAccess("tickets", true) || x.CreatedByUserId == user.UserId));
 
     private IQueryable<TicketDto> Dtos(IQueryable<SupportTicket> query) =>
         from t in query

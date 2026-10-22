@@ -76,7 +76,7 @@ public sealed class AuthTests(ApiFixture f)
         var reloaded = (await (await a.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
         Assert.Equal("نام تازه", reloaded.FullName); Assert.Equal("شرکت نمونه", reloaded.OrganizationName);
         var unchanged = (await (await other.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
-        Assert.Equal(before, unchanged);
+        Assert.Equivalent(before, unchanged, strict: true);
         Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Put, "/api/auth/me",
             new { fullName = "Changed", organizationName = "Wrong", organizationId = before.OrganizationId })).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.Browser().Send(HttpMethod.Put, "/api/auth/me", new NameRequest("Name", "Company"))).StatusCode);
@@ -90,7 +90,7 @@ public sealed class AuthTests(ApiFixture f)
         foreach (var invalid in new[] { "", "   ", "\t\n", new string('x', 201) })
             Assert.Equal(HttpStatusCode.BadRequest, (await a.Client.Send(HttpMethod.Put, "/api/auth/me", new NameRequest("Changed", invalid))).StatusCode);
         var after = (await (await a.Client.Send(HttpMethod.Get, "/api/auth/me")).Content.ReadFromJsonAsync<CurrentUserDto>(TestJson.Options))!;
-        Assert.Equal(before, after);
+        Assert.Equivalent(before, after, strict: true);
         Assert.Equal(HttpStatusCode.OK, (await a.Client.Send(HttpMethod.Put, "/api/auth/me", new NameRequest("Name", new string('x', 200)))).StatusCode);
     }
     [PostgresFact]
